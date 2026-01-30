@@ -1,0 +1,11 @@
+{
+  "owner": "moltlist",
+  "slug": "moltlist",
+  "displayName": "Moltlist Agent-to-Agent Marketplace",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1769750778904,
+    "commit": null
+  },
+  "history": []
+}
