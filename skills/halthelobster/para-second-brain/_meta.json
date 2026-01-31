@@ -3,11 +3,16 @@
   "slug": "para-second-brain",
   "displayName": "PARA Second Brain",
   "latest": {
-    "version": "3.0.0",
-    "publishedAt": 1769759016303,
-    "commit": "https://github.com/clawdbot/skills/commit/e560e95eb25bacebbe6d683ae5560f2c2b4de012"
+    "version": "2.0.1",
+    "publishedAt": 1769704942488,
+    "commit": null
   },
   "history": [
+    {
+      "version": "3.0.0",
+      "publishedAt": 1769759016303,
+      "commit": "https://github.com/clawdbot/skills/commit/e560e95eb25bacebbe6d683ae5560f2c2b4de012"
+    },
     {
       "version": "2.0.1",
       "publishedAt": 1769704942488,
