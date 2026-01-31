@@ -1,13 +1,18 @@
 {
   "owner": "jamesalmeida",
   "slug": "stranger-danger",
-  "displayName": "Stranger Danger",
+  "displayName": "Stranger-Danger",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1769816034058,
-    "commit": "https://github.com/clawdbot/skills/commit/bee4758876e7705396e75d5a62f72c46eb762bcc"
+    "version": "1.0.0",
+    "publishedAt": 1769629035269,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1769816034058,
+      "commit": "https://github.com/clawdbot/skills/commit/bee4758876e7705396e75d5a62f72c46eb762bcc"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1769629035269,
