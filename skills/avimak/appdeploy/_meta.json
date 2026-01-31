@@ -1,0 +1,11 @@
+{
+  "owner": "avimak",
+  "slug": "appdeploy",
+  "displayName": "AppDeploy",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1769893193220,
+    "commit": null
+  },
+  "history": []
+}
