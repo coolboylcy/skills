@@ -1,0 +1,11 @@
+{
+  "owner": "botond-rackhost",
+  "slug": "ansible-skill",
+  "displayName": "Ansible",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1769956578976,
+    "commit": null
+  },
+  "history": []
+}
