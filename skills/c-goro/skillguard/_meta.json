@@ -1,11 +1,17 @@
 {
   "owner": "c-goro",
   "slug": "skillguard",
-  "displayName": "SkillGuard — Agent Security Scanner",
+  "displayName": "SkillGuard",
   "latest": {
-    "version": "0.2.2",
-    "publishedAt": 1769891328754,
-    "commit": "https://github.com/clawdbot/skills/commit/5b69d68a31a1e2ec81270973e27a9f1396b2f69b"
+    "version": "1.0.1",
+    "publishedAt": 1769914559357,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.2.2",
+      "publishedAt": 1769891328754,
+      "commit": "https://github.com/clawdbot/skills/commit/5b69d68a31a1e2ec81270973e27a9f1396b2f69b"
+    }
+  ]
 }

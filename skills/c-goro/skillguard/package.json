@@ -1,6 +1,6 @@
 {
   "name": "skillguard",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "description": "Security scanner and auditor for AgentSkill packages",
   "type": "module",
   "main": "src/index.js",
