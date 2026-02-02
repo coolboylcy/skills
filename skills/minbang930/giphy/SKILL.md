@@ -15,45 +15,79 @@ Before using this skill, you need a Giphy API key:
 2. Sign up or log in
 3. Create a new app (select "API" not "SDK")
 4. Copy your API key
-5. Set the environment variable: `export GIPHY_API_KEY="your-api-key-here"`
+5. Add to OpenClaw config or set environment variable: `export GIPHY_API_KEY="your-api-key-here"`
 
-Alternatively, add it to your OpenClaw config or shell profile for persistence.
+### OpenClaw Config (Recommended)
+
+Add to `~/.openclaw/openclaw.json`:
+```json
+{
+  "skills": {
+    "entries": {
+      "giphy-gif": {
+        "apiKey": "your-api-key-here"
+      }
+    }
+  }
+}
+```
 
 ## Usage
 
-### Search for a GIF
+### Search and Send a GIF
 
-Use the `search_gif.py` script to find relevant GIFs:
+Use this one-liner to search and get a Giphy URL:
 
 ```bash
-python3 scripts/search_gif.py <search_query>
+# Basic search
+exec("QUERY='excited'; API_KEY=$(jq -r '.skills.entries.\"giphy-gif\".apiKey // env.GIPHY_API_KEY' ~/.openclaw/openclaw.json 2>/dev/null || echo \"$GIPHY_API_KEY\"); curl -s \"https://api.giphy.com/v1/gifs/search?api_key=${API_KEY}&q=$(printf '%s' \"$QUERY\" | jq -sRr @uri)&limit=1&rating=g\" | jq -r '.data[0].url // empty'")
 ```
 
-Example:
+### Practical Example
+
 ```bash
-python3 scripts/search_gif.py excited
-python3 scripts/search_gif.py happy dance
-python3 scripts/search_gif.py crying
-```
+# 1. Define your search query
+query="happy dance"
 
-The script returns a Giphy URL that Discord will automatically embed as a GIF.
+# 2. Get GIF URL using the helper function below
+gif_url=$(exec("QUERY='$query'; API_KEY=$(jq -r '.skills.entries.\"giphy-gif\".apiKey // env.GIPHY_API_KEY' ~/.openclaw/openclaw.json 2>/dev/null || echo \"$GIPHY_API_KEY\"); curl -s \"https://api.giphy.com/v1/gifs/search?api_key=${API_KEY}&q=$(printf '%s' \"$QUERY\" | jq -sRr @uri)&limit=1&rating=g\" | jq -r '.data[0].url // empty'"))
 
-### Sending GIFs in Discord
-
-When a GIF URL is obtained:
-
-1. Simply send the URL in the Discord channel
-2. Discord will automatically embed the GIF
-3. The GIF will display inline in the conversation
-
-Example workflow:
-```python
-# Search for a GIF
-gif_url = exec("python3 scripts/search_gif.py excited")
-
-# Send it to Discord (current channel)
+# 3. Send to Discord
 message(action="send", message=gif_url)
 ```
+
+### Simplified Helper Command
+
+For easier use, create this helper in your commands:
+
+```bash
+# Function to search GIF (copy this pattern)
+search_gif() {
+  local query="$1"
+  local api_key
+  
+  # Try OpenClaw config first, then env var
+  api_key=$(jq -r '.skills.entries."giphy-gif".apiKey // empty' ~/.openclaw/openclaw.json 2>/dev/null)
+  [[ -z "$api_key" ]] && api_key="$GIPHY_API_KEY"
+  
+  if [[ -z "$api_key" ]]; then
+    echo "Error: GIPHY_API_KEY not configured" >&2
+    return 1
+  fi
+  
+  # URL encode and search
+  local encoded_query=$(printf '%s' "$query" | jq -sRr @uri)
+  curl -s "https://api.giphy.com/v1/gifs/search?api_key=${api_key}&q=${encoded_query}&limit=1&rating=g&lang=en" | jq -r '.data[0].url // empty'
+}
+
+# Usage:
+# gif_url=$(search_gif "excited")
+# message(action="send", message="$gif_url")
+```
+
+### Discord Auto-Embed
+
+When you send a Giphy URL to Discord, it will automatically embed as an animated GIF. No additional steps needed.
 
 ## When to Use
 
@@ -103,8 +137,9 @@ Be thoughtful about when to send GIFs to maintain natural conversation flow:
   - Beta keys: 100 requests per hour
   - Production keys: Higher limits available
 - Response format: Giphy page URLs (Discord auto-embeds)
-- Language: Python 3 (no external dependencies beyond stdlib)
+- Dependencies: `bash`, `curl`, `jq` (standard on Linux/macOS/WSL)
 - Default rating: 'g' (safe for work)
+- API key priority: OpenClaw config → Environment variable
 
 ## API Key Tiers
 
@@ -112,3 +147,16 @@ Be thoughtful about when to send GIFs to maintain natural conversation flow:
 - **Production Key**: Higher limits, requires approval for specific use cases
 
 Get started with a free beta key at [developers.giphy.com](https://developers.giphy.com/).
+
+## Troubleshooting
+
+**"Unauthorized" error:**
+- Check API key is set correctly in `~/.openclaw/openclaw.json` or `$GIPHY_API_KEY`
+- Verify key is valid at Giphy dashboard
+
+**No GIF returned:**
+- Try a different search term
+- Check API rate limits (100/hour for beta keys)
+
+**jq not found:**
+- Install jq: `sudo apt install jq` (Linux) or `brew install jq` (macOS)
