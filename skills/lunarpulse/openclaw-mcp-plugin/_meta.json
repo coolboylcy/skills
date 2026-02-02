@@ -1,0 +1,11 @@
+{
+  "owner": "lunarpulse",
+  "slug": "openclaw-mcp-plugin",
+  "displayName": "Mcp Integration",
+  "latest": {
+    "version": "0.1.1",
+    "publishedAt": 1770028935207,
+    "commit": null
+  },
+  "history": []
+}
