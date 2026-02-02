@@ -3,9 +3,15 @@
   "slug": "section11",
   "displayName": "Section 11: Endurance Training Coach (Intervals.icu)",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1769876581010,
-    "commit": "https://github.com/clawdbot/skills/commit/b7ef940a4d2e081a8baeae65c647a8eb3bd8af48"
+    "version": "1.0.3",
+    "publishedAt": 1770060067417,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1769876581010,
+      "commit": "https://github.com/clawdbot/skills/commit/b7ef940a4d2e081a8baeae65c647a8eb3bd8af48"
+    }
+  ]
 }
