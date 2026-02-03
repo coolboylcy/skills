@@ -3,9 +3,15 @@
   "slug": "typeform",
   "displayName": "Typeform",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1770023926054,
-    "commit": "https://github.com/clawdbot/skills/commit/9dd64a8933d5506a5f9f853a7d2c0c3ed399d5d6"
+    "version": "1.0.1",
+    "publishedAt": 1770117405466,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770023926054,
+      "commit": "https://github.com/clawdbot/skills/commit/9dd64a8933d5506a5f9f853a7d2c0c3ed399d5d6"
+    }
+  ]
 }
