@@ -1,0 +1,11 @@
+{
+  "owner": "alphafactor",
+  "slug": "channel",
+  "displayName": "WeChat OA Channel",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770106699832,
+    "commit": null
+  },
+  "history": []
+}
