@@ -1,20 +1,24 @@
 ---
 name: ez-google
-description: Google Workspace tools for Gmail, Calendar, Drive, Docs, Sheets, Slides, Contacts, and Chat.
+description: Use when asked to send email, check inbox, read emails, check calendar, schedule meetings, create events, search Google Drive, create Google Docs, read or write spreadsheets, find contacts, or any task involving Gmail, Google Calendar, Drive, Docs, Sheets, Slides, or Contacts. Agent-friendly with hosted OAuth - no API keys needed.
 metadata: {"openclaw":{"emoji":"📧"}}
 ---
 
 # ez-google
 
+Agent-friendly Google Workspace tools. Simple CLI scripts with hosted OAuth - users just click a link and paste back a token. No API keys or credentials needed.
+
+**Run all commands with:** `uv run scripts/<script>.py <command> [args]`
+
 ## Auth (do this first)
 
 ```bash
-uv run scripts/auth.py status        # Check: AUTHENTICATED or NOT_AUTHENTICATED
-uv run scripts/auth.py login         # Get URL → send to user
-uv run scripts/auth.py complete 'URL'  # User pastes redirect URL back
+auth.py status        # Check: AUTHENTICATED or NOT_AUTHENTICATED
+auth.py login         # Get URL → send to user
+auth.py save '<TOKEN>'  # Save token from hosted OAuth
 ```
 
-**Auth flow:** `login` → user clicks link → user pastes URL back → `complete 'URL'`
+**Auth flow:** `status` → if not authenticated → `login` → user clicks link, copies token → `save '<TOKEN>'`
 
 ---
 
@@ -27,6 +31,17 @@ gmail.py get MESSAGE_ID              # Read email
 gmail.py send "to" "subject" "body"  # Send email
 gmail.py draft "to" "subject" "body" # Create draft
 gmail.py labels                      # List labels
+
+# Bulk operations (up to 1000 messages per API call)
+gmail.py bulk-label "query" --add LABEL --remove LABEL  # Add/remove labels
+gmail.py bulk-trash "query" [-y]     # Move to trash (use -y to skip confirmation)
+```
+
+**Bulk examples:**
+```bash
+gmail.py bulk-label "from:newsletter@example.com" --add ARCHIVE --remove INBOX
+gmail.py bulk-trash "subject:alert older_than:30d" -y
+gmail.py bulk-label "category:promotions" --add Label_3  # Use label IDs from `labels`
 ```
 
 ## Calendar
@@ -99,7 +114,5 @@ chat.py get SPACE_ID                 # Space details
 ```
 
 ---
-
-All commands: `uv run scripts/<script>.py <command> [args]`
 
 Note: After adding new services, run `auth.py logout` then `login` again to grant new permissions.
