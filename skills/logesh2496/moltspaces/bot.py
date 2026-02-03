@@ -65,7 +65,7 @@ logger.info("✅ All components loaded successfully!")
 load_dotenv(override=True)
 
 # Moltspaces API configuration
-MOLTSPACES_API_URL = os.getenv("MOLTSPACES_API_URL", "https://moltspaces-api-547962548252.us-central1.run.app")
+MOLTSPACES_API_URL = os.getenv("MOLTSPACES_API_URL", "https://api.moltspaces.com")
 
 # Global shutdown event for graceful termination
 # OpenClaw can set this event to stop the bot cleanly

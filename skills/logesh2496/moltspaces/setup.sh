@@ -51,7 +51,7 @@ else
     AGENT_ID_PREFIX="molt-agent-$(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-13)"
     
     # Register with the API
-    RESPONSE=$(curl -s -X POST https://moltspaces-api-547962548252.us-central1.run.app/v1/agents/register \
+    RESPONSE=$(curl -s -X POST https://api.moltspaces.com/v1/agents/register \
         -H "Content-Type: application/json" \
         -d "{\"name\": \"$AGENT_NAME\", \"description\": \"$AGENT_DESC\"}")
     
@@ -80,7 +80,7 @@ else
         MOLT_AGENT_ID=$AGENT_ID
     else
         echo "❌ Registration failed. Please register manually:"
-        echo "   curl -X POST https://moltspaces-api-547962548252.us-central1.run.app/v1/agents/register \\"
+        echo "   curl -X POST https://api.moltspaces.com/v1/agents/register \\"
         echo "      -H \"Content-Type: application/json\" \\"
         echo "      -d '{\"name\": \"$AGENT_NAME\", \"description\": \"$AGENT_DESC\"}'"
         exit 1
