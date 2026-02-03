@@ -108,6 +108,61 @@ function convertBlocksToMarkdown(blocks) {
   return md.join('\n\n');
 }
 
+async function appendDocxContent(documentId, content, accessToken) {
+  // 1. Convert markdown content to Feishu blocks
+  const blocks = convertMarkdownToBlocks(content);
+  
+  // 2. Append to the end of the document (root block)
+  // POST https://open.feishu.cn/open-apis/docx/v1/documents/{document_id}/blocks/{block_id}/children
+  // Use documentId as block_id to append to root
+  const url = `https://open.feishu.cn/open-apis/docx/v1/documents/${documentId}/blocks/${documentId}/children`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json; charset=utf-8'
+    },
+    body: JSON.stringify({
+      children: blocks,
+      index: -1 // Append to end
+    })
+  });
+
+  const data = await response.json();
+  if (data.code !== 0) {
+    throw new Error(`Failed to append to docx: ${data.msg}`);
+  }
+  
+  return { success: true, appended_blocks: data.data.children };
+}
+
+function convertMarkdownToBlocks(markdown) {
+  // Simple parser: split by newlines, treat # as headers, others as text
+  // For robustness, this should be a real parser. Here we implement a basic one.
+  const lines = markdown.split('\n');
+  const blocks = [];
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    
+    if (trimmed.startsWith('# ')) {
+      blocks.push({ block_type: 3, heading1: { elements: [{ text_run: { content: trimmed.substring(2) } }] } });
+    } else if (trimmed.startsWith('## ')) {
+      blocks.push({ block_type: 4, heading2: { elements: [{ text_run: { content: trimmed.substring(3) } }] } });
+    } else if (trimmed.startsWith('### ')) {
+      blocks.push({ block_type: 5, heading3: { elements: [{ text_run: { content: trimmed.substring(4) } }] } });
+    } else if (trimmed.startsWith('- ')) {
+      blocks.push({ block_type: 12, bullet: { elements: [{ text_run: { content: trimmed.substring(2) } }] } });
+    } else {
+      // Default to text (paragraph)
+      blocks.push({ block_type: 2, text: { elements: [{ text_run: { content: line } }] } });
+    }
+  }
+  return blocks;
+}
+
 function parseText(blockData) {
   if (!blockData || !blockData.elements) return "";
   
@@ -132,5 +187,6 @@ function parseText(blockData) {
 }
 
 module.exports = {
-  fetchDocxContent
+  fetchDocxContent,
+  appendDocxContent
 };

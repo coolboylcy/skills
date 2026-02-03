@@ -1,14 +1,33 @@
 const { getTenantAccessToken } = require('./lib/auth');
 const { resolveWiki } = require('./lib/wiki');
-const { fetchDocxContent } = require('./lib/docx');
+const { fetchDocxContent, appendDocxContent } = require('./lib/docx');
 const { fetchSheetContent } = require('./lib/sheet');
 const { fetchBitableContent } = require('./lib/bitable');
 const fs = require('fs');
 const path = require('path');
+const { promises: fsPromises } = fs;
 
 const CACHE_DIR = path.join(__dirname, 'cache');
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const EXECUTION_TIMEOUT_MS = 30000; // 30 seconds hard timeout
+
+async function executeWithAuthRetry(operation) {
+    let token = await getTenantAccessToken();
+    try {
+        return await operation(token);
+    } catch (e) {
+        const msg = e.message || '';
+        const isAuthError = msg.includes('9999166') || 
+                           (msg.toLowerCase().includes('token') && (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('expire')));
+        
+        if (isAuthError) {
+            console.error(`[Feishu-Doc] Auth Error (${msg}). Refreshing token...`);
+            token = await getTenantAccessToken(true);
+            return await operation(token);
+        }
+        throw e;
+    }
+}
 
 async function main() {
   // Set a global watchdog timeout
@@ -24,8 +43,8 @@ async function main() {
   const url = args[1];
   const noCache = args.includes('--no-cache');
 
-  if (command !== 'fetch') {
-    console.log(JSON.stringify({ error: "Usage: node index.js fetch <url> [--no-cache]", status: "usage_error" }));
+  if (command !== 'fetch' && command !== 'append') {
+    console.log(JSON.stringify({ error: "Usage: node index.js <fetch|append> <url> [options]", status: "usage_error" }));
     process.exit(1);
   }
 
@@ -38,12 +57,13 @@ async function main() {
     // Ensure cache dir exists
     if (!fs.existsSync(CACHE_DIR)) {
       fs.mkdirSync(CACHE_DIR, { recursive: true });
-    } else {
-      // Probabilistic cleanup (10% chance) to prevent infinite growth
-      // We do this BEFORE fetching to keep the disk tidy.
-      if (Math.random() < 0.1) {
-        cleanCache();
-      }
+    }
+
+    // Optimization: Run cleanup concurrently with logic (latency masking)
+    // Only run probabilistic cleanup (10%)
+    let cleanupPromise = Promise.resolve();
+    if (Math.random() < 0.1) {
+       cleanupPromise = cleanCacheAsync().catch(err => console.error(`[Cleanup Warning] ${err.message}`));
     }
 
     // Attempt cache read
@@ -55,30 +75,76 @@ async function main() {
     const cacheFile = path.join(CACHE_DIR, `${cacheKey}.json`);
 
     if (!noCache && fs.existsSync(cacheFile)) {
-      const stats = fs.statSync(cacheFile);
-      const age = Date.now() - stats.mtimeMs;
-      
-      if (age < CACHE_TTL_MS) {
-        // Cache hit
-        const cachedData = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-        cachedData._source = "cache";
-        cachedData._cachedAt = stats.mtime;
-        console.log(JSON.stringify(cachedData, null, 2));
-        clearTimeout(watchdog);
-        return;
+      try {
+        const stats = fs.statSync(cacheFile);
+        const age = Date.now() - stats.mtimeMs;
+        
+        if (age < CACHE_TTL_MS) {
+          // Cache hit
+          const raw = fs.readFileSync(cacheFile, 'utf8');
+          const cachedData = JSON.parse(raw);
+          cachedData._source = "cache";
+          cachedData._cachedAt = stats.mtime;
+          console.log(JSON.stringify(cachedData, null, 2));
+          
+          // Wait for cleanup before exiting (since we are fast anyway)
+          await cleanupPromise;
+          clearTimeout(watchdog);
+          return;
+        }
+      } catch (cacheErr) {
+        // Stability: Handle corrupt cache gracefully
+        console.error(`[Cache Error] Corrupt file detected, deleting: ${cacheErr.message}`);
+        try { fs.unlinkSync(cacheFile); } catch(e){}
       }
     }
 
-    const accessToken = await getTenantAccessToken();
-    const result = await processUrl(url, accessToken);
+    const result = await executeWithAuthRetry(async (token) => {
+        if (command === 'append') {
+            const contentIdx = args.indexOf('--content');
+            if (contentIdx === -1) throw new Error("Missing --content argument");
+            const content = args[contentIdx + 1];
+            
+            const wikiRegex = /\/wiki\/([a-zA-Z0-9]+)/;
+            const docxRegex = /\/docx\/([a-zA-Z0-9]+)/;
+            let id = '';
+            let type = 'docx'; // Default assumption if plain token
+            
+            if (wikiRegex.test(url)) {
+                 const wikiToken = url.match(wikiRegex)[1];
+                 const wikiInfo = await resolveWiki(wikiToken, token);
+                 if (wikiInfo) { id = wikiInfo.obj_token; type = wikiInfo.obj_type; }
+            } else if (docxRegex.test(url)) {
+                 id = url.match(docxRegex)[1];
+            } else if (url.match(/^[a-zA-Z0-9]{10,}$/)) {
+                 id = url;
+            } else {
+                 throw new Error("Invalid URL or Token");
+            }
+            
+            if (type !== 'docx') throw new Error(`Append only supported for docx (got ${type})`);
+            return await appendDocxContent(id, content, token);
+        }
+        return await processUrl(url, token);
+    });
     
-    // Save to cache
+    // Save to cache (Atomic)
     if (result && !result.error) {
-       fs.writeFileSync(cacheFile, JSON.stringify(result, null, 2));
+       const tempFile = `${cacheFile}.tmp.${Date.now()}`;
+       try {
+           fs.writeFileSync(tempFile, JSON.stringify(result, null, 2));
+           fs.renameSync(tempFile, cacheFile);
+       } catch (writeErr) {
+           console.error(`[Cache Write Error] ${writeErr.message}`);
+           try { fs.unlinkSync(tempFile); } catch(e){}
+       }
     }
 
     // Output JSON result
     console.log(JSON.stringify(result, null, 2));
+
+    // Ensure cleanup is done (usually instant if started early)
+    await cleanupPromise;
 
   } catch (error) {
     console.log(JSON.stringify({ error: error.message, stack: error.stack, status: "failed" }));
@@ -150,28 +216,29 @@ async function processUrl(url, accessToken) {
   }
 }
 
-function cleanCache() {
+async function cleanCacheAsync() {
   try {
-    const files = fs.readdirSync(CACHE_DIR);
+    const files = await fsPromises.readdir(CACHE_DIR);
     const now = Date.now();
     // Delete files older than 1 hour (3600000 ms)
     const MAX_AGE = 60 * 60 * 1000;
     
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
-      // Skip token.json if it exists here (though it should be in cache/token.json, better safe)
-      if (file === 'token.json') continue;
+    // Process files in parallel chunks or just all at once (since just unlink)
+    // Use Promise.allSettled to ensure one failure doesn't stop others
+    await Promise.allSettled(files.map(async (file) => {
+      if (!file.endsWith('.json')) return;
+      if (file === 'token.json') return;
 
       const filePath = path.join(CACHE_DIR, file);
       try {
-        const stats = fs.statSync(filePath);
+        const stats = await fsPromises.stat(filePath);
         if (now - stats.mtimeMs > MAX_AGE) {
-           fs.unlinkSync(filePath);
+           await fsPromises.unlink(filePath);
         }
       } catch (e) {
-        // Ignore individual file errors
+        // Ignore individual file errors (file might be gone)
       }
-    }
+    }));
   } catch (err) {
     // Ignore directory scan errors
   }
