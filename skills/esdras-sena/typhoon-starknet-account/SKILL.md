@@ -102,6 +102,8 @@ node ~/Documents/typhoon-starknet-account/scripts/show-address.js 0
 | `simulate.js` | Preflight simulate for a call/multicall |
 | `token-info.js` | Token metadata (decodes felt short strings) |
 | `decode-felt.js` | Decode felt short strings |
+| `sign-typed-data.js` | Sign typedData (for SIWS / Starkbook-style auth) |
+| `sign-invoke-tx.js` | Sign an INVOKE transaction (one or more calls) without broadcasting |
 
 ---
 , "argent"
@@ -165,6 +167,73 @@ node ~/Documents/typhoon-starknet-account/scripts/simulate.js '{"privateKeyPath"
 Single write:
 ```bash
 node ~/Documents/typhoon-starknet-account/scripts/invoke-contract.js '{"privateKeyPath":"...","accountAddress":"0x...","contractAddress":"0x...","method":"...","args":[...]}'
+```
+
+---
+
+## Sign typedData (for Starkbook / SIWS)
+
+When you need a Starknet account to sign a SIWS challenge (typedData) **without ever exposing the private key**, use:
+
+```bash
+node ~/Documents/typhoon-starknet-account/scripts/sign-typed-data.js '{
+  "accountAddress":"0x...",
+  "typedData": { "domain": { }, "types": { }, "primaryType": "Message", "message": { } }
+}'
+```
+
+Or if you saved the typedData to a file:
+
+```bash
+node ~/Documents/typhoon-starknet-account/scripts/sign-typed-data.js '{
+  "accountAddress":"0x...",
+  "typedDataPath":"/tmp/typedData.json"
+}'
+```
+
+Output is a signature array (hex strings) that can be submitted to verification endpoints (e.g. Starkbook `/api/auth/verify`).
+
+---
+
+## Sign an INVOKE transaction (no broadcast)
+
+To sign a transaction **without sending it**, use:
+
+```bash
+node ~/Documents/typhoon-starknet-account/scripts/sign-invoke-tx.js '{
+  "accountAddress":"0x...",
+  "calls":[
+    {"contractAddress":"0xTOKEN","entrypoint":"transfer","calldata":["0xTO","<uint256_low>","<uint256_high>"]}
+  ]
+}'
+```
+
+Or with ABI args (the script will fetch ABI and compile calldata for you):
+
+```bash
+node ~/Documents/typhoon-starknet-account/scripts/sign-invoke-tx.js '{
+  "accountAddress":"0x...",
+  "calls":[
+    {"contractAddress":"0xTOKEN","method":"transfer","args":["0xTO","123"]}
+  ]
+}'
+```
+
+This returns an `invokeTransaction` payload suitable for RPC `starknet_addInvokeTransaction` (signature included) plus a fee estimate.
+
+⚠️ Not broadcast: this script only signs. To actually send, you must submit the payload to an RPC endpoint (and you should confirm before broadcasting).
+
+### Starkbook end-to-end helper (recommended)
+If you want a single command that does challenge → sign locally → verify → (optional) post **without Starkbook ever touching a private key**:
+
+```bash
+node ~/Documents/typhoon-starknet-account/scripts/starkbook-client.js '{
+  "base":"http://localhost:3000",
+  "accountAddress":"0x...",
+  "action":"post",
+  "body":"hello from agent",
+  "linkUrl":"https://example.com"
+}'
 ```
 
 Approve + action in one tx:

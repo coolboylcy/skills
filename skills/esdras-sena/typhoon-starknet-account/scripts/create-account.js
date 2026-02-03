@@ -8,7 +8,7 @@
  * ERRORS: JSON to stderr
  */
 
-import { stark, hash, ec } from 'starknet';
+import { stark, hash, ec, Provider } from 'starknet';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -17,6 +17,7 @@ import { TyphoonSDK } from 'typhoon-sdk';
 
 const ARGENTX_CLASS_HASH = '0x036078334509b514626504edc9fb252328d1a240e4e948bef8d0c08dff45927f';
 const SECRETS_DIR = path.join(os.homedir(), '.openclaw', 'secrets', 'starknet');
+const RPC_URL = 'https://rpc.starknet.lava.build:443';
 
 function fail(message, stack) {
   console.error(JSON.stringify({ error: message, stack }));
@@ -135,10 +136,25 @@ async function main() {
   // Deploy via Typhoon
   await sdk.withdraw_to_anonymous_bot(keypair.publicKey, notes[0].txHash);
 
+  // Capture latest block AFTER deployment (best-effort provenance)
+  let latestBlock = null;
+  try {
+    const provider = new Provider({ nodeUrl: RPC_URL });
+    const b = await provider.getBlock('latest');
+    latestBlock = {
+      blockNumber: b.block_number,
+      blockHash: b.block_hash,
+      timestamp: b.timestamp,
+    };
+  } catch {
+    // ignore
+  }
+
   // Update artifact as deployed
   const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf-8'));
   artifact.deployed = true;
   artifact.deployedAt = new Date().toISOString();
+  artifact.deployedLatestBlock = latestBlock;
   fs.writeFileSync(artifactPath, JSON.stringify(artifact, null, 2), { mode: 0o600 });
 
   // Output result
@@ -149,6 +165,7 @@ async function main() {
     privateKeyPath: path.join(SECRETS_DIR, `${address}.key`),
     artifactPath,
     deployed: true,
+    deployedLatestBlock: latestBlock,
     explorer: `https://voyager.online/contract/${address}`,
   }));
 }

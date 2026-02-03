@@ -18,12 +18,12 @@ function fail(message) {
 }
 
 async function main() {
-  const raw = process.argv[2];
-  if (!raw) fail('No input.');
+  const rawInput = process.argv[2];
+  if (!rawInput) fail('No input.');
 
   let input;
   try {
-    input = JSON.parse(raw);
+    input = JSON.parse(rawInput);
   } catch (e) {
     fail(`JSON parse error: ${e.message}`);
   }
@@ -37,8 +37,43 @@ async function main() {
   if (!classResponse.abi) fail('Contract has no ABI on chain.');
 
   const contract = new Contract({ abi: classResponse.abi, address: input.contractAddress, provider });
+
+  // starknet.js decoding via ABI (nice when it works)
   const result = await contract.call(input.method, input.args || []);
   const serialized = serialize(result);
+
+  // Raw call fallback (avoids occasional ABI decode edge-cases)
+  let rawResult = null;
+  try {
+    const r = await provider.callContract({
+      contractAddress: input.contractAddress,
+      entrypoint: input.method,
+      calldata: (input.args || []).map(String),
+    });
+    rawResult = Array.isArray(r) ? r : (r?.result || null);
+  } catch {
+    // ignore
+  }
+
+  // If ABI-decoded result looks wrong (common symptom: "0"), try to decode uint256 from raw.
+  let uint256 = null;
+  if (rawResult && Array.isArray(rawResult) && rawResult.length === 2) {
+    try {
+      const low = BigInt(rawResult[0]);
+      const high = BigInt(rawResult[1]);
+      const v = low + (high << 128n);
+      // Only treat as uint256 if it's nonzero OR ABI-decoded already produced an object/array.
+      if (v !== 0n || typeof serialized !== 'string' || serialized !== '0') {
+        uint256 = {
+          low: String(rawResult[0]),
+          high: String(rawResult[1]),
+          value: v.toString(),
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   // Optional decoding helper for felt252 short strings (name/symbol, etc.)
   const decodeShortStrings = input.decodeShortStrings === true;
@@ -49,6 +84,8 @@ async function main() {
     method: input.method,
     contractAddress: input.contractAddress,
     result: serialized,
+    raw: rawResult,
+    uint256,
     decoded,
   }));
 }

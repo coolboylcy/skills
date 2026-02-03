@@ -21,8 +21,12 @@ import fs from 'fs';
 
 const RPC_URL = 'https://rpc.starknet.lava.build:443';
 
-function fail(message) {
-  console.error(JSON.stringify({ error: message }));
+function jsonStringifySafe(obj) {
+  return JSON.stringify(obj, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
+}
+
+function fail(message, stack) {
+  console.error(jsonStringifySafe({ error: message, stack }));
   process.exit(1);
 }
 
@@ -75,11 +79,11 @@ async function main() {
 
   const estimate = await account.estimateInvokeFee(populatedCalls);
 
-  console.log(JSON.stringify({
+  console.log(jsonStringifySafe({
     success: true,
     callCount: input.calls.length,
     estimate,
   }));
 }
 
-main().catch((err) => fail(err.message));
+main().catch((err) => fail(err?.message || String(err), err?.stack));
