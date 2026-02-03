@@ -186,6 +186,67 @@ def delete_event(event_id):
     print(f"Deleted event with ID: {event_id}")
     return True
 
+def daily_summary():
+    """Generate daily summary of today's events"""
+    today = datetime.now()
+    today_str = today.strftime("%Y-%m-%d")
+    weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    weekday = weekday_names[today.weekday()]
+    
+    events = load_events()
+    today_events = [e for e in events if e.get('date') == today_str]
+    today_events.sort(key=lambda x: x.get('time', '00:00'))
+    
+    # Format date in Chinese
+    formatted_date = today.strftime("%Y年%m月%d日")
+    
+    if not today_events:
+        return {
+            "date": formatted_date,
+            "weekday": weekday,
+            "count": 0,
+            "events": [],
+            "message": f"📅 {formatted_date} {weekday}\n\n今天没有安排任何日程，祝您有愉快的一天！"
+        }
+    
+    event_list = []
+    for event in today_events:
+        event_info = {
+            "title": event.get('title', '未命名'),
+            "time": event.get('time', '全天'),
+            "location": event.get('location', ''),
+            "description": event.get('description', '')
+        }
+        event_list.append(event_info)
+    
+    # Build message
+    message = f"📅 {formatted_date} {weekday}\n"
+    message += f"\n今日共有 {len(today_events)} 个日程：\n"
+    
+    for i, event in enumerate(today_events, 1):
+        time = event.get('time', '全天')
+        title = event.get('title', '未命名')
+        location = event.get('location', '')
+        description = event.get('description', '')
+        
+        message += f"\n{i}. {title}"
+        message += f"\n   ⏰ {time}"
+        if location:
+            message += f"\n   📍 {location}"
+        if description and description != title:
+            desc = description[:50] + '...' if len(description) > 50 else description
+            message += f"\n   📝 {desc}"
+    
+    message += "\n\n祝您今天顺利！"
+    
+    return {
+        "date": formatted_date,
+        "weekday": weekday,
+        "count": len(today_events),
+        "events": event_list,
+        "message": message
+    }
+
 def main():
     parser = argparse.ArgumentParser(description='Calendar management tool')
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
@@ -225,6 +286,9 @@ def main():
     delete_parser = subparsers.add_parser('delete', help='Delete an event')
     delete_parser.add_argument('--id', required=True, help='Event ID')
     
+    # Daily summary command
+    summary_parser = subparsers.add_parser('daily-summary', help='Show daily summary of today\'s events')
+    
     args = parser.parse_args()
     
     if args.command == 'list':
@@ -254,6 +318,9 @@ def main():
         )
     elif args.command == 'delete':
         delete_event(args.id)
+    elif args.command == 'daily-summary':
+        result = daily_summary()
+        print(result['message'])
     else:
         parser.print_help()
 

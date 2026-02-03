@@ -91,6 +91,19 @@ def process_message(user_input):
                     "response": f"❌ 获取事件列表失败：{result['error']}",
                     "error": True
                 }
+        elif intent == 'daily_summary':
+            from intent_handler import get_daily_summary
+            result = get_daily_summary()
+            if result["success"]:
+                return {
+                    "response": result['summary'],
+                    "completed": True
+                }
+            else:
+                return {
+                    "response": f"❌ 获取今日日程失败：{result['error']}",
+                    "error": True
+                }
         else:
             # For other intents, return a message saying it's detected but not fully implemented
             return {
@@ -158,6 +171,23 @@ def handle_followup(user_input, context):
                 "response": f"❌ 创建事件失败：{result['error']}",
                 "error": True
             }
+    
+    # Check if user is acknowledging a reminder
+    user_input_lower = user_input.lower()
+    ack_indicators = ['知道了', 'ok', '收到', 'okay', 'ack', 'acknowledged', 'yes', '确认', '确定', '已知悉']
+    
+    if any(indicator.lower() in user_input_lower for indicator in ack_indicators):
+        # Run the acknowledgment processor
+        import subprocess
+        import os
+        script_path = "/home/ubuntu/.openclaw/workspace/calendar_app/process_acknowledgment.py"
+        result = subprocess.run([sys.executable, script_path, user_input], capture_output=True, text=True)
+        print(f"Acknowledgment processed: {result.stdout.strip()}")
+        
+        return {
+            "response": "✅ 好的，已确认您收到了提醒",
+            "acknowledged": True
+        }
     
     return {"response": "抱歉，我不清楚您这条消息的上下文。"}
 

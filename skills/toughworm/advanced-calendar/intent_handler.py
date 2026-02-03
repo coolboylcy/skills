@@ -22,12 +22,19 @@ def detect_calendar_intent(user_input):
     update_keywords = ['更新', '修改', '更改', 'change', 'update', 'modify', 'edit']
     delete_keywords = ['删除', '取消', 'remove', 'delete', 'cancel']
     list_keywords = ['查看', '显示', '列出', 'list', 'show', 'find', 'search', '查询']
+    summary_keywords = ['今天日程', '今天安排', '今天有什么', '今日日程', '日程总结', 'daily summary', 'today schedule', 'what do i have today', '我今天', 'summary', '每日总结', '早上提醒', 'morning reminder', '设置每日提醒', 'schedule daily summary']
     
     intent = None
     confidence = 0
     
-    # Check for create intent
-    for keyword in create_keywords:
+    # Check for daily summary intent first (more specific)
+    for keyword in summary_keywords:
+        if keyword in user_input_lower:
+            intent = 'daily_summary'
+            confidence = 0.9
+            return intent, confidence
+    
+    # Check for create intent    for keyword in create_keywords:
         if keyword in user_input_lower:
             intent = 'create'
             confidence = 0.8
@@ -180,11 +187,42 @@ def extract_location_from_text(text):
     
     return ""
 
+def get_daily_summary():
+    """
+    Get daily summary of today's events
+    """
+    cmd = [
+        "/home/ubuntu/.openclaw/workspace/skills/calendar/scripts/calendar.sh",
+        "daily-summary"
+    ]
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            return {
+                "success": True,
+                "summary": result.stdout
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.stderr
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 def handle_calendar_intent(user_input, intent_type):
     """
     Handle calendar intents based on detected intent
     """
-    if intent_type == 'create':
+    if intent_type == 'daily_summary':
+        # Get daily summary
+        return get_daily_summary()
+    
+    elif intent_type == 'create':
         # Extract information from text
         date, time = parse_datetime_from_text(user_input)
         duration = parse_duration_from_text(user_input)

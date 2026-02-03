@@ -19,9 +19,10 @@ A comprehensive calendar system with natural language processing, automatic remi
 - **Interactive Creation**: When information is incomplete, the system asks for what it needs
 - **Automatic Reminders**: Sends WhatsApp notifications at your preferred time before events
 - **Flexible Reminders**: Set reminders minutes, hours, or days in advance
+- **Daily Summary**: Built-in daily summary feature - get a complete overview of today's schedule every morning
 - **Complete CRUD Operations**: Create, read, update, delete calendar events
 - **Local Storage**: All data stored locally, no external dependencies
-- **Cron Integration**: Automatic reminder checking every 5 minutes
+- **Cron Integration**: Automatic reminder checking every 5 minutes and optional daily morning summary
 
 ## Installation
 
@@ -62,6 +63,9 @@ calendar update --id EVENT_ID [--title TITLE] [--date YYYY-MM-DD] [--time HH:MM]
 
 # Delete an event
 calendar delete --id EVENT_ID
+
+# Daily summary
+calendar daily-summary
 ```
 
 ### Integration
@@ -97,21 +101,70 @@ User: "What do I have scheduled this week?"
 System: [Lists all events for the next 7 days]
 ```
 
+### Daily Summary
+```
+User: "Show me my schedule for today"
+System: 📅 2026年02月03日 周二
+
+      今日共有 3 个日程：
+
+      1. 团队会议
+         ⏰ 09:00
+         📍 总部会议室
+
+      2. 客户午餐
+         ⏰ 12:30
+         📍 赛特大厦
+
+      3. 项目汇报
+         ⏰ 15:00
+         📝 季度项目进展汇报
+
+      祝您今天顺利！
+```
+
+### Automated Daily Summary (Optional)
+You can configure automatic daily summaries to be sent every morning at 9:00 AM:
+
+```bash
+# Via OpenClaw Cron - add this job to send daily summary automatically
+openclaw cron add \
+  --name "daily-calendar-summary" \
+  --schedule "0 9 * * *" \
+  --command "calendar daily-summary"
+```
+
+Or via natural language:
+```
+User: "Set up a daily reminder every morning at 9am with my calendar summary"
+System: ✅ Daily summary scheduled for 9:00 AM every day
+```
+
 ## Architecture
 
 - **Natural Language Processor**: Interprets human language into calendar events
-- **Intent Detection**: Identifies whether user wants to create, list, update, or delete events
+- **Intent Detection**: Identifies whether user wants to create, list, update, delete, or get daily summary of events
 - **Information Extraction**: Parses dates, times, durations, locations, and reminders from text
 - **Interactive Handler**: Manages conversations when information is incomplete
+- **Daily Summary Generator**: Creates formatted daily overview with all scheduled events
 - **Storage Layer**: JSON-based persistent storage
-- **Notification System**: Automated WhatsApp reminders
-- **Cron Integration**: Scheduled reminder checks
+- **Notification System**: Automated WhatsApp reminders and daily summaries
+- **Cron Integration**: Scheduled reminder checks and optional daily morning summaries
 
 ## Technical Requirements
 
 - OpenClaw 1.0+
 - Python 3.6+
 - WhatsApp channel configured (for notifications)
+
+## Dependencies
+
+This skill requires the following Python packages which will be installed automatically during skill installation:
+
+- python-docx
+- lxml
+
+The skill includes a virtual environment setup script that will create and manage dependencies automatically.
 
 ## Customization
 
