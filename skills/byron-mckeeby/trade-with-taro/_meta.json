@@ -1,11 +1,17 @@
 {
   "owner": "byron-mckeeby",
   "slug": "trade-with-taro",
-  "displayName": "Trade with Tarō",
+  "displayName": "Trade With Taro",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1769965141548,
-    "commit": "https://github.com/clawdbot/skills/commit/201d33c5f549b92eaec18fdeb18959fcb0fdb257"
+    "version": "1.1.0",
+    "publishedAt": 1770078119887,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1769965141548,
+      "commit": "https://github.com/clawdbot/skills/commit/201d33c5f549b92eaec18fdeb18959fcb0fdb257"
+    }
+  ]
 }
