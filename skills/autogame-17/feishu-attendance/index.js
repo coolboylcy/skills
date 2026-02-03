@@ -1,8 +1,52 @@
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const { getAllUsers, getAttendance, sendMessage } = require('./lib/api');
+const fs = require('fs');
+const path = require('path');
 
-const ADMIN_ID = 'ou_cdc63fe05e88c580aedead04d851fc04';
+// Allow overriding Admin ID via env var, fallback to Master's ID
+const ADMIN_ID = process.env.FEISHU_ADMIN_ID;
+
+// Cache Logic
+const CACHE_DIR = path.resolve(__dirname, '../../memory/attendance_cache');
+if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+
+// --- Cache Helpers ---
+const USER_CACHE_FILE = path.join(CACHE_DIR, 'users_cache.json');
+
+async function getAllUsersCached() {
+    try {
+        if (fs.existsSync(USER_CACHE_FILE)) {
+            const stat = fs.statSync(USER_CACHE_FILE);
+            const age = Date.now() - stat.mtimeMs;
+            if (age < 24 * 60 * 60 * 1000) { // 24h TTL
+                 console.log(`Using cached user list (${Math.floor(age/1000/60)} min old).`);
+                 return JSON.parse(fs.readFileSync(USER_CACHE_FILE, 'utf8'));
+            }
+        }
+    } catch(e) {}
+    
+    // Fetch fresh
+    console.log('Fetching fresh user list...');
+    const users = await getAllUsers();
+    
+    // Write cache
+    try { fs.writeFileSync(USER_CACHE_FILE, JSON.stringify(users)); } catch(e) { console.warn('Failed to cache users:', e.message); }
+    return users;
+}
+
+function getHolidayCache(date) {
+    const file = path.join(CACHE_DIR, `holiday_${date}.json`);
+    if (fs.existsSync(file)) {
+        try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) {}
+    }
+    return null;
+}
+
+function saveHolidayCache(date, data) {
+    const file = path.join(CACHE_DIR, `holiday_${date}.json`);
+    try { fs.writeFileSync(file, JSON.stringify(data)); } catch (e) {}
+}
 
 async function main() {
   const argv = yargs(hideBin(process.argv))
@@ -11,6 +55,17 @@ async function main() {
       type: 'string',
       description: 'Date to check (YYYY-MM-DD)',
       default: new Date().toISOString().split('T')[0]
+    })
+    .option('notify', {
+      alias: 'n',
+      type: 'boolean',
+      description: 'Send DM notifications to users (Default: false)',
+      default: false
+    })
+    .option('dry-run', {
+      type: 'boolean',
+      description: 'Do not send any messages (even to Admin)',
+      default: false
     })
     .command('check', 'Check attendance and notify')
     .help()
@@ -40,10 +95,27 @@ async function main() {
   // Holiday Check
   let isWorkday = true;
   let dayType = 'Workday';
+  let holidayCheckWarning = '';
+  
   try {
       console.log('Checking holiday status...');
-      const holidayRes = await fetch(`https://timor.tech/api/holiday/info/${dateStr}`);
-      const holidayData = await holidayRes.json();
+      
+      let holidayData = getHolidayCache(dateStr);
+      if (holidayData) {
+          console.log('Using cached holiday data.');
+      } else {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+          const holidayRes = await fetch(`https://timor.tech/api/holiday/info/${dateStr}`, { signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          if (!holidayRes.ok) throw new Error(`HTTP ${holidayRes.status}`);
+
+          holidayData = await holidayRes.json();
+          saveHolidayCache(dateStr, holidayData);
+      }
+
       // type: 0=workday, 1=weekend, 2=holiday, 3=makeup
       if (holidayData && holidayData.type) {
           const type = holidayData.type.type;
@@ -56,13 +128,19 @@ async function main() {
           console.log(`Date ${dateStr} is a ${dayType} (type: ${type}).`);
       }
   } catch (e) {
-      console.error('Failed to check holiday API, assuming workday:', e.message);
+      console.error('Failed to check holiday API (using default: Workday):', e.message);
+      holidayCheckWarning = `⚠️ *Warning*: Holiday check failed (${e.message}). Assumed Workday.`;
+  }
+
+  // Safety: If holiday check failed, DO NOT spam users with DMs. Only report to admin.
+  const safeMode = !!holidayCheckWarning;
+  if (safeMode) {
+      console.log("SAFE MODE ACTIVE: User DMs disabled due to holiday API failure.");
   }
 
   try {
     // 1. Get all users
-    console.log('Fetching users...');
-    const users = await getAllUsers();
+    const users = await getAllUsersCached();
     console.log(`Found ${users.length} users.`);
     const userMap = {};
     users.forEach(u => userMap[u.open_id] = u); // Map open_id to user details
@@ -75,14 +153,35 @@ async function main() {
 
     const userIds = users.map(u => u.user_id).filter(id => !!id); // Use user_id (employee_id) for querying
 
-    if (userIds.length === 0) {
+    // Stability: Hybrid ID Support (user_id + open_id fallback)
+    const employeeIds = [];
+    const openIds = [];
+
+    users.forEach(u => {
+        if (u.user_id) employeeIds.push(u.user_id);
+        else if (u.open_id) openIds.push(u.open_id);
+    });
+
+    if (employeeIds.length === 0 && openIds.length === 0) {
       console.log("No users found to check.");
       return;
     }
 
     // 2. Get attendance
     console.log('Fetching attendance records...');
-    const results = await getAttendance(userIds, dateInt);
+    let results = [];
+    
+    if (employeeIds.length > 0) {
+        console.log(`Querying ${employeeIds.length} users via employee_id...`);
+        const r1 = await getAttendance(employeeIds, dateInt, 'employee_id');
+        results = results.concat(r1);
+    }
+    
+    if (openIds.length > 0) {
+         console.log(`Querying ${openIds.length} users via open_id (fallback)...`);
+         const r2 = await getAttendance(openIds, dateInt, 'open_id');
+         results = results.concat(r2);
+    }
     
     // 3. Analyze
     const report = {
@@ -102,10 +201,9 @@ async function main() {
       let isAbsent = false;
 
       if (records.length === 0) {
-        // No records
-        if (isWorkday) {
-            isAbsent = true; 
-        }
+        // No records usually means "No Shift" or "Rest Day" in Feishu.
+        // Do NOT mark as absent.
+        console.log(`[Info] ${userName}: No shift records found.`);
       } else {
         for (const record of records) {
            // Check In Result
@@ -118,52 +216,120 @@ async function main() {
         }
       }
 
-      // Prepare messages
+      // Prepare messages (Only send if enabled and safe)
+      // Helper to send safely without crashing the loop
+      const safeSend = async (uid, msg) => {
+          if (safeMode || !argv.notify || argv.dryRun) return;
+          try {
+              await sendMessage(uid, msg);
+          } catch (e) {
+              console.error(`[Error] Failed to send DM to ${userName} (${uid}): ${e.message}`);
+          }
+      };
+
       if (isAbsent) {
         report.absent.push(userName);
         console.log(`[Absent] ${userName}`);
-        await sendMessage(userId, `[Attendance Alert] You are marked as ABSENT for ${dateStr}. Please submit a request if this is an error.`);
+        await safeSend(userId, `[Attendance Alert] You are marked as ABSENT for ${dateStr}. Please submit a request if this is an error.`);
       } else {
         if (isLate) {
           report.late.push(userName);
           console.log(`[Late] ${userName}`);
-          await sendMessage(userId, `[Attendance Alert] You were LATE on ${dateStr}. Please be on time.`);
+          await safeSend(userId, `[Attendance Alert] You were LATE on ${dateStr}. Please be on time.`);
         }
         if (isEarly) {
           report.early.push(userName);
           console.log(`[Early] ${userName}`);
-          await sendMessage(userId, `[Attendance Alert] You left EARLY on ${dateStr}.`);
+          await safeSend(userId, `[Attendance Alert] You left EARLY on ${dateStr}.`);
         }
       }
     }
 
-    // 4. Report to Admin
-    let summary = `📋 *Attendance Report (${dateStr})*\nType: ${dayType} ${!isWorkday ? '(No Absent Checks)' : ''}\nTotal Checked: ${report.total}\n\n`;
+    // 4. Report to Admin (Card Construction)
+    const cardElements = [];
+    
+    // Summary Element
+    const statusEmoji = (!report.late.length && !report.early.length && !report.absent.length) ? '✅' : '⚠️';
+    let summaryText = `**Type**: ${dayType} ${!isWorkday ? '(No Absent Checks)' : ''}\n**Total Checked**: ${report.total}`;
+    if (holidayCheckWarning) summaryText += `\n${holidayCheckWarning}`;
+    if (argv.dryRun) summaryText += `\n(DRY RUN: No messages sent)`;
+    
+    cardElements.push({
+        tag: 'div',
+        text: { tag: 'lark_md', content: summaryText }
+    });
+    
+    const cardColor = (report.late.length || report.early.length || report.absent.length) ? 'orange' : 'green';
 
-    if (report.late.length > 0) summary += `🔴 *Late*:\n${report.late.join(', ')}\n\n`;
-    if (report.early.length > 0) summary += `🟡 *Early Leave*:\n${report.early.join(', ')}\n\n`;
-    if (report.absent.length > 0) summary += `⚫ *Absent*:\n${report.absent.join(', ')}\n\n`;
-
-    if (report.late.length === 0 && report.early.length === 0 && report.absent.length === 0) {
-        summary += "✅ *All Good!* No anomalies detected today.\n";
+    if (report.late.length > 0) {
+        cardElements.push({ tag: 'hr' });
+        cardElements.push({
+            tag: 'div',
+            text: { tag: 'lark_md', content: `🔴 **Late**:\n${report.late.join(', ')}` }
+        });
+    }
+    if (report.early.length > 0) {
+        cardElements.push({ tag: 'hr' });
+        cardElements.push({
+            tag: 'div',
+            text: { tag: 'lark_md', content: `🟡 **Early Leave**:\n${report.early.join(', ')}` }
+        });
+    }
+    if (report.absent.length > 0) {
+        cardElements.push({ tag: 'hr' });
+        cardElements.push({
+            tag: 'div',
+            text: { tag: 'lark_md', content: `⚫ **Absent**:\n${report.absent.join(', ')}` }
+        });
     }
 
-    // Add detailed logs for debugging/detailed view
-    summary += "\n*Detailed Logs:*\n";
+    if (report.late.length === 0 && report.early.length === 0 && report.absent.length === 0) {
+        cardElements.push({ tag: 'hr' });
+        cardElements.push({
+            tag: 'div',
+            text: { tag: 'lark_md', content: "✅ **All Good!** No anomalies detected today." }
+        });
+    }
+
+    // Detailed Logs
+    cardElements.push({ tag: 'hr' });
+    let details = "";
     for (const res of results) {
         const userId = res.user_id;
         const userName = userMap[userId] ? userMap[userId].name : userId;
         const records = res.records || [];
         if (records.length > 0) {
-            const r = records[0]; // Assuming one shift per day for simplicity
-            summary += `- ${userName}: In ${r.check_in_record_id ? '✅' : '❌'} | Out ${r.check_out_record_id ? '✅' : '❌'} (${r.check_in_result}/${r.check_out_result})\n`;
+            const r = records[0]; 
+            details += `- ${userName}: In ${r.check_in_record_id ? '✅' : '❌'} | Out ${r.check_out_record_id ? '✅' : '❌'}\n`;
         } else {
-             summary += `- ${userName}: No shift/records\n`;
+             details += `- ${userName}: No shift\n`;
         }
     }
+    // Truncate
+    const MAX_CHARS = 4000;
+    if (details.length > MAX_CHARS) details = details.substring(0, MAX_CHARS) + "\n... (truncated)";
+    
+    cardElements.push({
+        tag: 'note',
+        elements: [{ tag: 'plain_text', content: `Detailed Logs:\n${details}` }]
+    });
 
-    console.log('Sending report to Admin...');
-    await sendMessage(ADMIN_ID, summary);
+    const card = {
+        header: {
+            title: { tag: 'plain_text', content: `📋 Attendance Report (${dateStr})` },
+            template: cardColor
+        },
+        elements: cardElements
+    };
+
+    console.log('Sending report to Admin (via Card)...');
+    if (!argv.dryRun) {
+        // sendMessage in lib/api.js handles objects as interactive cards
+        await sendMessage(ADMIN_ID, card);
+        console.log('Report sent.');
+    } else {
+        console.log('DRY RUN: Report NOT sent.');
+    }
     console.log('Done.');
     console.log(JSON.stringify(report, null, 2));
 
