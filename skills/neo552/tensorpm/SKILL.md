@@ -1,3 +1,10 @@
+---
+name: TensorPM
+description: "AI-powered project management with local-first architecture. Manage projects, track action items, and coordinate teams via MCP tools or A2A agent communication. Signed & notarized."
+homepage: https://tensorpm.com
+user-invocable: true
+---
+
 # TensorPM Skill
 
 **AI-Powered Project Management** - Intelligently manage projects, track action items, and coordinate teams with context-driven prioritization.
@@ -6,11 +13,29 @@
 
 Interact with TensorPM via MCP tools or A2A agent communication.
 
+**Signed & Notarized:** macOS builds are code-signed and notarized by Apple. Windows builds are signed via Azure Trusted Signing.
+
 ## Download
 
+### macOS (Homebrew)
+
+```bash
+brew tap neo552/tensorpm
+brew install --cask tensorpm
+```
+
+### Linux (Terminal)
+
+```bash
+curl -fsSL https://tensorpm.com/download/linux -o ~/TensorPM.AppImage
+chmod +x ~/TensorPM.AppImage
+```
+
+### Direct Downloads
+
 - **Windows:** [TensorPM-Setup.exe](https://github.com/Neo552/TensorPM-Releases/releases/latest/download/TensorPM-Setup.exe)
-- **macOS (Apple Silicon):** [TensorPM-macOS.dmg](https://github.com/Neo552/TensorPM-Releases/releases/latest/download/TensorPM-macOS.dmg)
-- **Linux (x86_64):** [TensorPM-Linux.AppImage](https://github.com/Neo552/TensorPM-Releases/releases/latest/download/TensorPM-Linux.AppImage)
+- **macOS:** [TensorPM-macOS.dmg](https://github.com/Neo552/TensorPM-Releases/releases/latest/download/TensorPM-macOS.dmg)
+- **Linux:** [TensorPM-Linux.AppImage](https://github.com/Neo552/TensorPM-Releases/releases/latest/download/TensorPM-Linux.AppImage)
 
 **Release Notes:** <https://github.com/Neo552/TensorPM-Releases/releases/latest>
 
@@ -170,6 +195,8 @@ Tasks track the lifecycle of message requests. States: `submitted`, `working`, `
 | `POST` | `/projects/:id/action-items` | Create action items |
 | `PATCH` | `/projects/:id/action-items/:itemId` | Update an action item |
 | `POST` | `/projects/:id/a2a` | JSON-RPC messaging |
+| `GET` | `/workspaces` | List all workspaces with active workspace ID |
+| `POST` | `/workspaces/:id/activate` | Switch to a different workspace |
 
 **Optional Auth:** Set `A2A_HTTP_AUTH_TOKEN` env var before starting TensorPM to enable token validation.
 
@@ -185,6 +212,8 @@ Tasks track the lifecycle of message requests. States: `submitted`, `working`, `
 | `update_action_items` | Update existing action items |
 | `propose_updates` | Submit project updates for human review |
 | `set_api_key` | Set AI provider API key (openai, anthropic, google, mistral) |
+| `list_workspaces` | List all workspaces (local + cloud) with active workspace ID |
+| `set_active_workspace` | Switch to a different workspace |
 
 **Note:** MCP tools provide direct access to action items. Core project context (profile, budget, people, categories) can only be modified by the TensorPM project manager agent — use A2A `message/send` to request changes.
 
@@ -197,6 +226,23 @@ list_projects
 ```
 
 Returns all projects with their names and IDs.
+
+### List Workspaces
+
+```
+list_workspaces
+```
+
+Returns all accessible workspaces (local and cloud) with project counts and the currently active workspace ID.
+
+### Set Active Workspace
+
+```
+set_active_workspace
+  workspaceId: "workspace-uuid"
+```
+
+Switches to the specified workspace. This closes all open projects.
 
 ### Create Project
 
@@ -366,6 +412,22 @@ curl -X PATCH http://localhost:37850/projects/{projectId}/action-items/{itemId} 
   -H "Content-Type: application/json" \
   -d '{"status": "completed"}'
 ```
+
+### List workspaces
+
+```bash
+curl http://localhost:37850/workspaces
+```
+
+Returns all accessible workspaces (local and cloud) with project counts and the active workspace ID.
+
+### Activate a workspace
+
+```bash
+curl -X POST http://localhost:37850/workspaces/{workspaceId}/activate
+```
+
+Switches to the specified workspace. Closes all open projects.
 
 ## Notes
 
