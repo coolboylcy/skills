@@ -1,7 +1,7 @@
 ---
 name: universal-profile
 description: Manage LUKSO Universal Profiles — identity, permissions, tokens, and blockchain operations via direct or gasless relay transactions
-version: 0.3.3
+version: 0.3.5
 author: frozeman
 ---
 
@@ -41,7 +41,7 @@ Key files: `UP_KEY_PATH` env → `~/.openclaw/credentials/universal-profile-key.
 
 ### macOS Keychain Storage (Recommended on macOS)
 
-On macOS, store the controller private key in the system Keychain instead of a plaintext JSON file. The key is retrieved in memory only for signing and never written to disk.
+On macOS, store the controller private key in the system Keychain instead of a plaintext JSON file. **This is the recommended approach** — the key is retrieved in memory only for signing and never written to disk.
 
 **Store the key:**
 ```bash
@@ -74,10 +74,17 @@ privateKey = null; // Clear from memory
 ```
 
 **Notes:**
-- `-T /usr/bin/security` grants the `security` CLI access without a GUI prompt
+- `-T /usr/bin/security` grants the `security` CLI access without a GUI prompt, required for automated agent use
 - Apple's Secure Enclave does not support secp256k1 (Ethereum's curve), so the key must be extracted for signing — but it stays in memory only, never on disk
 - After storing in Keychain, delete the JSON credentials file
 - **This approach is macOS-only.** On Linux, consider using a secrets manager, encrypted keyring, or environment variables instead
+
+### ⚠️ JSON Key File (Less Secure)
+
+If you use the JSON key file (`~/.openclaw/credentials/universal-profile-key.json`), be aware:
+- The private key is stored on disk (even if the format is obfuscated)
+- Ensure the file has restricted permissions: `chmod 600 ~/.openclaw/credentials/universal-profile-key.json`
+- Prefer Keychain storage on macOS whenever possible
 
 ## Transactions
 
@@ -188,7 +195,9 @@ Full ABIs, interface IDs, and ERC725Y data keys are in `lib/constants.js`.
 
 Used for LSP3 profile metadata, LSP4 asset metadata, and any on-chain JSON reference.
 
-**Format:** `0x` + `0000` (2 bytes verification method) + `6f357c6a` (4 bytes = keccak256(utf8) hash function) + `0020` (2 bytes = hash length 32) + `<keccak256 hash>` (32 bytes) + `<url as UTF-8 hex>`
+**Format (hex):** `0x` + `0000` (2 bytes verification method) + `6f357c6a` (4 bytes = keccak256(utf8) hash function) + `0020` (2 bytes = hash length 32) + `<keccak256 hash>` (32 bytes) + `<url as UTF-8 hex>`
+
+**Header is always `00006f357c6a0020` (16 hex chars = 8 bytes).**
 
 ```javascript
 const jsonBytes = fs.readFileSync('metadata.json');
@@ -205,9 +214,27 @@ const hex = data.slice(2);        // remove 0x
 const url = Buffer.from(hex.slice(80), 'hex').toString('utf8');
 ```
 
-**⚠️ Common mistake:** Forgetting the `0020` hash length bytes between the hash function selector and the actual hash. Without it, the URL offset is wrong and parsers will read garbage.
+**⚠️ Common mistakes:**
+1. **Forgetting `0020`** — the 2-byte hash length between the hash function selector and the actual hash. Without it, the URL offset is wrong and parsers read garbage, breaking the entire profile.
+2. **Not pinning to a public IPFS service before setting on-chain** — local IPFS nodes are not reachable by gateways. Always pin via a service (e.g. Forever Moments Pinata proxy at `POST /api/pinata`) and verify the file is accessible via `https://api.universalprofile.cloud/ipfs/<CID>` BEFORE submitting the on-chain transaction.
+3. **Hash must match the exact bytes stored on IPFS** — compute keccak256 from the exact JSON string you upload, not a re-serialized version.
+4. **Using `hashFunction`/`hash` instead of `verification` object** in LSP3 metadata JSON — image entries (profileImage, backgroundImage) should use `{ "verification": { "method": "keccak256(bytes)", "data": "0x..." }, "url": "ipfs://..." }` format, NOT the legacy `{ "hashFunction": "...", "hash": "0x..." }` format.
 
 **LSP3Profile data key:** `0x5ef83ad9559033e6e941db7d7c495acdce616347d28e90c7ce47cbfcfcad3bc5`
+
+### Updating LSP3 Profile Metadata — Full Procedure
+
+1. **Read current profile** — `getData(LSP3_KEY)` → decode VerifiableURI → fetch JSON from IPFS
+2. **Modify the JSON** — update fields (name, description, links, images, etc.)
+3. **Use `verification` format for images** — `{ verification: { method: "keccak256(bytes)", data: "0x..." }, url: "ipfs://..." }`
+4. **Pin new images to IPFS** — upload via pinning service, get CID, verify accessible
+5. **Pin updated JSON to IPFS** — upload, get CID, verify accessible via gateway
+6. **Compute hash** — `keccak256(exactJsonBytes)` of the uploaded file
+7. **Encode VerifiableURI** — `0x00006f357c6a0020` + hash + url hex
+8. **Set on-chain** — `up.setData(LSP3_KEY, verifiableUri)` from controller
+9. **Verify** — read back on-chain data, decode, fetch from IPFS, confirm profile loads
+
+**NEVER submit the on-chain transaction until step 5 is verified.**
 
 **LSP28TheGrid data key:** `0x724141d9918ce69e6b8afcf53a91748466086ba2c74b94cab43c649ae2ac23ff`
 
@@ -276,12 +303,28 @@ await fetch('https://relayer.mainnet.lukso.network/api/execute', {
 
 ## Security
 
+### Permission Best Practices
 - Grant minimum permissions. Prefer CALL over SUPER_CALL.
 - Use AllowedCalls/AllowedERC725YDataKeys to restrict access.
 - Avoid DELEGATECALL and CHANGEOWNER unless absolutely necessary.
 - Use validity timestamps for relay calls.
 - Test on testnet (chain 4201) first.
 - Never log private keys.
+
+### Key Management
+- **Recommended (macOS):** Store private keys in macOS Keychain (see Credentials section above)
+- **JSON key files:** If used, restrict permissions (`chmod 600`) and consider migrating to Keychain
+- Private keys are only loaded into memory for signing, then cleared
+- The `config set` command is restricted to safe keys only — `keystorePath` and `profiles` cannot be modified at runtime to prevent path redirection attacks
+
+### Network Access
+This skill only communicates with known LUKSO ecosystem endpoints:
+- **RPC:** `https://42.rpc.thirdweb.com` (mainnet), `https://rpc.testnet.lukso.network` (testnet)
+- **Relay:** `https://relayer.mainnet.lukso.network/api` (gasless transactions)
+- **IPFS:** `https://api.universalprofile.cloud/ipfs/` (metadata), `https://www.forevermoments.life/api/pinata` (pinning)
+- **Forever Moments API:** `https://www.forevermoments.life/api/agent/v1` (NFT minting)
+
+No other external network calls are made. All transaction signing happens locally.
 
 ## Forever Moments (NFT Moments & Collections)
 
