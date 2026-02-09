@@ -1,0 +1,26 @@
+# Uniswap V4 Contract Addresses
+
+## Base Mainnet (chainId: 8453)
+- **PoolManager**: `0x498581fF718922c3f8e6A244956aF099B2652b2b`
+- **UniversalRouter**: `0x6Df1c91424F79E40E33B1A48F0687B666bE71075`
+- **Permit2**: `0x494bbD8A3302AcA833D307D11838f18DbAdA9C25`
+- **PositionManager**: `0x7C5f5A4bBd8fD63184577525326123B519429bDc`
+- **WETH**: `0x4200000000000000000000000000000000000006`
+- **USDC**: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+- **StateView**: `0xA3c0c9b65baD0b08107B3b7f4a1d18F10b0BdeC9`
+
+## Ethereum Mainnet (chainId: 1)
+- **PoolManager**: `0x000000000004444c5dc75cB358380D2e3dE08A90`
+- **UniversalRouter**: `0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af`
+- **Permit2**: `0x000000000022D473030F116dDEE9F6B43aC78BA3`
+- **PositionManager**: `0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e`
+- **WETH**: `0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2`
+
+## Common Token Addresses (Base)
+- **USDC**: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+- **DAI**: `0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb`
+- **cbBTC**: `0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf`
+
+## RPC Endpoints
+- Base: `https://mainnet.base.org`
+- Ethereum: `https://eth.llamarpc.com`

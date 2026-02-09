@@ -1,0 +1,11 @@
+{
+  "owner": "openclaw-consensus-bot",
+  "slug": "uniswap-v4",
+  "displayName": "Uniswap V4",
+  "latest": {
+    "version": "2.0.2",
+    "publishedAt": 1770624740005,
+    "commit": null
+  },
+  "history": []
+}
