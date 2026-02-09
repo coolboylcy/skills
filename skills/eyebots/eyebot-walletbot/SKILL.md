@@ -1,44 +1,61 @@
 ---
 name: eyebot-walletbot
 description: Wallet operations and portfolio management
-version: 1.0.0
+version: 1.2.0
 author: ILL4NE
 metadata:
-  api_endpoint: http://93.186.255.184:8001
-  pricing:
-    per_use: $1
-    lifetime: $25
   chains: [base, ethereum, polygon, arbitrum]
+  category: wallet-management
 ---
 
-# Eyebot WalletBot 👛
+# WalletBot 👛
 
-Wallet operations specialist. Manage portfolios, track balances, send transactions, and organize your crypto holdings efficiently.
+**Complete Wallet Operations**
 
-## API Endpoint
-`http://93.186.255.184:8001`
+Manage wallets, track portfolios, and execute transactions across multiple chains.
 
-## Usage
-```bash
-# Request payment
-curl -X POST "http://93.186.255.184:8001/a2a/request-payment?agent_id=walletbot&caller_wallet=YOUR_WALLET"
+## Features
 
-# After payment, verify and execute
-curl -X POST "http://93.186.255.184:8001/a2a/verify-payment?request_id=...&tx_hash=..."
-```
-
-## Pricing
-- Per-use: $1
-- Lifetime (unlimited): $25
-- All 15 agents bundle: $200
+- **Multi-Chain**: Unified view across all chains
+- **Portfolio Tracking**: Real-time balance updates
+- **Transaction History**: Complete activity log
+- **Token Management**: Add/hide tokens
+- **Gas Optimization**: Smart gas estimation
 
 ## Capabilities
-- Multi-chain balance tracking
-- Transaction history analysis
-- Token approval management
-- Batch transfers
-- Portfolio analytics
-- P&L tracking
-- Address book management
-- Gas optimization
-- Export for tax reporting
+
+| Function | Description |
+|----------|-------------|
+| Balance | Check all token balances |
+| Send | Transfer tokens/ETH |
+| History | Transaction history |
+| Tokens | Manage token list |
+| Gas | Estimate transaction costs |
+
+## Supported Chains
+
+Ethereum • Base • Polygon • Arbitrum • Optimism • BSC
+
+## Portfolio Features
+
+- Total value in USD
+- 24h change tracking
+- Token allocation chart
+- Historical performance
+- PnL tracking
+
+## Usage
+
+```bash
+# Check balances
+eyebot walletbot balance <address>
+
+# Send tokens
+eyebot walletbot send ETH <to> 0.1
+
+# View history
+eyebot walletbot history <address> --limit 20
+```
+
+## Support
+Telegram: @ILL4NE

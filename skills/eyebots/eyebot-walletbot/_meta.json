@@ -1,13 +1,18 @@
 {
   "owner": "eyebots",
   "slug": "eyebot-walletbot",
-  "displayName": "Eyebot WalletBot",
+  "displayName": "Eyebot Walletbot",
   "latest": {
-    "version": "1.1.0",
-    "publishedAt": 1770597907599,
-    "commit": "https://github.com/openclaw/skills/commit/1e2c8147acab194bda7da2e252963a2561f6b26a"
+    "version": "1.8.0",
+    "publishedAt": 1770639023402,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.1.0",
+      "publishedAt": 1770597907599,
+      "commit": "https://github.com/openclaw/skills/commit/1e2c8147acab194bda7da2e252963a2561f6b26a"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1770581446894,
