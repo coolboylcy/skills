@@ -1,0 +1,11 @@
+{
+  "owner": "awlevin",
+  "slug": "agent-chat",
+  "displayName": "Agent Chat",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1770705667627,
+    "commit": null
+  },
+  "history": []
+}
