@@ -3,11 +3,16 @@
   "slug": "sui-move",
   "displayName": "Sui Move",
   "latest": {
-    "version": "1.2.0",
-    "publishedAt": 1770642888886,
-    "commit": "https://github.com/openclaw/skills/commit/4dedcdae97d4df7532f1579bc1ad34b2223a0d6a"
+    "version": "1.1.1",
+    "publishedAt": 1770682823764,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.2.0",
+      "publishedAt": 1770642888886,
+      "commit": "https://github.com/openclaw/skills/commit/4dedcdae97d4df7532f1579bc1ad34b2223a0d6a"
+    },
     {
       "version": "1.1.0",
       "publishedAt": 1770553985852,
