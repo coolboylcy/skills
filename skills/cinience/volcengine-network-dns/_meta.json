@@ -1,0 +1,11 @@
+{
+  "owner": "cinience",
+  "slug": "volcengine-network-dns",
+  "displayName": "Volcengine Network Dns",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770769472231,
+    "commit": null
+  },
+  "history": []
+}
