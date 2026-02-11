@@ -32,6 +32,13 @@ from .types import Item
 from .logging_config import configure_quiet_mode, enable_debug_mode
 
 
+def _output_width() -> int:
+    """Terminal width for summary truncation. Use generous default when not a TTY."""
+    if not sys.stdout.isatty():
+        return 200
+    return shutil.get_terminal_size((120, 24)).columns
+
+
 # Configure quiet mode by default (suppress verbose library output)
 # Set KEEP_VERBOSE=1 to enable debug mode via environment
 if os.environ.get("KEEP_VERBOSE") == "1":
@@ -162,7 +169,7 @@ def _format_yaml_frontmatter(
     are ordered newest-first, matching list_versions() ordering.
     Changing that ordering would break the vN = -V N correspondence.
     """
-    cols = shutil.get_terminal_size((120, 24)).columns
+    cols = _output_width()
 
     def _truncate_summary(summary: str, prefix_len: int) -> str:
         """Truncate summary to fit terminal width, matching _format_summary_line."""
@@ -266,7 +273,7 @@ def _format_summary_line(item: Item, id_width: int = 0) -> str:
     date = item.tags.get("_updated_date") or item.tags.get("_updated", "")[:10] or item.tags.get("_created", "")[:10] or ""
 
     # Truncate summary to fit terminal width, collapse newlines
-    cols = shutil.get_terminal_size((120, 24)).columns
+    cols = _output_width()
     prefix_len = len(padded_id) + 1 + len(date) + 1  # "id date "
     max_summary = max(cols - prefix_len, 20)
     summary = item.summary.replace("\n", " ")
@@ -329,12 +336,12 @@ def main_callback(
     # If no subcommand provided, show the current intentions (now)
     if ctx.invoked_subcommand is None:
         from .api import NOWDOC_ID
-        kp = _get_keeper(None, "default")
+        kp = _get_keeper(None)
         item = kp.get_now()
-        version_nav = kp.get_version_nav(NOWDOC_ID, None, collection="default")
-        similar_items = kp.get_similar_for_display(NOWDOC_ID, limit=3, collection="default")
+        version_nav = kp.get_version_nav(NOWDOC_ID, None)
+        similar_items = kp.get_similar_for_display(NOWDOC_ID, limit=3)  # bare `keep`: default 3
         similar_offsets = {s.id: kp.get_version_offset(s) for s in similar_items}
-        meta_sections = kp.resolve_meta(NOWDOC_ID, collection="default")
+        meta_sections = kp.resolve_meta(NOWDOC_ID, limit_per_doc=3)
         typer.echo(_format_item(
             item,
             as_json=_get_json_output(),
@@ -358,14 +365,6 @@ StoreOption = Annotated[
     )
 ]
 
-CollectionOption = Annotated[
-    str,
-    typer.Option(
-        "--collection", "-c",
-        envvar="KEEP_COLLECTION",
-        help="Collection name"
-    )
-]
 
 LimitOption = Annotated[
     int,
@@ -478,6 +477,20 @@ def _format_item(
     return _format_summary_line(item)
 
 
+def _versions_to_items(doc_id: str, current: Item | None, versions: list) -> list[Item]:
+    """Convert current item + archived VersionInfo list into Items for _format_items."""
+    items: list[Item] = []
+    if current:
+        items.append(current)
+    for i, v in enumerate(versions, start=1):
+        tags = dict(v.tags)
+        tags["_version"] = str(i)
+        tags["_updated"] = v.created_at or ""
+        tags["_updated_date"] = (v.created_at or "")[:10]
+        items.append(Item(id=doc_id, summary=v.summary, tags=tags))
+    return items
+
+
 def _format_items(items: list[Item], as_json: bool = False) -> str:
     """Format multiple items for display."""
     if _get_ids_output():
@@ -525,26 +538,25 @@ See: https://github.com/hughpyle/keep#installation
 """
 
 
-def _get_keeper(store: Optional[Path], collection: str) -> Keeper:
+def _get_keeper(store: Optional[Path]) -> Keeper:
     """Initialize memory, handling errors gracefully."""
     import atexit
 
     # Check global override from --store on main command
     actual_store = store if store is not None else _get_store_override()
     try:
-        kp = Keeper(actual_store, collection=collection)
+        kp = Keeper(actual_store)
         # Ensure close() runs before interpreter shutdown to release model locks
         atexit.register(kp.close)
-        # Check for missing embedding provider
+        # Warn (don't exit) if no embedding provider — read-only ops still work
         if kp._config and kp._config.embedding is None:
             typer.echo(NO_PROVIDER_ERROR.strip(), err=True)
-            raise typer.Exit(1)
         # Check tool integrations (fast path: dict lookup, no I/O)
         if kp._config:
             from .integrations import check_and_install
             try:
                 check_and_install(kp._config)
-            except Exception:
+            except (OSError, ValueError) as e:
                 pass  # Never block normal operation
         return kp
     except Exception as e:
@@ -615,23 +627,32 @@ def find(
     include_self: Annotated[bool, typer.Option(
         help="Include the queried item (only with --id)"
     )] = False,
+    text: Annotated[bool, typer.Option(
+        "--text",
+        help="Use full-text search instead of semantic similarity"
+    )] = False,
     tag: Annotated[Optional[list[str]], typer.Option(
         "--tag", "-t",
         help="Filter by tag (key or key=value, repeatable)"
     )] = None,
     store: StoreOption = None,
-    collection: CollectionOption = "default",
     limit: LimitOption = 10,
     since: SinceOption = None,
+    history: Annotated[bool, typer.Option(
+        "--history",
+        help="Include archived versions of matching items"
+    )] = False,
 ):
     """
-    Find items using semantic similarity search.
+    Find items by semantic similarity (default) or full-text search.
 
     \b
     Examples:
-        keep find "authentication"              # Search by text
+        keep find "authentication"              # Semantic search
+        keep find "auth" --text                 # Full-text search
         keep find --id file:///path/to/doc.md   # Find similar to item
         keep find "auth" -t project=myapp       # Search + filter by tag
+        keep find "auth" --history              # Include archived versions
     """
     if id and query:
         typer.echo("Error: Specify either a query or --id, not both", err=True)
@@ -639,14 +660,19 @@ def find(
     if not id and not query:
         typer.echo("Error: Specify a query or --id", err=True)
         raise typer.Exit(1)
+    if id and text:
+        typer.echo("Error: --text cannot be used with --id", err=True)
+        raise typer.Exit(1)
 
-    kp = _get_keeper(store, collection)
+    kp = _get_keeper(store)
 
     # Search with higher limit if filtering, then post-filter
     search_limit = limit * 5 if tag else limit
 
     if id:
         results = kp.find_similar(id, limit=search_limit, since=since, include_self=include_self)
+    elif text:
+        results = kp.query_fulltext(query, limit=search_limit, since=since)
     else:
         results = kp.find(query, limit=search_limit, since=since)
 
@@ -654,21 +680,30 @@ def find(
     if tag:
         results = _filter_by_tags(results, tag)
 
-    typer.echo(_format_items(results[:limit], as_json=_get_json_output()))
+    results = results[:limit]
+
+    # Expand with archived versions if requested
+    if history:
+        expanded: list[Item] = []
+        for item in results:
+            versions = kp.list_versions(item.id, limit=limit)
+            expanded.extend(_versions_to_items(item.id, item, versions))
+        results = expanded
+
+    typer.echo(_format_items(results, as_json=_get_json_output()))
 
 
-@app.command()
+@app.command(hidden=True)
 def search(
     query: Annotated[str, typer.Argument(default=..., help="Full-text search query")],
     store: StoreOption = None,
-    collection: CollectionOption = "default",
     limit: LimitOption = 10,
     since: SinceOption = None,
 ):
     """
-    Search item summaries using full-text search.
+    Search item summaries using full-text search (alias for find --text).
     """
-    kp = _get_keeper(store, collection)
+    kp = _get_keeper(store)
     results = kp.query_fulltext(query, limit=limit, since=since)
     typer.echo(_format_items(results, as_json=_get_json_output()))
 
@@ -676,7 +711,6 @@ def search(
 @app.command("list")
 def list_recent(
     store: StoreOption = None,
-    collection: CollectionOption = "default",
     limit: LimitOption = 10,
     tag: Annotated[Optional[list[str]], typer.Option(
         "--tag", "-t",
@@ -691,6 +725,10 @@ def list_recent(
         help="Sort order: 'updated' (default) or 'accessed'"
     )] = "updated",
     since: SinceOption = None,
+    history: Annotated[bool, typer.Option(
+        "--history",
+        help="Include archived versions in listing"
+    )] = False,
 ):
     """
     List recent items, filter by tags, or list tag keys/values.
@@ -705,14 +743,15 @@ def list_recent(
         keep list --tags=              # List all tag keys
         keep list --tags=foo           # List values for tag 'foo'
         keep list --since P3D          # Items updated in last 3 days
+        keep list --history            # Include archived versions
     """
-    kp = _get_keeper(store, collection)
+    kp = _get_keeper(store)
 
     # --tags mode: list keys or values
     if tags is not None:
         # Empty string means list all keys, otherwise list values for key
         key = tags if tags else None
-        values = kp.list_tags(key, collection=collection)
+        values = kp.list_tags(key)
         if _get_json_output():
             typer.echo(json.dumps(values))
         else:
@@ -734,10 +773,10 @@ def list_recent(
         for t in tag:
             if "=" in t:
                 key, value = t.split("=", 1)
-                matches = kp.query_tag(key, value, limit=limit, since=since, collection=collection)
+                matches = kp.query_tag(key, value, limit=limit, since=since)
             else:
                 # Key only - find items with this tag key (any value)
-                matches = kp.query_tag(t, limit=limit, since=since, collection=collection)
+                matches = kp.query_tag(t, limit=limit, since=since)
 
             if results is None:
                 results = {item.id: item for item in matches}
@@ -751,7 +790,7 @@ def list_recent(
         return
 
     # Default: recent items
-    results = kp.list_recent(limit=limit, since=since, order_by=sort, collection=collection)
+    results = kp.list_recent(limit=limit, since=since, order_by=sort, include_history=history)
     typer.echo(_format_items(results, as_json=_get_json_output()))
 
 
@@ -767,7 +806,6 @@ def tag_update(
         help="Tag keys to remove"
     )] = None,
     store: StoreOption = None,
-    collection: CollectionOption = "default",
 ):
     """
     Add, update, or remove tags on existing documents.
@@ -781,7 +819,7 @@ def tag_update(
         keep tag-update doc:1 --remove obsolete_tag
         keep tag-update doc:1 --tag temp=  # Remove via empty value
     """
-    kp = _get_keeper(store, collection)
+    kp = _get_keeper(store)
 
     # Parse tags from key=value format
     tag_changes = _parse_tags(tags)
@@ -798,7 +836,7 @@ def tag_update(
     # Process each document
     results = []
     for doc_id in ids:
-        item = kp.tag(doc_id, tags=tag_changes, collection=collection)
+        item = kp.tag(doc_id, tags=tag_changes)
         if item is None:
             typer.echo(f"Not found: {doc_id}", err=True)
         else:
@@ -817,7 +855,6 @@ def put(
         help="Document ID (auto-generated for text/stdin modes)"
     )] = None,
     store: StoreOption = None,
-    collection: CollectionOption = "default",
     tags: Annotated[Optional[list[str]], typer.Option(
         "--tag", "-t",
         help="Tag as key=value (can be repeated)"
@@ -847,7 +884,7 @@ def put(
       keep put "my note" -t done   # Same ID, new version (tag change)
       keep put "different note"    # Different ID (new doc)
     """
-    kp = _get_keeper(store, collection)
+    kp = _get_keeper(store)
     parsed_tags = _parse_tags(tags)
 
     # Determine mode based on source content
@@ -891,7 +928,7 @@ def put(
 
     # Surface similar items (occasion for reflection)
     suggest_limit = 10 if suggest_tags else 3
-    similar_items = kp.get_similar_for_display(item.id, limit=suggest_limit, collection=collection)
+    similar_items = kp.get_similar_for_display(item.id, limit=suggest_limit)
     similar_offsets = {s.id: kp.get_version_offset(s) for s in similar_items}
 
     typer.echo(_format_item(
@@ -924,12 +961,11 @@ def update(
     source: Annotated[Optional[str], typer.Argument(help="URI to fetch, text content, or '-' for stdin")] = None,
     id: Annotated[Optional[str], typer.Option("--id", "-i")] = None,
     store: StoreOption = None,
-    collection: CollectionOption = "default",
     tags: Annotated[Optional[list[str]], typer.Option("--tag", "-t")] = None,
     summary: Annotated[Optional[str], typer.Option("--summary")] = None,
 ):
     """Add or update a document (alias for 'put')."""
-    put(source=source, id=id, store=store, collection=collection, tags=tags, summary=summary)
+    put(source=source, id=id, store=store, tags=tags, summary=summary)
 
 
 @app.command("add", hidden=True)
@@ -937,22 +973,17 @@ def add(
     source: Annotated[Optional[str], typer.Argument(help="URI to fetch, text content, or '-' for stdin")] = None,
     id: Annotated[Optional[str], typer.Option("--id", "-i")] = None,
     store: StoreOption = None,
-    collection: CollectionOption = "default",
     tags: Annotated[Optional[list[str]], typer.Option("--tag", "-t")] = None,
     summary: Annotated[Optional[str], typer.Option("--summary")] = None,
 ):
     """Add a document (alias for 'put')."""
-    put(source=source, id=id, store=store, collection=collection, tags=tags, summary=summary)
+    put(source=source, id=id, store=store, tags=tags, summary=summary)
 
 
 @app.command()
 def now(
     content: Annotated[Optional[str], typer.Argument(
         help="Content to set (omit to show current)"
-    )] = None,
-    file: Annotated[Optional[Path], typer.Option(
-        "--file", "-f",
-        help="Read content from file"
     )] = None,
     reset: Annotated[bool, typer.Option(
         "--reset",
@@ -967,11 +998,14 @@ def now(
         help="List all versions"
     )] = False,
     store: StoreOption = None,
-    collection: CollectionOption = "default",
     tags: Annotated[Optional[list[str]], typer.Option(
         "--tag", "-t",
         help="Set tag (with content) or filter (without content)"
     )] = None,
+    limit: Annotated[int, typer.Option(
+        "--limit", "-n",
+        help="Max similar/meta items to show (default 3)"
+    )] = 3,
 ):
     """
     Get or set the current working intentions.
@@ -990,62 +1024,21 @@ def now(
         keep now "What's important now"  # Update intentions
         keep now "Auth work" -t project=myapp  # Update with tag
         keep now -t project=myapp        # Find version with tag
-        keep now -f context.md           # Read content from file
+        keep now -n 10                   # Show with more similar/meta items
         keep now --reset                 # Reset to default from system
         keep now -V 1                    # Previous version
         keep now --history               # List all versions
     """
     from .api import NOWDOC_ID
 
-    kp = _get_keeper(store, collection)
+    kp = _get_keeper(store)
 
     # Handle history listing
     if history:
-        versions = kp.list_versions(NOWDOC_ID, limit=50, collection=collection)
-        current = kp.get(NOWDOC_ID, collection=collection)
-
-        if _get_ids_output():
-            # Output version identifiers, one per line
-            if current:
-                typer.echo(f"{NOWDOC_ID}@V{{0}}")
-            for i in range(1, len(versions) + 1):
-                typer.echo(f"{NOWDOC_ID}@V{{{i}}}")
-        elif _get_json_output():
-            result = {
-                "id": NOWDOC_ID,
-                "current": {
-                    "summary": current.summary if current else None,
-                    "offset": 0,
-                    "vid": f"{NOWDOC_ID}@V{{0}}",
-                } if current else None,
-                "versions": [
-                    {
-                        "offset": i + 1,
-                        "vid": f"{NOWDOC_ID}@V{{{i + 1}}}",
-                        "version": v.version,
-                        "summary": v.summary[:60],
-                        "created_at": v.created_at,
-                    }
-                    for i, v in enumerate(versions)
-                ],
-            }
-            typer.echo(json.dumps(result, indent=2))
-        else:
-            if current:
-                summary_preview = current.summary[:60].replace("\n", " ")
-                if len(current.summary) > 60:
-                    summary_preview += "..."
-                typer.echo(f"v0 (current): {summary_preview}")
-            if versions:
-                typer.echo(f"\nArchived:")
-                for i, v in enumerate(versions, start=1):
-                    date_part = v.created_at[:10] if v.created_at else "unknown"
-                    summary_preview = v.summary[:50].replace("\n", " ")
-                    if len(v.summary) > 50:
-                        summary_preview += "..."
-                    typer.echo(f"  v{i} ({date_part}): {summary_preview}")
-            else:
-                typer.echo("No version history.")
+        versions = kp.list_versions(NOWDOC_ID, limit=limit)
+        current = kp.get(NOWDOC_ID)
+        items = _versions_to_items(NOWDOC_ID, current, versions)
+        typer.echo(_format_items(items, as_json=_get_json_output()))
         return
 
     # Handle version retrieval
@@ -1055,9 +1048,9 @@ def now(
             item = kp.get_now()
             internal_version = None
         else:
-            item = kp.get_version(NOWDOC_ID, offset, collection=collection)
+            item = kp.get_version(NOWDOC_ID, offset)
             # Get internal version number for API call
-            versions = kp.list_versions(NOWDOC_ID, limit=1, collection=collection)
+            versions = kp.list_versions(NOWDOC_ID, limit=1)
             if versions:
                 internal_version = versions[0].version - (offset - 1)
             else:
@@ -1067,7 +1060,7 @@ def now(
             typer.echo(f"Version not found (offset {offset})", err=True)
             raise typer.Exit(1)
 
-        version_nav = kp.get_version_nav(NOWDOC_ID, internal_version, collection=collection)
+        version_nav = kp.get_version_nav(NOWDOC_ID, internal_version)
         typer.echo(_format_item(
             item,
             as_json=_get_json_output(),
@@ -1076,8 +1069,12 @@ def now(
         ))
         return
 
+    # Read from stdin if piped and no content argument
+    if content is None and not reset and not sys.stdin.isatty():
+        content = sys.stdin.read().strip() or None
+
     # Determine if we're getting or setting
-    setting = content is not None or file is not None or reset
+    setting = content is not None or reset
 
     if setting:
         if reset:
@@ -1090,12 +1087,6 @@ def now(
             except FileNotFoundError:
                 typer.echo("Error: Builtin now.md not found", err=True)
                 raise typer.Exit(1)
-        elif file is not None:
-            if not file.exists():
-                typer.echo(f"Error: File not found: {file}", err=True)
-                raise typer.Exit(1)
-            new_content = file.read_text()
-            parsed_tags = {}
         else:
             new_content = content
             parsed_tags = {}
@@ -1106,9 +1097,9 @@ def now(
         item = kp.set_now(new_content, tags=parsed_tags or None)
 
         # Surface similar items and meta sections (occasion for reflection)
-        similar_items = kp.get_similar_for_display(item.id, limit=3, collection=collection)
+        similar_items = kp.get_similar_for_display(item.id, limit=limit)
         similar_offsets = {s.id: kp.get_version_offset(s) for s in similar_items}
-        meta_sections = kp.resolve_meta(item.id, collection=collection)
+        meta_sections = kp.resolve_meta(item.id, limit_per_doc=limit)
 
         typer.echo(_format_item(
             item,
@@ -1117,13 +1108,11 @@ def now(
             similar_offsets=similar_offsets if similar_items else None,
             meta_sections=meta_sections if meta_sections else None,
         ))
-        if not _get_json_output() and not _get_ids_output() and not sys.stdout.isatty():
-            typer.echo("\nAs an agent, you should reflect on this work. (run: `keep reflect`)")
     else:
         # Get current intentions (or search version history if tags specified)
         if tags:
             # Search version history for most recent version with matching tags
-            item = _find_now_version_by_tags(kp, tags, collection)
+            item = _find_now_version_by_tags(kp, tags)
             if item is None:
                 typer.echo("No version found matching tags", err=True)
                 raise typer.Exit(1)
@@ -1132,10 +1121,10 @@ def now(
         else:
             # Standard: get current with version navigation and similar items
             item = kp.get_now()
-            version_nav = kp.get_version_nav(NOWDOC_ID, None, collection=collection)
-            similar_items = kp.get_similar_for_display(NOWDOC_ID, limit=3, collection=collection)
+            version_nav = kp.get_version_nav(NOWDOC_ID, None)
+            similar_items = kp.get_similar_for_display(NOWDOC_ID, limit=limit)
             similar_offsets = {s.id: kp.get_version_offset(s) for s in similar_items}
-            meta_sections = kp.resolve_meta(NOWDOC_ID, collection=collection)
+            meta_sections = kp.resolve_meta(NOWDOC_ID, limit_per_doc=limit)
             typer.echo(_format_item(
                 item,
                 as_json=_get_json_output(),
@@ -1144,11 +1133,9 @@ def now(
                 similar_offsets=similar_offsets,
                 meta_sections=meta_sections,
             ))
-            if not _get_json_output() and not _get_ids_output() and not sys.stdout.isatty():
-                typer.echo("\nAs an agent, you should reflect on this work. (run: `keep reflect`)")
 
 
-def _find_now_version_by_tags(kp, tags: list[str], collection: str):
+def _find_now_version_by_tags(kp, tags: list[str]):
     """
     Search nowdoc version history for most recent version matching all tags.
 
@@ -1181,11 +1168,11 @@ def _find_now_version_by_tags(kp, tags: list[str], collection: str):
         return current
 
     # Scan archived versions (newest first)
-    versions = kp.list_versions(NOWDOC_ID, limit=100, collection=collection)
+    versions = kp.list_versions(NOWDOC_ID, limit=100)
     for i, v in enumerate(versions):
         if matches_tags(v.tags):
             # Found match - get full item at this version offset
-            return kp.get_version(NOWDOC_ID, i + 1, collection=collection)
+            return kp.get_version(NOWDOC_ID, i + 1)
 
     return None
 
@@ -1220,9 +1207,9 @@ def get(
         "--similar", "-S",
         help="List similar items"
     )] = False,
-    no_similar: Annotated[bool, typer.Option(
-        "--no-similar",
-        help="Suppress similar items in output"
+    meta: Annotated[bool, typer.Option(
+        "--meta", "-M",
+        help="List meta items"
     )] = False,
     tag: Annotated[Optional[list[str]], typer.Option(
         "--tag", "-t",
@@ -1230,10 +1217,9 @@ def get(
     )] = None,
     limit: Annotated[int, typer.Option(
         "--limit", "-n",
-        help="Max items for --history or --similar (default: 10)"
+        help="Max items for --history, --similar, or --meta (default: 10)"
     )] = 10,
     store: StoreOption = None,
-    collection: CollectionOption = "default",
 ):
     """
     Retrieve item(s) by ID.
@@ -1248,15 +1234,15 @@ def get(
         keep get "doc:1@V{1}"           # Same as -V 1
         keep get doc:1 --history        # List all versions
         keep get doc:1 --similar        # List similar items
-        keep get doc:1 --no-similar     # Suppress similar items
+        keep get doc:1 --meta           # List meta items
         keep get doc:1 -t project=myapp # Only if tag matches
     """
-    kp = _get_keeper(store, collection)
+    kp = _get_keeper(store)
     outputs = []
     errors = []
 
     for one_id in id:
-        result = _get_one(kp, one_id, version, history, similar, no_similar, tag, limit, collection)
+        result = _get_one(kp, one_id, version, history, similar, meta, tag, limit)
         if result is None:
             errors.append(one_id)
         else:
@@ -1276,10 +1262,9 @@ def _get_one(
     version: Optional[int],
     history: bool,
     similar: bool,
-    no_similar: bool,
+    meta: bool,
     tag: Optional[list[str]],
     limit: int,
-    collection: str,
 ) -> Optional[str]:
     """Get a single item and return its formatted output, or None on error."""
 
@@ -1287,7 +1272,7 @@ def _get_one(
     actual_id = one_id
     version_from_id = None
 
-    if kp.exists(one_id, collection=collection):
+    if kp.exists(one_id):
         # Literal ID exists - use it directly (prevents confusion attacks)
         actual_id = one_id
     else:
@@ -1304,60 +1289,14 @@ def _get_one(
 
     if history:
         # List all versions
-        versions = kp.list_versions(actual_id, limit=limit, collection=collection)
-        current = kp.get(actual_id, collection=collection)
-
-        if _get_ids_output():
-            # Output version identifiers, one per line
-            lines = []
-            if current:
-                lines.append(f"{actual_id}@V{{0}}")
-            for i in range(1, len(versions) + 1):
-                lines.append(f"{actual_id}@V{{{i}}}")
-            return "\n".join(lines)
-        elif _get_json_output():
-            result = {
-                "id": actual_id,
-                "current": {
-                    "summary": current.summary if current else None,
-                    "tags": current.tags if current else {},
-                    "offset": 0,
-                    "vid": f"{actual_id}@V{{0}}",
-                } if current else None,
-                "versions": [
-                    {
-                        "offset": i + 1,
-                        "vid": f"{actual_id}@V{{{i + 1}}}",
-                        "version": v.version,
-                        "summary": v.summary,
-                        "created_at": v.created_at,
-                    }
-                    for i, v in enumerate(versions)
-                ],
-            }
-            return json.dumps(result, indent=2)
-        else:
-            lines = []
-            if current:
-                summary_preview = current.summary[:60].replace("\n", " ")
-                if len(current.summary) > 60:
-                    summary_preview += "..."
-                lines.append(f"v0 (current): {summary_preview}")
-            if versions:
-                lines.append(f"\nArchived:")
-                for i, v in enumerate(versions, start=1):
-                    date_part = v.created_at[:10] if v.created_at else "unknown"
-                    summary_preview = v.summary[:50].replace("\n", " ")
-                    if len(v.summary) > 50:
-                        summary_preview += "..."
-                    lines.append(f"  v{i} ({date_part}): {summary_preview}")
-            else:
-                lines.append("No version history.")
-            return "\n".join(lines)
+        versions = kp.list_versions(actual_id, limit=limit)
+        current = kp.get(actual_id)
+        items = _versions_to_items(actual_id, current, versions)
+        return _format_items(items, as_json=_get_json_output())
 
     if similar:
         # List similar items
-        similar_items = kp.get_similar_for_display(actual_id, limit=limit, collection=collection)
+        similar_items = kp.get_similar_for_display(actual_id, limit=limit)
         similar_offsets = {s.id: kp.get_version_offset(s) for s in similar_items}
 
         if _get_ids_output():
@@ -1398,16 +1337,47 @@ def _get_one(
                 lines.append("  No similar items found.")
             return "\n".join(lines)
 
+    if meta:
+        # List meta items for this ID
+        meta_sections = kp.resolve_meta(actual_id, limit_per_doc=limit)
+        if _get_ids_output():
+            lines = []
+            for name, items in meta_sections.items():
+                for item in items:
+                    lines.append(_shell_quote_id(item.id))
+            return "\n".join(lines)
+        elif _get_json_output():
+            result = {
+                "id": actual_id,
+                "meta": {
+                    name: [{"id": item.id, "summary": item.summary[:60]} for item in items]
+                    for name, items in meta_sections.items()
+                },
+            }
+            return json.dumps(result, indent=2)
+        else:
+            lines = [f"Meta for {actual_id}:"]
+            for name, items in meta_sections.items():
+                lines.append(f"  {name}:")
+                for item in items:
+                    summary_preview = item.summary[:50].replace("\n", " ")
+                    if len(item.summary) > 50:
+                        summary_preview += "..."
+                    lines.append(f"    {_shell_quote_id(item.id)}  {summary_preview}")
+            if len(lines) == 1:
+                lines.append("  No meta items found.")
+            return "\n".join(lines)
+
     # Get specific version or current
     offset = effective_version if effective_version is not None else 0
 
     if offset == 0:
-        item = kp.get(actual_id, collection=collection)
+        item = kp.get(actual_id)
         internal_version = None
     else:
-        item = kp.get_version(actual_id, offset, collection=collection)
+        item = kp.get_version(actual_id, offset)
         # Calculate internal version number for API call
-        versions = kp.list_versions(actual_id, limit=1, collection=collection)
+        versions = kp.list_versions(actual_id, limit=1)
         if versions:
             internal_version = versions[0].version - (offset - 1)
         else:
@@ -1428,16 +1398,16 @@ def _get_one(
             return None
 
     # Get version navigation
-    version_nav = kp.get_version_nav(actual_id, internal_version, collection=collection)
+    version_nav = kp.get_version_nav(actual_id, internal_version)
 
-    # Get similar items and meta sections (unless suppressed or viewing old version)
+    # Get similar items and meta sections for current version
     similar_items = None
     similar_offsets = None
     meta_sections = None
-    if not no_similar and offset == 0:
-        similar_items = kp.get_similar_for_display(actual_id, limit=3, collection=collection)
+    if offset == 0:
+        similar_items = kp.get_similar_for_display(actual_id, limit=3)
         similar_offsets = {s.id: kp.get_version_offset(s) for s in similar_items}
-        meta_sections = kp.resolve_meta(actual_id, collection=collection)
+        meta_sections = kp.resolve_meta(actual_id)
 
     return _format_item(
         item,
@@ -1454,7 +1424,6 @@ def _get_one(
 def del_cmd(
     id: Annotated[list[str], typer.Argument(help="ID(s) of item(s) to delete")],
     store: StoreOption = None,
-    collection: CollectionOption = "default",
 ):
     """
     Delete the current version of item(s).
@@ -1468,24 +1437,24 @@ def del_cmd(
         keep del %abc123 %def456      # Remove multiple items
         keep del now                  # Revert now to previous
     """
-    kp = _get_keeper(store, collection)
+    kp = _get_keeper(store)
     had_errors = False
 
     for one_id in id:
-        item = kp.get(one_id, collection=collection)
+        item = kp.get(one_id)
         if item is None:
             typer.echo(f"Not found: {one_id}", err=True)
             had_errors = True
             continue
 
-        restored = kp.revert(one_id, collection=collection)
+        restored = kp.revert(one_id)
 
         if restored is None:
             # Fully deleted
             typer.echo(_format_summary_line(item))
         else:
             # Reverted — show the restored version with similar items
-            similar_items = kp.get_similar_for_display(restored.id, limit=3, collection=collection)
+            similar_items = kp.get_similar_for_display(restored.id, limit=3)
             similar_offsets = {s.id: kp.get_version_offset(s) for s in similar_items}
             typer.echo(_format_item(
                 restored,
@@ -1502,10 +1471,9 @@ def del_cmd(
 def delete(
     id: Annotated[list[str], typer.Argument(help="ID(s) of item(s) to delete")],
     store: StoreOption = None,
-    collection: CollectionOption = "default",
 ):
     """Delete the current version of item(s) (alias for 'del')."""
-    del_cmd(id=id, store=store, collection=collection)
+    del_cmd(id=id, store=store)
 
 
 @app.command("collections")
@@ -1515,7 +1483,7 @@ def list_collections(
     """
     List all collections in the store.
     """
-    kp = _get_keeper(store, "default")
+    kp = _get_keeper(store)
     collections = kp.list_collections()
 
     if _get_json_output():
@@ -1528,6 +1496,39 @@ def list_collections(
                 typer.echo(c)
 
 
+
+
+@app.command("reindex")
+def reindex(
+    store: StoreOption = None,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
+):
+    """
+    Rebuild search index with current embedding provider.
+
+    Re-embeds all items from the document store into the search index.
+    Use when changing embedding providers or to repair search.
+    """
+    kp = _get_keeper(store)
+    count = kp.count()
+
+    if count == 0:
+        typer.echo("No items to reindex.")
+        raise typer.Exit(0)
+
+    if not yes:
+        typer.confirm(f"Reindex {count} items with current embedding provider?", abort=True)
+
+    typer.echo(f"Reindexing {count} items...")
+    stats = kp.reindex()
+
+    if _get_json_output():
+        typer.echo(json.dumps(stats))
+    else:
+        typer.echo(
+            f"Done: {stats['indexed']} indexed, {stats['failed']} failed, "
+            f"{stats['versions']} versions"
+        )
 
 
 def _get_config_value(cfg, store_path: Path, path: str):
@@ -1565,20 +1566,20 @@ def _get_config_value(cfg, store_path: Path, path: str):
         try:
             chroma = ChromaStore(store_path)
             return chroma.list_collections()
-        except Exception:
+        except (OSError, ValueError):
             return []
 
     # Provider shortcuts
     if path == "providers":
         if cfg:
             return {
-                "embedding": cfg.embedding.name,
+                "embedding": cfg.embedding.name if cfg.embedding else None,
                 "summarization": cfg.summarization.name,
                 "document": cfg.document.name,
             }
         return None
     if path == "providers.embedding":
-        return cfg.embedding.name if cfg else None
+        return cfg.embedding.name if cfg and cfg.embedding else None
     if path == "providers.summarization":
         return cfg.summarization.name if cfg else None
     if path == "providers.document":
@@ -1621,7 +1622,7 @@ def _format_config_with_defaults(cfg, store_path: Path) -> str:
     try:
         chroma = ChromaStore(store_path)
         collections = chroma.list_collections()
-    except Exception:
+    except (OSError, ValueError):
         collections = []
 
     # Show paths
@@ -1722,7 +1723,7 @@ def config(
     """
     # Handle system docs reset - requires full Keeper initialization
     if reset_system_docs:
-        kp = _get_keeper(store, "default")
+        kp = _get_keeper(store)
         stats = kp.reset_system_documents()
         typer.echo(f"Reset {stats['reset']} system documents")
         return
@@ -1775,7 +1776,7 @@ def config(
             "store": str(store_path),
             "collections": collections,
             "providers": {
-                "embedding": cfg.embedding.name if cfg else None,
+                "embedding": cfg.embedding.name if cfg and cfg.embedding else None,
                 "summarization": cfg.summarization.name if cfg else None,
                 "document": cfg.document.name if cfg else None,
             },
@@ -1810,7 +1811,7 @@ def process_pending(
     Items indexed with --lazy use a truncated placeholder summary.
     This command generates real summaries for those items.
     """
-    kp = _get_keeper(store, "default")
+    kp = _get_keeper(store)
 
     # Daemon mode: acquire singleton lock, process all, clean up
     if daemon:

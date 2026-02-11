@@ -101,7 +101,8 @@ keep find "auth" --since P7D           # Last 7 days
 # Retrieve (shows similar items by default)
 keep get "file://$(keep config tool)/docs/library/ancrenewisse.pdf"
 keep get https://inguz.substack.com/p/keep
-keep get ID --no-similar             # Without similar items
+keep get ID --meta                   # List meta items only
+keep get ID --similar                # List similar items only
 
 # Tags
 keep list --tag project=myapp          # Find by tag
@@ -218,12 +219,12 @@ On first use, `keep` detects coding tools and installs a protocol block and hook
 
 | Tool | Protocol Block | Hooks |
 |------|---------------|-------|
-| Claude Code (`~/.claude/`) | `CLAUDE.md` — reflective practice prompt | `settings.json` — `keep now` on session start |
+| Claude Code (`~/.claude/`) | `CLAUDE.md` — reflective practice prompt | `settings.json` — session start, prompt submit, subagent, session end |
+| Kiro (`~/.kiro/`) | `steering/keep.md` — reflective practice prompt | `hooks/*.kiro.hook` — agent spawn, prompt submit, agent stop |
 | OpenAI Codex (`~/.codex/`) | `AGENTS.md` — reflective practice prompt | — |
-| OpenClaw (cwd) | `AGENTS.md` — reflective practice prompt (if found in cwd) | — |
-| Kiro (`~/.kiro/`) | detection only | detection only |
+| OpenClaw (cwd) | `AGENTS.md` — reflective practice prompt (if found in cwd) | [Plugin](OPENCLAW-INTEGRATION.md) — agent start, agent stop |
 
-OpenClaw sets its working directory to the agent workspace containing `AGENTS.md`. The protocol block is installed automatically on each run if not already present.
+Hooks inject `keep now` context at key moments (session start, prompt submit) so the agent always has current intentions and relevant context. The protocol block teaches the reflective practice itself.
 
 Run `keep config` to see integration status. Set `KEEP_NO_SETUP=1` to skip auto-install.
 
@@ -251,10 +252,13 @@ CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...  # OAuth token alternative
 
 **Slow local summarization:** Large content is summarized in the background automatically.
 
+**Claude Code hooks need `jq`:** The prompt-submit hook uses `jq` to extract context. Install with your package manager (e.g., `brew install jq`). Hooks are fail-safe without it, but prompt context won't be captured.
+
 ## Next Steps
 
 - [REFERENCE.md](REFERENCE.md) — Complete CLI reference
 - [PYTHON-API.md](PYTHON-API.md) — Python API for embedding keep in applications
 - [AGENT-GUIDE.md](AGENT-GUIDE.md) — Working session patterns
 - [ARCHITECTURE.md](ARCHITECTURE.md) — System internals
+- [OPENCLAW-INTEGRATION.md](OPENCLAW-INTEGRATION.md) — OpenClaw plugin setup
 - [SKILL.md](../SKILL.md) — The reflective practice

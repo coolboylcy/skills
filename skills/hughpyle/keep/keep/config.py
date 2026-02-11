@@ -99,8 +99,8 @@ class StoreConfig:
     version: int = CONFIG_VERSION
     created: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
-    # Provider configurations
-    embedding: ProviderConfig = field(default_factory=lambda: ProviderConfig("sentence-transformers"))
+    # Provider configurations (embedding may be None if no provider is available)
+    embedding: Optional[ProviderConfig] = field(default_factory=lambda: ProviderConfig("sentence-transformers"))
     summarization: ProviderConfig = field(default_factory=lambda: ProviderConfig("truncate"))
     document: ProviderConfig = field(default_factory=lambda: ProviderConfig("composite"))
 
@@ -160,30 +160,6 @@ def read_openclaw_config() -> dict | None:
         return None
 
 
-def get_openclaw_memory_search_config(openclaw_config: dict | None) -> dict | None:
-    """
-    Extract memorySearch config from OpenClaw config.
-
-    Returns the memorySearch settings or None if not configured.
-
-    Example structure:
-        {
-            "provider": "openai" | "gemini" | "local" | "auto",
-            "model": "text-embedding-3-small",
-            "remote": {
-                "apiKey": "sk-...",
-                "baseUrl": "https://..."
-            }
-        }
-    """
-    if not openclaw_config:
-        return None
-
-    return (openclaw_config
-            .get("agents", {})
-            .get("defaults", {})
-            .get("memorySearch", None))
-
 
 def _detect_ollama() -> dict | None:
     """
@@ -209,8 +185,8 @@ def _detect_ollama() -> dict | None:
             models = [m["name"] for m in data.get("models", [])]
             if models:
                 return {"base_url": base_url, "models": models}
-    except Exception:
-        pass
+    except (OSError, ValueError):
+        pass  # Ollama not running or not responding
     return None
 
 
@@ -320,6 +296,7 @@ def detect_default_providers() -> dict[str, ProviderConfig | None]:
         if is_apple_silicon:
             try:
                 import mlx.core  # noqa
+                import sentence_transformers  # noqa  — MLX embedding uses sentence-transformers
                 embedding_provider = ProviderConfig("mlx", {"model": "all-MiniLM-L6-v2"})
             except ImportError:
                 pass
@@ -465,7 +442,7 @@ def load_config(config_dir: Path) -> StoreConfig:
         store_path=store_path_str,
         version=version,
         created=data.get("store", {}).get("created", ""),
-        embedding=parse_provider(data.get("embedding", {"name": "sentence-transformers"})),
+        embedding=parse_provider(data["embedding"]) if "embedding" in data else None,
         summarization=parse_provider(data.get("summarization", {"name": "truncate"})),
         document=parse_provider(data.get("document", {"name": "composite"})),
         embedding_identity=parse_embedding_identity(data.get("embedding_identity")),

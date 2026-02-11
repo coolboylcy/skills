@@ -59,6 +59,8 @@ Document summary here...
 
 Version numbers are **offsets**: @V{0} = current, @V{1} = previous, @V{2} = two versions ago.
 
+**Output width:** Summaries are truncated to fit the terminal. When stdout is not a TTY (e.g., piped through hooks), output uses 200 columns for wider summaries.
+
 ### Pipe Composition
 
 ```bash
@@ -80,7 +82,8 @@ keep --help                          # Show all commands
 # Current intentions (now)
 keep now                             # Show current intentions with version nav
 keep now "What's important now"      # Update intentions
-keep now -f context.md -t project=x  # Read content from file with tags
+keep now -n 10                       # Show with more similar/meta items
+echo "piped content" | keep now      # Set from stdin
 keep now -V 1                        # Previous intentions
 keep now --history                   # List all versions
 keep reflect                         # Deep structured reflection practice
@@ -98,25 +101,30 @@ keep get ID -V 1                     # Previous version with prev/next nav
 keep get "ID@V{1}"                   # Same as -V 1 (version identifier syntax)
 keep get ID --history                # List all versions (default 10, -n to override)
 keep get ID --similar                # List similar items (default 10)
-keep get ID --no-similar             # Suppress similar items
 keep get ID --similar -n 20          # List 20 similar items
+keep get ID --meta                   # List meta items
+keep get ID --meta -n 5              # List 5 meta items per section
 
 # List recent items
 keep list                            # Show 10 most recent (summary lines)
 keep list -n 20                      # Show 20 most recent
 keep --ids list                      # IDs only (for piping)
 keep --full list                     # Full YAML frontmatter
+keep list --history                  # Include archived versions
 
 # Debug mode
 keep -v <cmd>                        # Enable debug logging to stderr
 
-# Search with time filtering (--since accepts ISO duration or date)
+# Search (semantic by default, --text for full-text)
+keep find "query"                    # Semantic similarity search
+keep find "query" --text             # Full-text search on summaries
+keep find --id ID                    # Find similar to item
+keep find "query" --history          # Include archived versions
 keep find "query" --since P7D        # Last 7 days
 keep find "query" --since P1W        # Last week
 keep find "query" --since PT1H       # Last hour
 keep find "query" --since 2026-01-15 # Since specific date
 keep find --id ID --since P30D       # Similar items from last 30 days
-keep search "text" --since P3D       # Full-text search, last 3 days
 
 # Tag filtering
 keep list --tags=                    # List all tag keys
@@ -137,6 +145,10 @@ keep tag-update ID1 ID2 --tag k=v    # Tag multiple docs
 
 # Delete / revert
 keep del ID                       # Remove item (or revert to previous version)
+
+# Maintenance
+keep reindex                      # Rebuild search index with current embedding provider
+keep reindex -y                   # Skip confirmation
 ```
 
 ## Python API
@@ -221,17 +233,6 @@ keep find "authentication" -t topic=auth
 # Big picture (no project filter)
 keep find "recent work" --since P1D
 ```
-
-**For complete segregation**, use collections with `KEEP_COLLECTION`:
-```bash
-export KEEP_COLLECTION=work
-keep now "work context"
-
-export KEEP_COLLECTION=personal
-keep now "personal context"
-```
-
-Collections are separate stores. Tags are overlays within a store.
 
 ### Speech-Act Tags
 
@@ -338,13 +339,11 @@ keep now -V 2                  # Two versions ago of nowdoc
 
 ### History Output
 
-`--history` shows versions using offset numbers:
+`--history` shows versions as summary lines with version identifiers:
 ```
-v0 (current): Current summary...
-
-Archived:
-  v1 (2026-01-15): Previous summary...
-  v2 (2026-01-14): Older summary...
+now           2026-01-16 Current summary...
+now@V{1}      2026-01-15 Previous summary...
+now@V{2}      2026-01-14 Older summary...
 ```
 
 With `--ids`, outputs version identifiers for piping:
@@ -371,7 +370,6 @@ Same content = same ID = enables versioning via tag changes.
 ```bash
 KEEP_STORE_PATH=/path/to/store       # Override store location
 KEEP_CONFIG=/path/to/.keep           # Override config directory
-KEEP_COLLECTION=name                 # Collection name (default: "default")
 KEEP_TAG_PROJECT=myapp               # Auto-apply tags (any KEEP_TAG_* variable)
 KEEP_VERBOSE=1                       # Debug logging to stderr
 KEEP_NO_SETUP=1                      # Skip auto-install of tool integrations

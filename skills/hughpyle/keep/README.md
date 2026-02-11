@@ -39,6 +39,8 @@ What makes this more than a vector store: when you view your current context (`k
 
 Backed by ChromaDB for vectors, SQLite for metadata and versions.
 
+> This is like an opinionated version of [Reflexion](https://github.com/noahshinn/reflexion) from Shinn et al.  If there are other similar research or projects I'd like to hear about them!
+
 ### The Practice
 
 keep is designed as a skill for AI agents — a practice, not just a tool. The [skill instructions](SKILL.md) teach agents to reflect before, during, and after action: check intentions, recognize commitments, capture learnings, notice breakdowns. `keep reflect` guides a structured reflection; `keep now` tracks current intentions and surfaces what's relevant.
@@ -49,15 +51,15 @@ This works because the tool and the skill reinforce each other. The tool stores 
 
 ### Integration
 
-The skill instructions install into your agent's system prompt automatically on first use (Claude Code, OpenAI Codex, OpenClaw). For deeper integration:
+The skill instructions and hooks install into your agent's configuration automatically on first use (Claude Code, Kiro, OpenAI Codex, OpenClaw). Hooks inject `keep now` context at session start, on each prompt, and at session end — so the agent always knows its current intentions.
 
 | Layer | What it does |
 |-------|-------------|
 | **Skill prompt** | Always in system prompt — guides reflection, breakdown capture, document indexing |
-| **Plugin hook** | Injects `keep now` context at the start of each agent turn ([OpenClaw plugin](SKILL.md#openclaw-integration)) |
+| **Hooks** | Inject `keep now -n 10` context at session start, prompt submit, and session end |
 | **Daily cron** | Scheduled deep reflection in an isolated session ([OpenClaw cron](SKILL.md#openclaw-integration)) |
 
-The CLI alone is enough to start. The plugin and cron make it automatic.
+The CLI alone is enough to start. The hooks make it automatic.
 
 ---
 

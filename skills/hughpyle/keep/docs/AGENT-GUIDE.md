@@ -21,6 +21,7 @@ keep put "file://$(keep config tool)/docs/library/ancrenewisse.pdf"
 keep put https://inguz.substack.com/p/keep -t topic=practice
 keep put "User prefers OAuth2 with PKCE" -t topic=auth
 keep find "authentication flow" --limit 5
+keep find "auth" --text                        # Full-text search on summaries
 keep find "auth" -t project=myapp              # Semantic search + tag filter
 keep list --tag project=myapp
 keep get file:///project/readme.md
@@ -169,13 +170,11 @@ The Exhortation to Rāhula at Mango Stone is a Buddhist sutra that teaches...
 
 ### Version history
 
-`keep now --history` or `keep get ID --history` shows a compact version list:
+`keep now --history` or `keep get ID --history` shows versions as summary lines:
 
 ```
-v0 (current): Finished reading MN61. The mirror teaching: reflect before, ...
-
-Archived:
-  v1 (2026-02-07): Reading the first teachings. Exploring MN61 and th...
+now           2026-02-08 Finished reading MN61. The mirror teaching: reflect before, ...
+now@V{1}      2026-02-07 Reading the first teachings. Exploring MN61 and th...
 ```
 
 ### Other formats
@@ -321,8 +320,8 @@ All documents retain version history automatically. When you update a document, 
 **CLI:**
 ```bash
 keep get ID                   # Current version with similar items
-keep get ID --no-similar      # Just the document, no similar
 keep get ID --similar         # List similar items (default 10, -n to override)
+keep get ID --meta            # List meta items (-n to override)
 keep get ID -V 1              # Previous version
 keep get ID -V 2              # Two versions ago
 keep get ID --history         # List all versions (default 10, -n to override)
@@ -364,11 +363,7 @@ Same content = same ID = enables versioning via tag changes.
 * Retrieve by semantic similarity, full-text search, or tags.
 * Transfer context between agents or sessions seamlessly.
 
-The data is partitioned by *collection*. Collection names are lowercase ASCII with underscores.
-
 ## Functionality
-
-within a collection:
 
 `update(id: URI, tags: dict)` - inserts or updates the document at `URI` into the store.  This process delegates the work of embedding, summarization and tagging, then updates the store.  Any `tags` are merged with existing tags (overlay, not replace) and stored alongside the "derived tags" produced by the tagging service.
 
@@ -578,7 +573,6 @@ See [QUICKSTART.md](QUICKSTART.md#provider-options) for available embedding, sum
 | Situation | Behavior |
 |-----------|----------|
 | Store path doesn't exist | Created automatically |
-| Collection doesn't exist | Created on first `update()` |
 | URI unreachable | `IOError` raised from `update()` |
 | Item not found | `get()` returns `None`, `find_similar()` raises `KeyError` |
 | No results | Empty list returned |
