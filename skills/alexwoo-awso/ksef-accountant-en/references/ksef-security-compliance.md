@@ -538,10 +538,22 @@ For production accounting systems:
 
 ---
 
+## Secure Coding Practices Summary
+
+- No `os.system()` - use `subprocess.run()` with argument lists
+- No `eval()` or `exec()` - never execute dynamic code
+- No `shell=True` - prevents shell injection
+- Path validation to prevent traversal attacks
+- Timeout settings to prevent hanging processes
+- No hardcoded credentials - use environment variables or vaults
+- Parameterized queries only (never string concatenation for SQL)
+- Input validation on all user inputs
+- Least privilege principle for all service accounts
+
+---
+
 **Compliance:** Implementation of above practices supports compliance with:
 - VAT Act
 - GDPR / RODO
 - Accounting Act
 - ISO 27001 standards (optional)
-
-[← Back to main SKILL](https://github.com/alexwoo-awso/skill/blob/main/ksef-accountant-en/SKILL.md)

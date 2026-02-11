@@ -388,7 +388,5 @@ Cr 130 Current account     11,500.00
 ---
 
 **See also:**
-- [AI Features - Classification](https://github.com/alexwoo-awso/skill/blob/main/ksef-accountant-en/ksef-ai-features.md#klasyfikacja)
-- [JPK_V7 Examples](https://github.com/alexwoo-awso/skill/blob/main/ksef-accountant-en/ksef-jpk-examples.md)
-
-[← Back to main SKILL](https://github.com/alexwoo-awso/skill/blob/main/ksef-accountant-en/SKILL.md)
+- [AI Features - Classification](ksef-ai-features.md#klasyfikacja)
+- [JPK_V7 Examples](ksef-jpk-examples.md)

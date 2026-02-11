@@ -494,5 +494,3 @@ def log_ai_decision(invoice, prediction, action):
 ---
 
 **Final warning:** All AI features require regular monitoring, validation, and supervision by qualified personnel. Do not rely solely on automated decisions in tax and accounting matters.
-
-[← Back to main SKILL](https://github.com/alexwoo-awso/skill/blob/main/ksef-accountant-en/SKILL.md)

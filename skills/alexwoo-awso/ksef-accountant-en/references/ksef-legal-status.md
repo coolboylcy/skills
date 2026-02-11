@@ -108,5 +108,3 @@
 
 **Last update:** February 8, 2026
 **Next verification:** Recommended every 2 weeks
-
-[← Back to main SKILL](https://github.com/alexwoo-awso/skill/blob/main/ksef-accountant-en/SKILL.md)

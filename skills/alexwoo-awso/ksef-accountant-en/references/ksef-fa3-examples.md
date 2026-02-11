@@ -337,5 +337,3 @@ def validate_fa3_before_send(xml_content):
 
 **Official FA(3) documentation:**
 https://ksef.podatki.gov.pl/media/4u1bmhx4/information-sheet-on-the-fa-3-logical-structure.pdf
-
-[← Back to main SKILL](https://github.com/alexwoo-awso/skill/blob/main/ksef-accountant-en/SKILL.md)

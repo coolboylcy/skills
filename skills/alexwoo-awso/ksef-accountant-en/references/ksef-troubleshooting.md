@@ -479,5 +479,3 @@ def validate_fa3_xsd(xml_content):
 - KSeF Documentation: https://ksef.podatki.gov.pl
 - Forum: https://github.com/CIRFMF/ksef-discussions
 - MF Helpdesk: (check KSeF portal)
-
-[← Back to main SKILL](https://github.com/alexwoo-awso/skill/blob/main/ksef-accountant-en/SKILL.md)
