@@ -1,0 +1,11 @@
+{
+  "owner": "teeclaw",
+  "slug": "openclaw-credential-manager",
+  "displayName": "OpenClaw Credential Manager",
+  "latest": {
+    "version": "2.0.0",
+    "publishedAt": 1770781638826,
+    "commit": null
+  },
+  "history": []
+}
