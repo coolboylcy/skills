@@ -1,0 +1,11 @@
+{
+  "owner": "juguangyuan520-dotcom",
+  "slug": "report-generator",
+  "displayName": "Generate responsive HTML pages suitable for reporting, supporting resizing and screenshot capture.",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1770816527775,
+    "commit": null
+  },
+  "history": []
+}
