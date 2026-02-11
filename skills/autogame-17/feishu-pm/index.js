@@ -104,9 +104,13 @@ program
     .requiredOption('--table <id>', 'Table ID')
     .requiredOption('--title <text>', 'Task Title')
     .option('--desc <text>', 'Description')
+    .option('--content <text>', 'Content (alias for --desc)')
     .option('--priority <text>', 'Priority (e.g. "Important")')
     .action(async (opts) => {
         try {
+            // Alias mapping
+            if (opts.content && !opts.desc) opts.desc = opts.content;
+
             // Hardcoded mapping for "Iter 11" style for now, but extensible
             const fields = {
                 '需求': opts.title
