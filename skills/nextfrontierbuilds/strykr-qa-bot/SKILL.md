@@ -1,3 +1,11 @@
+---
+name: strykr-qa-bot
+description: AI-powered QA for Strykr trading platform. Pre-built tests for crypto, stocks, news, AI chat. CI/CD ready. Works with Cursor, Claude, ChatGPT, Copilot. Vibe-coding enabled.
+version: 0.1.2
+author: NextFrontierBuilds
+keywords: [strykr, prism, qa, testing, automation, web-qa-bot, clawdbot, moltbot, ai, ai-agent, vibe-coding, cursor, claude, chatgpt, copilot, github-copilot, crypto, trading, fintech, openclaw, ai-tools, developer-tools, devtools, typescript, llm]
+---
+
 # strykr-qa-bot
 
 QA automation skill for testing Strykr (https://app.strykr.ai).
