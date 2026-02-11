@@ -1,0 +1,11 @@
+{
+  "owner": "ymode",
+  "slug": "moltbook-filter",
+  "displayName": "Moltbook Spam Filter",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770791010954,
+    "commit": null
+  },
+  "history": []
+}
