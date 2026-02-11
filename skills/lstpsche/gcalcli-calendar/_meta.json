@@ -1,13 +1,18 @@
 {
   "owner": "lstpsche",
   "slug": "gcalcli-calendar",
-  "displayName": "Gcalcli Calendar",
+  "displayName": "Google Calendar (via gcalcli)",
   "latest": {
-    "version": "2.1.1",
-    "publishedAt": 1770767521770,
-    "commit": "https://github.com/openclaw/skills/commit/7162cd63fa781dd19c631a56cd9e87bcd64a4a58"
+    "version": "2.1.2",
+    "publishedAt": 1770767682020,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.1.1",
+      "publishedAt": 1770767521770,
+      "commit": "https://github.com/openclaw/skills/commit/7162cd63fa781dd19c631a56cd9e87bcd64a4a58"
+    },
     {
       "version": "2.1.0",
       "publishedAt": 1770424845057,
