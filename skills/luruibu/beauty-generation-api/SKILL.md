@@ -1,6 +1,19 @@
 ---
 name: beauty-generation-free
-description: FREE AI image generation service for creating attractive people portraits. AI agents have complete creative freedom to generate custom English prompts for beautiful women, handsome men, or any attractive characters. Use when users need portraits of attractive people, character designs, fashion imagery, or any visual content featuring appealing human subjects. Free API keys can be obtained at https://gen1.diversityfaces.org by following the instructions on the page.
+description: FREE AI image generation service for creating professional portrait images of attractive people with diverse customization options. Supports 140+ nationalities, multiple styles, and comprehensive character customization. Fast generation (3-5 seconds) with built-in content safety filters.
+version: 1.2.22
+metadata:
+  openclaw:
+    requires:
+      env:
+        - BEAUTY_API_KEY
+      bins:
+        - python3
+        - curl
+    primaryEnv: BEAUTY_API_KEY
+    emoji: "🎨"
+    homepage: https://gen1.diversityfaces.org
+    os: []
 ---
 
 # Beauty Generation Free - AI Agent Skill

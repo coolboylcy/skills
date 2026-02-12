@@ -1,47 +1,29 @@
 {
   "name": "beauty-generation-free",
-  "version": "1.2.17",
-  "description": "FREE AI image generation service for creating professional portrait images of attractive people. Supports diverse demographics, styles, and creative concepts with built-in content safety filters. Simple workflow: create prompt → generate → download → deliver to user within 5-10 seconds. Requires BEAUTY_API_KEY environment variable. Enforces safety rules: refuses minors, nudity, deepfakes, violence, and hate speech.",
+  "version": "1.2.22",
+  "description": "FREE AI image generation service for creating professional portrait images with 140+ nationalities, diverse styles, and comprehensive customization. Fast generation (3-5 seconds) with built-in content safety filters.",
   "main": "SKILL.md",
-  "requiredEnvVars": ["BEAUTY_API_KEY"],
-  "securityPolicy": {
-    "contentSafety": "Enforced - refuses minors, nudity, sexual content, violence, deepfakes, hate speech",
-    "dataHandling": "No personal data collection. Generated images stored temporarily on service only.",
-    "apiKeyScope": "Image generation endpoints only - no access to billing, account data, or admin functions",
-    "trustLevel": "Official service at https://gen1.diversityfaces.org"
+  "author": "DiversityFaces Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luruibu/beauty-generation"
   },
-  "credentials": {
-    "BEAUTY_API_KEY": {
-      "description": "API key for beauty generation service. Get free key at https://gen1.diversityfaces.org. For testing, use official test key: ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI (test/demo only, limited quota)",
-      "scope": "image-generation-only",
-      "permissions": "Image generation endpoints only - no access to billing, account data, or admin functions",
-      "optional": false,
-      "testKey": "ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI",
-      "testKeyWarning": "Test key has limited quota and is for demo/testing only. Use your own key for production."
-    }
+  "homepage": "https://gen1.diversityfaces.org",
+  "bugs": {
+    "url": "https://github.com/luruibu/beauty-generation/issues"
   },
   "keywords": [
     "beauty-generation",
     "portrait-photography",
     "character-design",
-    "fashion-design",
     "ai-art",
     "image-generation",
     "professional-headshots",
-    "artistic-portraits",
-    "high-quality",
-    "api-service",
-    "free-generation",
     "safe-ai",
     "content-safety",
-    "diverse-representation",
-    "fast-generation"
+    "diverse-representation"
   ],
-  "author": "DiversityFaces Team",
-  "license": "MIT",
-  "engines": {
-    "node": ">=14.0.0"
-  },
   "scripts": {
     "test": "python3 scripts/generate.py --test",
     "generate": "python3 scripts/generate.py"
@@ -50,44 +32,5 @@
     "SKILL.md",
     "scripts/",
     "README.md"
-  ],
-  "agentskills": {
-    "skill": "SKILL.md",
-    "category": "image-generation",
-    "tags": ["beauty", "portraits", "fashion", "attractive-people", "custom-prompts", "english-prompts", "creative-freedom", "fast-delivery"],
-    "apiRequired": true,
-    "authentication": "api-key",
-    "formatRequirements": "english-prompts-only",
-    "crossPlatform": true,
-    "unicodeSupport": true,
-    "updateFrequency": "manual",
-    "requiredEnvVars": [
-      {
-        "name": "BEAUTY_API_KEY",
-        "description": "API key for beauty generation service. Get free key at https://gen1.diversityfaces.org. For testing, use: ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI (test/demo only, limited quota). This key grants access ONLY to image generation endpoints (/api/generate/custom, /api/status, /api/image). It does NOT grant access to billing, account data, or admin functions.",
-        "optional": false,
-        "default": null,
-        "scope": "image-generation-only",
-        "testKey": "ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI"
-      }
-    ],
-    "provenance": {
-      "service": "DiversityFaces Beauty Generation API",
-      "homepage": "https://gen1.diversityfaces.org",
-      "documentation": "https://gen1.diversityfaces.org",
-      "repository": "https://github.com/luruibu/beauty-generation",
-      "trustLevel": "official",
-      "dataHandling": "Images are generated and stored temporarily on the service. No personal data collection. Generated images are not retained after download unless explicitly saved by user.",
-      "apiKeyPermissions": "Image generation only - no access to billing, account settings, or other user data",
-      "securityRecommendations": "Use a dedicated/ephemeral API key. Do not share the key. Treat as sensitive credential."
-    }
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/luruibu/beauty-generation"
-  },
-  "homepage": "https://gen1.diversityfaces.org",
-  "bugs": {
-    "url": "https://github.com/luruibu/beauty-generation/issues"
-  }
+  ]
 }
