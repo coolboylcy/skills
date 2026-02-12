@@ -3,11 +3,16 @@
   "slug": "ollama-memory-embeddings",
   "displayName": "Ollama Memory Embeddings",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1770753165126,
-    "commit": "https://github.com/openclaw/skills/commit/cd2c2de209ff74009232341528edb53e88270637"
+    "version": "1.0.3",
+    "publishedAt": 1770813832556,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1770753165126,
+      "commit": "https://github.com/openclaw/skills/commit/cd2c2de209ff74009232341528edb53e88270637"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1770747527476,
