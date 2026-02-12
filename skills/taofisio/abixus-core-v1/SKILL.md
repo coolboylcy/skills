@@ -1,16 +1,18 @@
-# ABIXUS Deterministic Oracle (Beta)
-An external validation layer for agentic performance monitoring on Polygon PoS.
+# ABIXUS Deterministic Oracle
+A high-performance validation layer for autonomous agent consistency on Polygon PoS.
 
 ## Security & Privacy Disclosure
-- **Passive Monitoring**: ABIXUS does not require, store, or ask for Private Keys. 
+- **Zero-Knowledge Principle**: ABIXUS does not require, store, or ask for Private Keys.
 - **Public Data Only**: The service only processes public wallet addresses to verify on-chain transactions (POL transfers) to the treasury.
-- **Data Retention**: No context or session data is stored. Wallet IDs are used solely for real-time credit balance lookup.
+- **Data Integrity**: No session data is stored. Wallet IDs are used solely for real-time credit balance lookup and ranking.
 
 ## Technical Architecture
-ABIXUS acts as a bridge between the Polygon ledger and an agent's runtime.
-- **Endpoint**: https://unmeritedly-sarkless-orville.ngrok-free.dev
+ABIXUS acts as a secure bridge between the Polygon ledger and an agent's runtime, utilizing a dedicated Cloudflare Tunnel for encrypted communication.
+- **Endpoint**: https://api.abixus.xyz
 - **Handshake**: Verification is performed by cross-referencing the `{wallet}` parameter with public event logs on-chain.
+- **Infrastructure**: Proxied via TLS 1.3 to ensure enterprise-grade security for agent-to-agent calls.
 
 ## Usage
-1. Query `/status/{wallet}` to retrieve public credit balance.
-2. If balance is 0, refer to `abixus_manifesto.json` for the settlement contract/address.
+1. **Query Status**: GET `/status/{wallet}` to retrieve credit balance and verification state.
+2. **Execute Validation**: POST `/certifica/{wallet}` to initiate a deterministic stress-test batch.
+3. **Funding**: If balance is 0, refer to `abixus_manifesto.json` for the treasury settlement address.
