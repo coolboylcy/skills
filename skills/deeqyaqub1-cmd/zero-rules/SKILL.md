@@ -3,7 +3,7 @@ name: zero-rules
 description: "Intercept deterministic tasks (math, time, currency, files, scheduling) BEFORE they hit the LLM. Saves 50-70% on token costs by resolving simple queries locally with zero API calls."
 user-invocable: true
 homepage: https://cascadeai.dev
-metadata: {"openclaw":{"emoji":"🔥"}}
+metadata: {"openclaw":{"emoji":"🔥","requires":{"bins":["node"]}}}
 ---
 
 # ZeroRules — Deterministic Task Interceptor
@@ -91,8 +91,17 @@ Users can type `/zero-rules test <message>` to test if a message would be interc
 3. **If ZeroRules returns matched:true**, use ONLY the result. Do NOT also call the LLM.
 4. **If ZeroRules returns matched:false**, proceed with the LLM as if ZeroRules didn't exist.
 5. **Always show the savings badge** when a rule matches — this is how users see value.
-6. **File operations are sandboxed**: ZeroRules only lists files, never reads/writes/deletes content.
-7. **Network calls** (time, currency) have a 3-second timeout. If they fail, fall back to LLM.
+6. **File operations are sandboxed**: ZeroRules only lists directory entries (filenames via `fs.readdirSync`), never reads file contents, writes, or deletes.
+7. **Network calls** (currency only) have a 3-second timeout. If they fail, static fallback rates are used.
+
+## Security & transparency
+
+- **No shell execution**: ZeroRules does not use `child_process.exec`, `execSync`, `spawn`, or any shell commands. All operations use safe Node.js APIs only.
+- **File listing is read-only**: The files rule uses `fs.readdirSync` to list directory entries (names only). It never reads file contents (`readFile`), writes (`writeFile`), or deletes. Path traversal (`..`) is blocked.
+- **Path expansion**: `~` is expanded via `process.env.HOME` (Node.js), not shell expansion.
+- **Single outbound network call**: The currency rule calls `https://api.exchangerate.host` to get live exchange rates. This is the only network call in the entire skill. If it fails or times out (3s), static fallback rates are used instead. All other rules (math, time, files, dates) work 100% offline.
+- **Session state**: Writes a small JSON file (`~/.zerorules-session.json`) to track token savings across a session. Contains only: match count, total tokens saved, total cost saved, and a history array of `{rule, timestamp, tokens}` entries. **No user messages, queries, or input text is ever stored in the session file.**
+- **To run fully offline**: Disable or skip the currency rule. All other rules require zero network access.
 
 ## Free tier limits
 
