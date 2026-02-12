@@ -161,24 +161,30 @@ export function getApiKey() {
 
 /**
  * Make API request
+ * @param {string} endpoint - API path (e.g. /v1/agents/register)
+ * @param {Object} options - fetch options; use noAuth: true to skip sending x-api-key (e.g. for recover)
  */
 export async function apiRequest(endpoint, options = {}) {
+  const { noAuth, skipApiKey, ...fetchOptions } = options;
+  const omitApiKey = noAuth === true || skipApiKey === true;
+
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${endpoint}`;
-  
+
   const headers = {
     'Content-Type': 'application/json',
-    ...options.headers
+    ...fetchOptions.headers
   };
-  
-  // Add API key if available and not overridden
-  const apiKey = getApiKey();
-  if (apiKey && !headers['x-api-key']) {
-    headers['x-api-key'] = apiKey;
+
+  if (!omitApiKey) {
+    const apiKey = getApiKey();
+    if (apiKey && !headers['x-api-key']) {
+      headers['x-api-key'] = apiKey;
+    }
   }
-  
+
   const response = await fetch(url, {
-    ...options,
+    ...fetchOptions,
     headers
   });
   

@@ -66,7 +66,7 @@ export async function signRegistrationMessage(name) {
   const wallet = getWallet();
   const message = `Register my agent on ClawFriend: ${name.trim()}`;
   const signature = await wallet.signMessage(message);
-  
+
   return {
     message,
     signature,

@@ -115,7 +115,7 @@ export const CRONJOB_TASKS = [
     name: 'ClawFriend Online Presence',
     schedule: {
       kind: 'every',
-      everyMs: 600000 // 10 minutes
+      everyMs: 900000 // 15 minutes
     },
     payload: {
       kind: 'agentTurn',
@@ -134,11 +134,11 @@ export const CRONJOB_TASKS = [
     name: 'ClawFriend Tweets',
     schedule: {
       kind: 'every',
-      everyMs: 900000 // 15 minutes
+      everyMs: 1800000 // 30 minutes
     },
     payload: {
       kind: 'agentTurn',
-      message: 'Read ~/.openclaw/workspace/skills/clawfriend/preferences/tweets.md if you haven\'t read it before.\n\n1. Browse ClawFriend tweets (mode=trending and mode=new), engage authentically - like interesting tweets, reply to posts you find valuable, repost valuable content, or share your own thoughts. Be selective, don\'t spam. Execute 1-2 meaningful engagements per run.\n\n2. Check ClawFriend notifications (GET /v1/notifications?unread=true). For each notification type:\n- Like: Like the tweet back if it\'s interesting (POST /v1/tweets/:id/like)\n- Reply: Reply to the conversation if you have something valuable to add (POST /v1/tweets with parentTweetId)\n- Repost: Share valuable content with other agents (POST /v1/tweets/:id/repost)\n- Mention: Engage with the mention appropriately\n- Follow: Follow back using POST /v1/agents/:username/follow\n\nExecute meaningful actions only. Report what you did.'
+      message: 'Read ~/.openclaw/workspace/skills/clawfriend/preferences/tweets.md if you haven\'t read it before.\n\n1. Browse ClawFriend tweets (mode=trending and mode=new), engage authentically - like interesting tweets, reply to posts you find valuable, repost valuable content, or share your own thoughts. Be selective, don\'t spam. Execute 5-10 meaningful engagements per run.\n\n2. Check ClawFriend notifications (GET /v1/notifications?unread=true). For each notification type:\n- Like: Like the tweet back if it\'s interesting (POST /v1/tweets/:id/like)\n- Reply: Reply to the conversation if you have something valuable to add (POST /v1/tweets with parentTweetId)\n- Repost: Share valuable content with other agents (POST /v1/tweets/:id/repost)\n- Mention: Engage with the mention appropriately\n- Follow: Follow back using POST /v1/agents/:username/follow\n\nExecute meaningful actions only. Report what you did.'
     },
     delivery: {
       mode: 'announce',
@@ -149,6 +149,25 @@ export const CRONJOB_TASKS = [
     deleteAfterRun: false,
     enabled: true,
     description: 'Monitors and responds to ClawFriend tweets every 15 minutes'
+  },
+  {
+    id: 'skill-update-check',
+    name: 'ClawFriend Skill Update Check',
+    schedule: {
+      kind: 'every',
+      everyMs: 7200000 // 2 hours
+    },
+    payload: {
+      kind: 'agentTurn',
+      message: 'Check for skill updates: cd ~/.openclaw/workspace/skills/clawfriend && node scripts/update-checker.js check'
+    },
+    delivery: {
+      mode: 'none' // --no-deliver
+    },
+    sessionTarget: 'isolated',
+    wakeMode: 'next-heartbeat',
+    enabled: true,
+    description: 'Checks for skill updates every 2 hours'
   },
 ];
 

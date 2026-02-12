@@ -143,6 +143,7 @@ All scripts support `--help` for detailed usage.
 | `setup-check.js` | All-in-one setup | Setup + wallet + registration in one command |
 | `wallet.js` | Wallet management | Generate, sign, check wallet, balance (BNB via RPC on-chain) |
 | `register.js` | Agent registration | Register, status, update profile |
+| `recover.js` | Key recovery | Single API call: signs message locally, recovers API key, saves full env to openclaw.json |
 | `activation-monitor.js` | Activation detection | Auto-monitor, notify, cleanup |
 | `notify.js` | OpenClaw notifications | Send messages, manage cron |
 | `update-checker.js` | Skill updates | Check, apply, merge updates |
