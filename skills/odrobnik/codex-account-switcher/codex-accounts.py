@@ -617,6 +617,7 @@ def _get_quota_for_account(name):
 
 def cmd_auto(json_mode=False):
     """Switch to the account with the most quota available."""
+    import time
     ensure_dirs()
     
     accounts = [f.stem for f in ACCOUNTS_DIR.glob("*.json") if not f.name.startswith('.')]
@@ -638,6 +639,7 @@ def cmd_auto(json_mode=False):
     if not json_mode:
         print(f"🔄 Checking quota for {len(accounts)} account(s)...\n")
     
+    now = int(time.time())
     results = {}
     for name in accounts:
         if not json_mode:
@@ -648,19 +650,29 @@ def cmd_auto(json_mode=False):
         if limits:
             weekly_pct = limits['secondary']['used_percent']
             daily_pct = limits['primary']['used_percent']
+            weekly_resets_at = limits['secondary'].get('resets_at', 0)
+            
+            # If quota has already reset, treat as 0% used
+            effective_weekly_pct = 0 if now >= weekly_resets_at else weekly_pct
+            
             results[name] = {
                 'weekly_used': weekly_pct,
+                'weekly_resets_at': weekly_resets_at,
+                'effective_weekly_used': effective_weekly_pct,
                 'daily_used': daily_pct,
-                'available': 100 - weekly_pct
+                'available': 100 - effective_weekly_pct
             }
             if not json_mode:
-                print(f"weekly {weekly_pct:.0f}% used")
+                if effective_weekly_pct < weekly_pct:
+                    print(f"weekly {weekly_pct:.0f}% used → RESET (now 0%)")
+                else:
+                    print(f"weekly {weekly_pct:.0f}% used")
         else:
             results[name] = {'error': 'could not get quota'}
             if not json_mode:
                 print("❌ failed")
     
-    # Find best account (lowest weekly usage)
+    # Find best account (lowest effective weekly usage, accounting for resets)
     valid = {k: v for k, v in results.items() if 'available' in v}
     
     if not valid:
@@ -672,7 +684,15 @@ def cmd_auto(json_mode=False):
             print("\n❌ Could not get quota for any account")
         return
     
-    best = max(valid.keys(), key=lambda k: valid[k]['available'])
+    # Sort by: 1) lowest effective usage, 2) earliest reset time (if both at 100%)
+    def sort_key(k):
+        v = valid[k]
+        effective = v['effective_weekly_used']
+        resets_at = v.get('weekly_resets_at', float('inf'))
+        # Return (effective_usage, resets_at) - lower is better
+        return (effective, resets_at)
+    
+    best = min(valid.keys(), key=sort_key)
     
     # Check if already on best account
     already_active = (original_account == best)
@@ -686,24 +706,42 @@ def cmd_auto(json_mode=False):
             "switched_to": best,
             "already_active": already_active,
             "weekly_used": valid[best]['weekly_used'],
+            "effective_weekly_used": valid[best]['effective_weekly_used'],
+            "weekly_resets_at": valid[best].get('weekly_resets_at'),
             "available": valid[best]['available'],
             "all_accounts": results
         }, indent=2))
     else:
+        from datetime import datetime
         if already_active:
             print(f"\n✅ Already on best account: {best}")
         else:
             print(f"\n✅ Switched to: {best}")
-        print(f"   Weekly quota: {valid[best]['weekly_used']:.0f}% used ({valid[best]['available']:.0f}% available)")
+        
+        effective = valid[best]['effective_weekly_used']
+        actual = valid[best]['weekly_used']
+        if effective < actual:
+            print(f"   Weekly quota: RESET (was {actual:.0f}%, now fresh)")
+        else:
+            print(f"   Weekly quota: {actual:.0f}% used ({valid[best]['available']:.0f}% available)")
         
         # Show comparison
         print(f"\nAll accounts:")
-        for name, data in sorted(results.items(), key=lambda x: x[1].get('weekly_used', 999)):
+        for name, data in sorted(results.items(), key=lambda x: (x[1].get('effective_weekly_used', 999), x[1].get('weekly_resets_at', float('inf')))):
             if 'error' in data:
                 print(f"   {name}: {data['error']}")
             else:
                 marker = " ←" if name == best else ""
-                print(f"   {name}: {data['weekly_used']:.0f}% weekly{marker}")
+                eff = data['effective_weekly_used']
+                act = data['weekly_used']
+                resets_at = data.get('weekly_resets_at', 0)
+                
+                if eff < act:
+                    reset_dt = datetime.fromtimestamp(resets_at).strftime("%b %d %H:%M")
+                    print(f"   {name}: RESET (was {act:.0f}%, reset at {reset_dt}){marker}")
+                else:
+                    reset_dt = datetime.fromtimestamp(resets_at).strftime("%b %d %H:%M")
+                    print(f"   {name}: {act:.0f}% used (resets {reset_dt}){marker}")
 
 def cmd_use(name):
     ensure_dirs()
@@ -723,6 +761,55 @@ def cmd_use(name):
     info = get_account_info(source)
     print(f"✅ Switched to account: {name} ({info.get('email')})")
 
+def get_token_email(auth_path) -> str:
+    """Extract email from a token file."""
+    info = get_account_info(auth_path) or {}
+    return (info.get("email") or "").strip().lower()
+
+
+def safe_save_token(source_path: Path, target_path: Path, force: bool = False) -> tuple[bool, str]:
+    """Safely save a token file, preventing overwrites with different users.
+    
+    Returns (success, message).
+    """
+    if not source_path.exists():
+        return False, "Source token file does not exist"
+    
+    source_email = get_token_email(source_path)
+    if not source_email or source_email in ("unknown", "error"):
+        return False, "Could not determine email from source token"
+    
+    # If target exists, verify emails match
+    if target_path.exists():
+        target_email = get_token_email(target_path)
+        if target_email and target_email not in ("unknown", "error"):
+            if source_email != target_email:
+                if not force:
+                    return False, f"Refusing to overwrite: target has {target_email}, source has {source_email}"
+                # Force mode: warn but proceed
+                print(f"⚠️  Warning: overwriting {target_email} with {source_email} (--force)")
+    
+    shutil.copy2(source_path, target_path)
+    return True, f"Saved token for {source_email}"
+
+
+def cmd_save(name: str, force: bool = False):
+    """Save the current auth.json to a named account, with safety check."""
+    ensure_dirs()
+    
+    if not AUTH_FILE.exists():
+        print("❌ No current auth.json to save")
+        return
+    
+    target = ACCOUNTS_DIR / f"{name}.json"
+    success, message = safe_save_token(AUTH_FILE, target, force=force)
+    
+    if success:
+        print(f"✅ {message} as '{name}'")
+    else:
+        print(f"❌ {message}")
+
+
 def sync_current_login_to_snapshot() -> None:
     """Persist the CURRENT ~/.codex/auth.json back into the matching named snapshot.
 
@@ -731,6 +818,7 @@ def sync_current_login_to_snapshot() -> None:
     Rules:
     - If the current login's email matches an existing snapshot (any name), update that file.
     - If it doesn't match any snapshot, create a new snapshot using the email local-part.
+    - NEVER overwrite a snapshot with a different user's token (safety check).
 
     This runs silently (no prints) because it's executed on every invocation.
     """
@@ -747,7 +835,9 @@ def sync_current_login_to_snapshot() -> None:
         match = _resolve_matching_account_by_email(email)
         if match is not None:
             if not is_current(match):
-                shutil.copy2(AUTH_FILE, match)
+                # Safety check: verify emails match before overwriting
+                success, _ = safe_save_token(AUTH_FILE, match, force=False)
+                # Silently ignore failures (e.g., email mismatch)
             return
 
         # No match: create a new snapshot with local-part name
@@ -784,6 +874,10 @@ def main():
     use_parser = subparsers.add_parser("use", help="Switch to an account")
     use_parser.add_argument("name", help="Name of the account to switch to")
 
+    save_parser = subparsers.add_parser("save", help="Save current token to a named account")
+    save_parser.add_argument("name", help="Name to save the account as")
+    save_parser.add_argument("--force", action="store_true", help="Force overwrite even if emails don't match")
+
     auto_parser = subparsers.add_parser("auto", help="Switch to the account with most quota available")
     auto_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
@@ -796,6 +890,8 @@ def main():
         cmd_add(name_override=getattr(args, "name", None))
     elif args.command == "use":
         cmd_use(args.name)
+    elif args.command == "save":
+        cmd_save(args.name, force=bool(getattr(args, "force", False)))
     elif args.command == "auto":
         cmd_auto(json_mode=bool(getattr(args, "json", False)))
     else:
