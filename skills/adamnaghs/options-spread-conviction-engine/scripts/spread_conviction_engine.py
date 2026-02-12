@@ -9,6 +9,9 @@ Created:    2026-02-09
 Version:    1.2.1
 License:    MIT
 
+# Module version - single source of truth
+__version__ = "1.2.1"
+
 Description:
     A unified conviction engine that scores four vertical spread strategies:
 
@@ -63,6 +66,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import warnings
 from dataclasses import dataclass, field, asdict
@@ -432,8 +436,12 @@ def fetch_ohlcv(ticker: str, period: str = "2y", interval: str = "1d") -> pd.Dat
         pd.DataFrame with columns: Open, High, Low, Close, Volume
 
     Raises:
-        ValueError: If no data is returned for the given ticker.
+        ValueError: If no data is returned for the given ticker or invalid ticker format.
     """
+    # Validate ticker format (1-5 uppercase letters)
+    if not re.match(r'^[A-Z]{1,5}$', ticker.upper()):
+        raise ValueError(f"Invalid ticker format: '{ticker}'. Expected 1-5 uppercase letters (e.g., AAPL, SPY)")
+
     df = yf.download(ticker, period=period, interval=interval, progress=False)
 
     if df.empty:
@@ -1584,11 +1592,12 @@ def analyse(
 
     tier = ConvictionTier.from_score(conviction)
     
-    # ADX Gate: ADX < 20 caps credit spreads at WATCH
+    # ADX Gate: ADX < 20 caps credit spreads at WATCH and adjusts score
     if strategy.is_credit and adx_sig.value < 20:
         if tier in (ConvictionTier.PREPARE, ConvictionTier.EXECUTE):
             tier = ConvictionTier.WATCH
-            # We don't necessarily change the score, but we cap the tier
+            # Adjust score to tier boundary to maintain consistency
+            conviction = min(conviction, 59.9)
     
     strikes = calculate_strikes(price, strategy, bollinger_sig)
 
@@ -1629,7 +1638,7 @@ def print_report(result: ConvictionResult) -> None:
 
     print()
     print("=" * 70)
-    print(f"  CONVICTION REPORT: {result.ticker} (v1.2.0)")
+    print(f"  CONVICTION REPORT: {result.ticker} (v{__version__})")
     print(f"  Strategy: {result.strategy_label}")
     print("=" * 70)
     print(f"  Price:       ${result.price}")
