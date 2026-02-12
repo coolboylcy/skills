@@ -113,13 +113,40 @@ def suggest_filename_stem(api_key: str, title: str) -> str | None:
     return stem or None
 
 
+def _find_workspace_root() -> Path:
+    """Walk up from script location to find workspace root."""
+    env = os.environ.get("OPENCLAW_WORKSPACE")
+    if env:
+        return Path(env).expanduser().resolve()
+    cwd = Path.cwd()
+    if (cwd / "skills").is_dir():
+        return cwd
+    d = Path(__file__).resolve().parent
+    for _ in range(6):
+        if (d / "skills").is_dir() and d != d.parent:
+            return d
+        d = d.parent
+    return cwd
+
+
 def default_out_dir() -> Path:
-    """Default output directory: the workspace 'out/' (outside the skills folder)."""
-    here = Path(__file__).resolve()
-    for p in here.parents:
-        if p.name == "skills":
-            return p.parent / "out"
-    return Path.cwd() / "out"
+    """Default output directory: workspace/gemini-yt-video-transcript/out/."""
+    return _find_workspace_root() / "gemini-yt-video-transcript" / "out"
+
+
+def _safe_output_path(raw: str) -> Path:
+    """Resolve output path and verify it's under workspace or /tmp."""
+    p = Path(raw).expanduser().resolve()
+    allowed = [
+        _find_workspace_root().resolve(),
+        Path("/tmp").resolve(),
+        Path(os.environ.get("TMPDIR", "/tmp")).resolve(),
+    ]
+    for root in allowed:
+        if p == root or str(p).startswith(str(root) + "/"):
+            return p
+    roots_str = ", ".join(str(r) for r in allowed)
+    raise ValueError(f"Output path '{raw}' is outside allowed directories: {roots_str}")
 
 
 def main() -> int:
@@ -143,7 +170,7 @@ def main() -> int:
 
     out_path: Path
     if args.out:
-        out_path = Path(args.out)
+        out_path = _safe_output_path(args.out)
     else:
         stem: str | None = None
         if title:
