@@ -1,6 +1,6 @@
 {
   "name": "claw-memory-guardian",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "防丢失记忆系统 - 基于亲身教训的OpenClaw记忆保护方案",
   "main": "index.js",
   "scripts": {
@@ -42,7 +42,7 @@
     "price": {
       "free": true,
       "pro": 9.99,
-      "enterprise": 99
+      "enterprise": 49
     },
     "features": {
       "free": ["basic-save", "auto-backup", "simple-search"],
