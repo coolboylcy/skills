@@ -1,149 +1,127 @@
 #!/usr/bin/env node
 /**
- * Notion Page Watcher
- * Monitors a Notion page for changes and suggests next actions
+ * Notion page change monitor
+ * Detects edits and compares with local markdown files
+ *
+ * Usage: watch-notion.js <page-id> <local-path>
  */
 
 const fs = require('fs');
 const path = require('path');
-const { getPage, getAllBlocks, blocksToMarkdown } = require('./notion-to-md.js');
+const {
+  checkApiKey,
+  notionRequest,
+  normalizeId,
+  getAllBlocks,
+  blocksToMarkdown,
+} = require('./notion-utils.js');
 
-const STATE_FILE = path.join(__dirname, '../memory/notion-watch-state.json');
+// State file location — relative to the workspace, not the script
+const DEFAULT_STATE_FILE = path.join(process.cwd(), 'memory', 'notion-watch-state.json');
 
-// Load watch state
-function loadState() {
-  if (!fs.existsSync(STATE_FILE)) {
-    return { pages: {} };
-  }
-  return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+function loadState(stateFile) {
+  if (!fs.existsSync(stateFile)) return { pages: {} };
+  return JSON.parse(fs.readFileSync(stateFile, 'utf8'));
 }
 
-// Save watch state
-function saveState(state) {
-  const dir = path.dirname(STATE_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
+function saveState(stateFile, state) {
+  const dir = path.dirname(stateFile);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), 'utf8');
 }
 
-// Check a specific page for changes
-async function checkPage(pageId, localPath) {
+async function getPage(pageId) {
+  const id = normalizeId(pageId);
+  return notionRequest(`/v1/pages/${encodeURIComponent(id)}`, 'GET');
+}
+
+async function checkPage(pageId, localPath, stateFile = DEFAULT_STATE_FILE) {
   try {
-    const state = loadState();
-    const pageState = state.pages[pageId] || {};
-    
-    // Fetch current page state
-    const page = await getPage(pageId);
+    const normalizedPageId = normalizeId(pageId);
+    const state = loadState(stateFile);
+    const pageState = state.pages[normalizedPageId] || {};
+
+    const page = await getPage(normalizedPageId);
     const lastEditedTime = page.last_edited_time;
     const title = page.properties?.title?.title?.[0]?.plain_text || 'Untitled';
-    
-    // Check if page was edited since last check
-    const hasChanges = !pageState.lastEditedTime || 
-                      new Date(lastEditedTime) > new Date(pageState.lastEditedTime);
-    
+
+    const hasChanges = !pageState.lastEditedTime ||
+      new Date(lastEditedTime) > new Date(pageState.lastEditedTime);
+
     const result = {
-      pageId,
+      pageId: normalizedPageId,
       title,
       lastEditedTime,
       hasChanges,
       localPath,
       actions: []
     };
-    
+
     if (hasChanges) {
-      // Fetch blocks and convert to markdown
-      const blocks = await getAllBlocks(pageId);
+      const blocks = await getAllBlocks(normalizedPageId);
       const notionMarkdown = blocksToMarkdown(blocks);
-      
-      // Compare with local file if it exists
-      let localMarkdown = '';
+
       let localDiffers = false;
-      
       if (fs.existsSync(localPath)) {
-        localMarkdown = fs.readFileSync(localPath, 'utf8');
-        // Simple comparison (could be enhanced with proper diff)
+        const localMarkdown = fs.readFileSync(localPath, 'utf8');
         localDiffers = localMarkdown.trim() !== notionMarkdown.trim();
       }
-      
+
       result.notionMarkdown = notionMarkdown;
       result.localDiffers = localDiffers;
       result.blockCount = blocks.length;
-      
-      // Suggest actions
+
       if (pageState.lastEditedTime) {
         result.actions.push(`📝 Page edited since last check (${new Date(pageState.lastEditedTime).toLocaleString()})`);
       } else {
         result.actions.push('🆕 First time checking this page');
       }
-      
+
       if (localDiffers) {
-        result.actions.push(`⚠️  Local markdown differs from Notion version`);
-        result.actions.push(`💡 Suggested: Sync Notion → markdown to update local file`);
+        result.actions.push('⚠️  Local markdown differs from Notion version');
+        result.actions.push('💡 Suggested: Sync Notion → markdown to update local file');
       }
-      
-      // Update state
+
       pageState.lastEditedTime = lastEditedTime;
       pageState.lastChecked = new Date().toISOString();
       pageState.title = title;
-      state.pages[pageId] = pageState;
-      saveState(state);
-      
+      state.pages[normalizedPageId] = pageState;
+      saveState(stateFile, state);
     } else {
       result.actions.push('✓ No changes since last check');
     }
-    
+
     return result;
-    
   } catch (error) {
     return {
-      pageId,
+      pageId: normalizeId(pageId),
       error: error.message,
       actions: [`❌ Error checking page: ${error.message}`]
     };
   }
 }
 
-// CLI interface
 async function main() {
   const args = process.argv.slice(2);
-  
-  // Get page ID and local path from args or environment
-  let pageId = args[0];
-  let localPath = args[1];
-  
-  // Fallback to environment variables if not provided
-  if (!pageId) pageId = process.env.NOTION_WATCH_PAGE_ID;
-  if (!localPath) localPath = process.env.NOTION_WATCH_LOCAL_PATH;
-  
+  let pageId = args[0] || process.env.NOTION_WATCH_PAGE_ID;
+  let localPath = args[1] || process.env.NOTION_WATCH_LOCAL_PATH;
+
   if (!pageId || !localPath) {
-    console.error(`Usage: watch-notion.js <page-id> <local-path>
-
-Arguments:
-  page-id      Notion page ID to monitor
-  local-path   Local markdown file path for comparison
-
-Environment variables (optional):
-  NOTION_WATCH_PAGE_ID       Default page ID
-  NOTION_WATCH_LOCAL_PATH    Default local path
-
-Examples:
-  node watch-notion.js "abc123..." "/path/to/draft.md"
-  
-  # Using environment variables
-  export NOTION_WATCH_PAGE_ID="abc123..."
-  export NOTION_WATCH_LOCAL_PATH="/path/to/draft.md"
-  node watch-notion.js
-`);
+    console.error('Usage: watch-notion.js <page-id> <local-path>');
+    console.error('');
+    console.error('Environment variables (fallback):');
+    console.error('  NOTION_WATCH_PAGE_ID    Default page ID');
+    console.error('  NOTION_WATCH_LOCAL_PATH Default local path');
     process.exit(1);
   }
-  
+
   const result = await checkPage(pageId, localPath);
   console.log(JSON.stringify(result, null, 2));
   return result;
 }
 
 if (require.main === module) {
+  checkApiKey();
   main().catch(err => {
     console.error('Fatal error:', err);
     process.exit(1);
