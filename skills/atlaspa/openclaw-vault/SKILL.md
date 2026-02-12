@@ -1,6 +1,5 @@
 ---
 name: openclaw-vault
-description: "Credential lifecycle security for agent workspaces. Audit credential exposure, detect misconfigured permissions, inventory all secrets, and identify stale credentials needing rotation. Free alert layer — upgrade to openclaw-vault-pro for automated remediation, credential rotation, and access control."
 user-invocable: true
 metadata: {"openclaw":{"emoji":"🔐","requires":{"bins":["python3"]},"os":["darwin","linux","win32"]}}
 ---
@@ -22,7 +21,6 @@ Credentials don't just leak through source code. They leak through:
 
 This skill watches the full credential lifecycle. Sentry finds secrets in files. Vault finds secrets that are *exposed*.
 
-**Need automated remediation?** Upgrade to [openclaw-vault-pro](https://github.com/AtlasPA/openclaw-vault-pro) for auto-fix permissions, credential rotation reminders, access control policies, and secure credential injection.
 
 ## Commands
 

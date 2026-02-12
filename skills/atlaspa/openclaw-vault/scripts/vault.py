@@ -1,24 +1,34 @@
 #!/usr/bin/env python3
-"""OpenClaw Vault — Credential Lifecycle Protection
+"""OpenClaw Vault— Full Credential Lifecycle Security
 
-Audits credential exposure, detects misconfigured permissions, inventories
-all secrets, and identifies stale credentials needing rotation.
+Everything in openclaw-vault (free) PLUS automated countermeasures:
+auto-fix permissions, quarantine exposed files, rotation tracking,
+git history scanning, and automated protection sweeps.
 
 Usage:
-    vault.py audit     [--workspace PATH]
-    vault.py exposure  [--workspace PATH]
-    vault.py inventory [--workspace PATH]
-    vault.py status    [--workspace PATH]
+    vault.py audit            [--workspace PATH]
+    vault.py exposure         [--workspace PATH]
+    vault.py inventory        [--workspace PATH]
+    vault.py status           [--workspace PATH]
+    vault.py fix-permissions  [--workspace PATH]
+    vault.py quarantine FILE  [--workspace PATH]
+    vault.py unquarantine FILE[--workspace PATH]
+    vault.py rotate-check     [--workspace PATH] [--max-age DAYS]
+    vault.py gitguard         [--workspace PATH]
+    vault.py protect          [--workspace PATH] [--max-age DAYS]
 
-Free version: detect and alert.
-Pro version: auto-fix, rotation reminders, access policies, secure injection.
+Scanning: detect and alert.
+Full version: subvert + quarantine + defend.
 """
 
 import argparse
 import io
+import json
 import os
 import re
+import shutil
 import stat
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -42,7 +52,7 @@ SKIP_DIRS = {
     ".integrity", ".quarantine", ".snapshots",
 }
 
-SELF_SKILL_DIRS = {"openclaw-vault", "openclaw-vault-pro"}
+SELF_SKILL_DIRS = {"openclaw-vault", "openclaw-vault"}
 
 STALE_THRESHOLD_DAYS = 90
 
@@ -76,7 +86,6 @@ DOCKER_FILES = {"Dockerfile", "docker-compose.yml", "docker-compose.yaml", ".doc
 
 # Patterns for detecting credentials in various contexts
 CREDENTIAL_PATTERNS = [
-    # Key=value patterns in configs
     ("API Key", re.compile(
         r"""(?:api[_-]?key|apikey)\s*[=:]\s*["']?([A-Za-z0-9\-_]{16,})["']?""",
         re.IGNORECASE)),
@@ -166,6 +175,16 @@ CREDENTIAL_TYPE_MAP = {
     "id_dsa": "SSH Key (DSA)",
 }
 
+# Git-tracked credential file patterns for gitguard
+GIT_CREDENTIAL_GLOBS = [
+    "*.env", "*.env.*", ".env", ".env.*",
+    "credentials.json", "service-account.json", "secrets.json",
+    "*.pem", "*.key", "*.p12", "*.pfx",
+    ".npmrc", ".pypirc", ".netrc", ".pgpass", ".my.cnf",
+    "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa",
+    "htpasswd", ".htpasswd",
+]
+
 
 # ---------------------------------------------------------------------------
 # Utility functions
@@ -219,8 +238,6 @@ def file_age_days(path):
 def is_world_readable(path):
     """Check if a file is world-readable (Unix) or has overly open permissions."""
     if sys.platform == "win32":
-        # On Windows, check if the file is in a potentially public directory
-        # True permission checks require win32api; we approximate
         return False
     try:
         mode = path.stat().st_mode
@@ -291,8 +308,30 @@ def classify_credential(path):
     return "Unknown"
 
 
+def quarantine_dir(workspace):
+    """Return the vault quarantine directory path."""
+    return workspace / ".quarantine" / "vault"
+
+
+def run_git(workspace, *args):
+    """Run a git command in the workspace, return (stdout, returncode)."""
+    try:
+        result = subprocess.run(
+            ["git"] + list(args),
+            cwd=str(workspace),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return result.stdout, result.returncode
+    except FileNotFoundError:
+        return "", -1
+    except subprocess.TimeoutExpired:
+        return "", -2
+
+
 # ---------------------------------------------------------------------------
-# Audit checks
+# Audit checks (shared with free version)
 # ---------------------------------------------------------------------------
 
 def check_env_permissions(workspace):
@@ -308,15 +347,14 @@ def check_env_permissions(workspace):
                     findings.append({
                         "type": "permission", "severity": "CRITICAL",
                         "file": str(rel),
-                        "detail": f".env file is world-readable (permissions too open)",
+                        "detail": ".env file is world-readable (permissions too open)",
                     })
                 elif is_group_readable(fpath):
                     findings.append({
                         "type": "permission", "severity": "WARNING",
                         "file": str(rel),
-                        "detail": f".env file is group-readable (consider restricting to owner-only)",
+                        "detail": ".env file is group-readable (consider restricting to owner-only)",
                     })
-                # Check if non-empty
                 content = read_text_safe(fpath)
                 if content:
                     var_count = len([l for l in content.strip().split("\n")
@@ -335,19 +373,14 @@ def check_shell_history(workspace):
     findings = []
     home = Path.home()
     history_files = []
-
-    # Check home directory for history files
     for hname in SHELL_HISTORY_FILES:
         hpath = home / hname
         if hpath.is_file():
             history_files.append(hpath)
-
-    # Also check workspace itself
     for hname in SHELL_HISTORY_FILES:
         hpath = workspace / hname
         if hpath.is_file():
             history_files.append(hpath)
-
     for hpath in history_files:
         content = read_text_safe(hpath)
         if not content:
@@ -356,7 +389,6 @@ def check_shell_history(workspace):
         for line_idx, line in enumerate(lines, 1):
             for pattern_name, pattern in HISTORY_CREDENTIAL_PATTERNS:
                 for match in pattern.finditer(line):
-                    # Determine display path
                     try:
                         rel = hpath.relative_to(workspace)
                         display = str(rel)
@@ -376,17 +408,12 @@ def check_git_config(workspace):
     """Check git config files for embedded credentials."""
     findings = []
     config_paths = []
-
-    # Workspace-level git config
     ws_gitconfig = workspace / ".git" / "config"
     if ws_gitconfig.is_file():
         config_paths.append(ws_gitconfig)
-
-    # Global git config
     global_gitconfig = Path.home() / ".gitconfig"
     if global_gitconfig.is_file():
         config_paths.append(global_gitconfig)
-
     for gpath in config_paths:
         content = read_text_safe(gpath)
         if not content:
@@ -396,7 +423,6 @@ def check_git_config(workspace):
             display = str(rel)
         except ValueError:
             display = f"~/{gpath.name}"
-
         lines = content.split("\n")
         for line_idx, line in enumerate(lines, 1):
             for pattern_name, pattern in GIT_CONFIG_CREDENTIAL_PATTERNS:
@@ -415,7 +441,6 @@ def check_config_credentials(workspace):
     """Scan config files (JSON, YAML, TOML, INI) for hardcoded credentials."""
     findings = []
     config_files = collect_files(workspace, extensions=CONFIG_EXTENSIONS)
-
     for fpath in config_files:
         if is_binary(fpath):
             continue
@@ -428,7 +453,6 @@ def check_config_credentials(workspace):
             for pattern_name, pattern in CREDENTIAL_PATTERNS:
                 for match in pattern.finditer(line):
                     matched = match.group(1) if match.lastindex else match.group(0)
-                    # Skip placeholder values
                     if matched.lower() in (
                         "your_api_key_here", "your_secret_here", "changeme",
                         "xxxxxxxxxxxx", "placeholder", "todo", "fixme",
@@ -436,7 +460,6 @@ def check_config_credentials(workspace):
                         "example", "test", "dummy",
                     ):
                         continue
-                    # Skip very short matches that are likely not real credentials
                     if len(matched) < 8:
                         continue
                     findings.append({
@@ -453,7 +476,6 @@ def check_log_credentials(workspace):
     """Check log files for leaked credentials."""
     findings = []
     log_files = collect_files(workspace, extensions=LOG_EXTENSIONS)
-
     for fpath in log_files:
         if is_binary(fpath):
             continue
@@ -482,22 +504,18 @@ def check_gitignore_coverage(workspace):
     """Check if .env and credential files are properly gitignored."""
     findings = []
     gitignore = workspace / ".gitignore"
-
     if not gitignore.exists():
-        # Only flag if there are actually .env or credential files present
         env_files = collect_files(workspace, names={n for n in CREDENTIAL_FILES if n.startswith(".env")})
         if env_files:
             findings.append({
                 "type": "gitignore", "severity": "WARNING",
                 "file": ".gitignore",
-                "detail": "No .gitignore found — .env and credential files may be committed to git",
+                "detail": "No .gitignore found -- .env and credential files may be committed to git",
             })
         return findings
-
     content = read_text_safe(gitignore)
     if not content:
         return findings
-
     important_patterns = [".env", "*.pem", "*.key", "credentials.json", "secrets.json", "*.p12", "*.pfx"]
     missing = [p for p in important_patterns if p not in content]
     if missing:
@@ -513,11 +531,8 @@ def check_stale_credentials(workspace):
     """Detect credential files older than the staleness threshold."""
     findings = []
     cred_files = collect_files(
-        workspace,
-        names=CREDENTIAL_FILES,
-        extensions=CREDENTIAL_EXTENSIONS,
+        workspace, names=CREDENTIAL_FILES, extensions=CREDENTIAL_EXTENSIONS,
     )
-
     for fpath in cred_files:
         age = file_age_days(fpath)
         if age < 0:
@@ -527,29 +542,26 @@ def check_stale_credentials(workspace):
             findings.append({
                 "type": "stale", "severity": "WARNING",
                 "file": str(rel),
-                "detail": f"Credential file is {int(age)} days old (threshold: {STALE_THRESHOLD_DAYS} days) — consider rotation",
+                "detail": f"Credential file is {int(age)} days old (threshold: {STALE_THRESHOLD_DAYS} days) -- consider rotation",
             })
     return findings
 
 
 # ---------------------------------------------------------------------------
-# Exposure checks
+# Exposure checks (shared with free version)
 # ---------------------------------------------------------------------------
 
 def check_public_directory_exposure(workspace):
     """Check for credential files in publicly accessible directories."""
     findings = []
     public_dirs = {"public", "static", "www", "html", "dist", "build", "out", "assets"}
-
     for root, dirs, filenames in os.walk(workspace):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         rel_root = Path(root).relative_to(workspace)
         parts = rel_root.parts
-
         in_public = any(p.lower() in public_dirs for p in parts)
         if not in_public:
             continue
-
         for fname in filenames:
             fpath = Path(root) / fname
             if fname in CREDENTIAL_FILES or fpath.suffix.lower() in CREDENTIAL_EXTENSIONS:
@@ -568,22 +580,15 @@ def check_git_credential_history(workspace):
     git_dir = workspace / ".git"
     if not git_dir.is_dir():
         return findings
-
-    # Check if any credential files are tracked by git
-    # We look for credential files that exist and might be tracked
     cred_files = collect_files(
-        workspace,
-        names=CREDENTIAL_FILES,
-        extensions=CREDENTIAL_EXTENSIONS,
+        workspace, names=CREDENTIAL_FILES, extensions=CREDENTIAL_EXTENSIONS,
     )
     for fpath in cred_files:
         rel = fpath.relative_to(workspace)
-        # If a credential file exists alongside a .git directory, flag it
-        # (actual git log checking would need subprocess, but we can flag the risk)
         findings.append({
             "type": "git_exposure", "severity": "WARNING",
             "file": str(rel),
-            "detail": "Credential file exists in a git repository — verify it is gitignored and not in commit history",
+            "detail": "Credential file exists in a git repository -- verify it is gitignored and not in commit history",
         })
     return findings
 
@@ -592,7 +597,6 @@ def check_docker_credentials(workspace):
     """Check Docker/container configs for embedded secrets."""
     findings = []
     docker_files = collect_files(workspace, names=DOCKER_FILES)
-
     for fpath in docker_files:
         if is_binary(fpath):
             continue
@@ -605,7 +609,6 @@ def check_docker_credentials(workspace):
             for pattern_name, pattern in DOCKER_CREDENTIAL_PATTERNS:
                 for match in pattern.finditer(line):
                     matched = match.group(1).strip() if match.lastindex else match.group(0).strip()
-                    # Skip variable references like $VAR or ${VAR}
                     if matched.startswith("$") or matched.startswith("${"):
                         continue
                     findings.append({
@@ -624,9 +627,8 @@ def check_shell_aliases(workspace):
     home = Path.home()
     rc_files = [
         home / ".bashrc", home / ".zshrc", home / ".profile",
-        home / ".bash_profile", home / ".zprofile",
+        home / ".bashfile", home / ".zprofile",
     ]
-
     for rcpath in rc_files:
         if not rcpath.is_file():
             continue
@@ -635,7 +637,6 @@ def check_shell_aliases(workspace):
             continue
         lines = content.split("\n")
         for line_idx, line in enumerate(lines, 1):
-            # Check for aliases or exports with credential-like values
             for pattern_name, pattern in HISTORY_CREDENTIAL_PATTERNS:
                 for match in pattern.finditer(line):
                     findings.append({
@@ -653,7 +654,6 @@ def check_url_credentials_in_code(workspace):
     code_extensions = {".py", ".js", ".ts", ".rb", ".go", ".java", ".sh", ".bash",
                        ".ps1", ".php", ".rs", ".c", ".cpp", ".cs"}
     code_files = collect_files(workspace, extensions=code_extensions)
-
     for fpath in code_files:
         if is_binary(fpath):
             continue
@@ -666,7 +666,6 @@ def check_url_credentials_in_code(workspace):
             for pattern_name, pattern in URL_CREDENTIAL_PATTERNS:
                 for match in pattern.finditer(line):
                     matched = match.group(1) if match.lastindex else match.group(0)
-                    # Skip test/example values
                     if matched.lower() in ("test", "example", "dummy", "xxx"):
                         continue
                     findings.append({
@@ -687,12 +686,8 @@ def build_inventory(workspace):
     """Build a structured inventory of all credential files."""
     inventory = []
     cred_files = collect_files(
-        workspace,
-        names=CREDENTIAL_FILES,
-        extensions=CREDENTIAL_EXTENSIONS,
+        workspace, names=CREDENTIAL_FILES, extensions=CREDENTIAL_EXTENSIONS,
     )
-
-    # Also find any .env* files that might not be in the standard set
     for root, dirs, filenames in os.walk(workspace):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         rel_root = Path(root).relative_to(workspace)
@@ -703,7 +698,6 @@ def build_inventory(workspace):
             fpath = Path(root) / fname
             if fname.startswith(".env") and fpath not in cred_files:
                 cred_files.append(fpath)
-
     for fpath in cred_files:
         rel = fpath.relative_to(workspace)
         age = file_age_days(fpath)
@@ -716,9 +710,7 @@ def build_inventory(workspace):
         except (OSError, PermissionError):
             size = 0
             mtime = "unknown"
-
         stale = age > STALE_THRESHOLD_DAYS if age >= 0 else False
-
         inventory.append({
             "file": str(rel),
             "type": cred_type,
@@ -728,18 +720,17 @@ def build_inventory(workspace):
             "stale": stale,
             "world_readable": is_world_readable(fpath),
         })
-
     return inventory
 
 
 # ---------------------------------------------------------------------------
-# Commands
+# Basic commands
 # ---------------------------------------------------------------------------
 
 def cmd_audit(workspace):
     """Full credential exposure audit."""
     print("=" * 60)
-    print("OPENCLAW VAULT — CREDENTIAL AUDIT")
+    print("OPENCLAW VAULT FULL -- CREDENTIAL AUDIT")
     print("=" * 60)
     print(f"Workspace: {workspace}")
     print(f"Timestamp: {now_iso()}")
@@ -760,7 +751,7 @@ def cmd_audit(workspace):
 def cmd_exposure(workspace):
     """Check for credential exposure vectors."""
     print("=" * 60)
-    print("OPENCLAW VAULT — EXPOSURE CHECK")
+    print("OPENCLAW VAULT FULL -- EXPOSURE CHECK")
     print("=" * 60)
     print(f"Workspace: {workspace}")
     print(f"Timestamp: {now_iso()}")
@@ -780,7 +771,7 @@ def cmd_exposure(workspace):
 def cmd_inventory(workspace):
     """Build and display credential inventory."""
     print("=" * 60)
-    print("OPENCLAW VAULT — CREDENTIAL INVENTORY")
+    print("OPENCLAW VAULT FULL -- CREDENTIAL INVENTORY")
     print("=" * 60)
     print(f"Workspace: {workspace}")
     print(f"Timestamp: {now_iso()}")
@@ -792,7 +783,6 @@ def cmd_inventory(workspace):
         print("No credential files found in workspace.")
         return 0
 
-    # Table header
     print(f"{'File':<40} {'Type':<24} {'Modified':<12} {'Age':<8} {'Status'}")
     print("-" * 100)
 
@@ -825,12 +815,7 @@ def cmd_inventory(workspace):
     if exposed_count:
         print(f"  Exposed (world-readable): {exposed_count}")
     print()
-
-    if stale_count or exposed_count:
-        print("Upgrade to openclaw-vault-pro for automated credential rotation")
-        print("reminders and permission auto-fix.")
-        return 1
-    return 0
+    return 1 if (stale_count or exposed_count) else 0
 
 
 def cmd_status(workspace):
@@ -840,7 +825,6 @@ def cmd_status(workspace):
     stale_count = sum(1 for i in inventory if i["stale"])
     exposed_count = sum(1 for i in inventory if i["world_readable"])
 
-    # Quick exposure scan
     exposure_findings = []
     exposure_findings.extend(check_env_permissions(workspace))
     exposure_findings.extend(check_config_credentials(workspace))
@@ -850,7 +834,6 @@ def cmd_status(workspace):
 
     parts = []
     parts.append(f"{cred_count} credential file(s)")
-
     if critical_count > 0:
         parts.append(f"{critical_count} CRITICAL exposure(s)")
     if warning_count > 0:
@@ -875,6 +858,730 @@ def cmd_status(workspace):
 
 
 # ---------------------------------------------------------------------------
+# Pro commands
+# ---------------------------------------------------------------------------
+
+def cmd_fix_permissions(workspace):
+    """Auto-fix file permissions on credential files.
+
+    Unix: chmod 600 (owner read/write only).
+    Windows: icacls to restrict access to current user only.
+    """
+    print("=" * 60)
+    print("OPENCLAW VAULT FULL -- FIX PERMISSIONS")
+    print("=" * 60)
+    print(f"Workspace: {workspace}")
+    print(f"Timestamp: {now_iso()}")
+    print()
+
+    cred_files = collect_files(
+        workspace, names=CREDENTIAL_FILES, extensions=CREDENTIAL_EXTENSIONS,
+    )
+    # Also pick up any .env* files
+    for root, dirs, filenames in os.walk(workspace):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS
+                   and not d.startswith(".quarantine")]
+        rel_root = Path(root).relative_to(workspace)
+        parts = rel_root.parts
+        if len(parts) >= 2 and parts[0] == "skills" and parts[1] in SELF_SKILL_DIRS:
+            continue
+        for fname in filenames:
+            fpath = Path(root) / fname
+            if fname.startswith(".env") and fpath not in cred_files:
+                cred_files.append(fpath)
+
+    if not cred_files:
+        print("No credential files found. Nothing to fix.")
+        return 0
+
+    fixed = 0
+    skipped = 0
+    errors = 0
+
+    for fpath in cred_files:
+        rel = fpath.relative_to(workspace)
+
+        if sys.platform == "win32":
+            # Windows: use icacls to restrict to current user
+            username = os.environ.get("USERNAME", os.environ.get("USER", ""))
+            if not username:
+                print(f"  [SKIP] {rel} -- cannot determine current user")
+                skipped += 1
+                continue
+            try:
+                # Remove inherited permissions and grant only current user full control
+                subprocess.run(
+                    ["icacls", str(fpath), "/inheritance:r",
+                     "/grant:r", f"{username}:(R,W)"],
+                    capture_output=True, text=True, timeout=15,
+                )
+                print(f"  [FIXED] {rel} -- restricted to {username} (R,W)")
+                fixed += 1
+            except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+                print(f"  [ERROR] {rel} -- {exc}")
+                errors += 1
+        else:
+            # Unix: chmod 600
+            try:
+                current_mode = fpath.stat().st_mode
+                desired = stat.S_IRUSR | stat.S_IWUSR  # 0o600
+                if (current_mode & 0o777) == desired:
+                    print(f"  [OK]    {rel} -- already 600")
+                    skipped += 1
+                    continue
+                os.chmod(fpath, desired)
+                print(f"  [FIXED] {rel} -- set to 600 (owner read/write only)")
+                fixed += 1
+            except (OSError, PermissionError) as exc:
+                print(f"  [ERROR] {rel} -- {exc}")
+                errors += 1
+
+    print()
+    print("-" * 40)
+    print(f"Fixed: {fixed}  |  Already OK: {skipped}  |  Errors: {errors}")
+    print("=" * 60)
+
+    return 2 if errors else (0 if fixed == 0 else 0)
+
+
+def cmd_quarantine(workspace, target_file):
+    """Move an exposed credential file to .quarantine/vault/ with metadata."""
+    print("=" * 60)
+    print("OPENCLAW VAULT FULL -- QUARANTINE")
+    print("=" * 60)
+    print(f"Workspace: {workspace}")
+    print(f"Timestamp: {now_iso()}")
+    print()
+
+    # Resolve the target file
+    target = Path(target_file)
+    if not target.is_absolute():
+        target = workspace / target
+
+    if not target.is_file():
+        print(f"[ERROR] File not found: {target_file}", file=sys.stderr)
+        return 1
+
+    try:
+        rel = target.relative_to(workspace)
+    except ValueError:
+        print(f"[ERROR] File is outside workspace: {target_file}", file=sys.stderr)
+        return 1
+
+    qdir = quarantine_dir(workspace)
+    qdir.mkdir(parents=True, exist_ok=True)
+
+    # Generate a unique quarantine name (preserve extension, add timestamp)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    safe_name = str(rel).replace(os.sep, "__").replace("/", "__")
+    q_name = f"{ts}__{safe_name}"
+    q_path = qdir / q_name
+
+    # Write metadata sidecar
+    metadata = {
+        "original_path": str(rel),
+        "original_absolute": str(target),
+        "quarantined_at": now_iso(),
+        "reason": "Exposed credential file quarantined by openclaw-vault",
+        "quarantine_file": q_name,
+    }
+    meta_path = qdir / f"{q_name}.meta.json"
+
+    try:
+        shutil.move(str(target), str(q_path))
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2)
+    except (OSError, PermissionError) as exc:
+        print(f"[ERROR] Failed to quarantine: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"  [QUARANTINED] {rel}")
+    print(f"    Moved to:   .quarantine/vault/{q_name}")
+    print(f"    Metadata:   .quarantine/vault/{q_name}.meta.json")
+    print(f"    Reason:     Exposed credential file")
+    print()
+    print("Use 'unquarantine' to restore this file to its original location.")
+    print("=" * 60)
+    return 0
+
+
+def cmd_unquarantine(workspace, target_file):
+    """Restore a quarantined credential file to its original location."""
+    print("=" * 60)
+    print("OPENCLAW VAULT FULL -- UNQUARANTINE")
+    print("=" * 60)
+    print(f"Workspace: {workspace}")
+    print(f"Timestamp: {now_iso()}")
+    print()
+
+    qdir = quarantine_dir(workspace)
+    if not qdir.is_dir():
+        print("[ERROR] No quarantine directory found.", file=sys.stderr)
+        return 1
+
+    # Search for matching quarantined file by original path or quarantine name
+    target_normalized = target_file.replace(os.sep, "__").replace("/", "__")
+    found_meta = None
+    found_qfile = None
+
+    for meta_file in sorted(qdir.glob("*.meta.json"), reverse=True):
+        try:
+            with open(meta_file, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        orig = meta.get("original_path", "")
+        qname = meta.get("quarantine_file", "")
+
+        # Match by original path or by quarantine file name or by partial name
+        if (orig == target_file
+                or qname == target_file
+                or orig.replace(os.sep, "__").replace("/", "__") == target_normalized
+                or target_file in orig
+                or target_file in qname):
+            q_candidate = qdir / qname
+            if q_candidate.is_file():
+                found_meta = meta
+                found_qfile = q_candidate
+                break
+
+    if not found_meta or not found_qfile:
+        print(f"[ERROR] No quarantined file matching '{target_file}' found.", file=sys.stderr)
+        print()
+        # List available quarantined files
+        metas = list(qdir.glob("*.meta.json"))
+        if metas:
+            print("Available quarantined files:")
+            for mf in sorted(metas):
+                try:
+                    with open(mf, "r", encoding="utf-8") as f:
+                        m = json.load(f)
+                    print(f"  {m.get('original_path', '?')} (quarantined {m.get('quarantined_at', '?')})")
+                except (OSError, json.JSONDecodeError):
+                    pass
+        return 1
+
+    original_path = workspace / found_meta["original_path"]
+
+    # Ensure parent directory exists
+    original_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if original_path.exists():
+        print(f"[WARNING] Original location already has a file: {found_meta['original_path']}")
+        print("  The existing file will be overwritten.")
+        print()
+
+    try:
+        shutil.move(str(found_qfile), str(original_path))
+        # Remove metadata file
+        meta_path = qdir / f"{found_meta['quarantine_file']}.meta.json"
+        if meta_path.is_file():
+            meta_path.unlink()
+    except (OSError, PermissionError) as exc:
+        print(f"[ERROR] Failed to restore: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"  [RESTORED] {found_meta['original_path']}")
+    print(f"    From:     .quarantine/vault/{found_meta['quarantine_file']}")
+    print(f"    To:       {found_meta['original_path']}")
+    print()
+    print("File restored. Consider running 'fix-permissions' to secure it.")
+    print("=" * 60)
+    return 0
+
+
+def cmd_rotate_check(workspace, max_age_days=None):
+    """Check credential file ages and generate rotation recommendations."""
+    threshold = max_age_days if max_age_days is not None else STALE_THRESHOLD_DAYS
+
+    print("=" * 60)
+    print("OPENCLAW VAULT FULL -- ROTATION CHECK")
+    print("=" * 60)
+    print(f"Workspace: {workspace}")
+    print(f"Timestamp: {now_iso()}")
+    print(f"Max age threshold: {threshold} days")
+    print()
+
+    cred_files = collect_files(
+        workspace, names=CREDENTIAL_FILES, extensions=CREDENTIAL_EXTENSIONS,
+    )
+    # Also gather .env* files
+    for root, dirs, filenames in os.walk(workspace):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS
+                   and not d.startswith(".quarantine")]
+        rel_root = Path(root).relative_to(workspace)
+        parts = rel_root.parts
+        if len(parts) >= 2 and parts[0] == "skills" and parts[1] in SELF_SKILL_DIRS:
+            continue
+        for fname in filenames:
+            fpath = Path(root) / fname
+            if fname.startswith(".env") and fpath not in cred_files:
+                cred_files.append(fpath)
+
+    if not cred_files:
+        print("No credential files found. Nothing to check.")
+        return 0
+
+    overdue = []
+    approaching = []
+    ok = []
+
+    for fpath in cred_files:
+        age = file_age_days(fpath)
+        if age < 0:
+            continue
+        rel = fpath.relative_to(workspace)
+        cred_type = classify_credential(fpath)
+        entry = {
+            "file": str(rel),
+            "type": cred_type,
+            "age_days": int(age),
+            "threshold": threshold,
+        }
+
+        if age > threshold:
+            entry["status"] = "OVERDUE"
+            entry["overdue_by"] = int(age - threshold)
+            overdue.append(entry)
+        elif age > threshold * 0.75:
+            entry["status"] = "APFULLACHING"
+            entry["days_remaining"] = int(threshold - age)
+            approaching.append(entry)
+        else:
+            entry["status"] = "OK"
+            entry["days_remaining"] = int(threshold - age)
+            ok.append(entry)
+
+    # Print rotation schedule
+    if overdue:
+        print("OVERDUE -- Rotate immediately:")
+        print("-" * 40)
+        for item in sorted(overdue, key=lambda x: -x["age_days"]):
+            print(f"  [OVERDUE]     {item['file']}")
+            print(f"                Type: {item['type']}  |  Age: {item['age_days']}d  |  Overdue by: {item['overdue_by']}d")
+            print()
+
+    if approaching:
+        print("APFULLACHING -- Rotate soon:")
+        print("-" * 40)
+        for item in sorted(approaching, key=lambda x: x["days_remaining"]):
+            print(f"  [APFULLACHING] {item['file']}")
+            print(f"                Type: {item['type']}  |  Age: {item['age_days']}d  |  {item['days_remaining']}d remaining")
+            print()
+
+    if ok:
+        print(f"OK -- Within rotation window ({threshold}d):")
+        print("-" * 40)
+        for item in sorted(ok, key=lambda x: -x["age_days"]):
+            print(f"  [OK]          {item['file']}")
+            print(f"                Type: {item['type']}  |  Age: {item['age_days']}d  |  {item['days_remaining']}d remaining")
+            print()
+
+    # Summary
+    print("=" * 60)
+    print("ROTATION SCHEDULE SUMMARY")
+    print("-" * 40)
+    print(f"  Overdue:     {len(overdue)}")
+    print(f"  Approaching: {len(approaching)}")
+    print(f"  OK:          {len(ok)}")
+    print(f"  Total:       {len(overdue) + len(approaching) + len(ok)}")
+    print("=" * 60)
+
+    if overdue:
+        return 2
+    elif approaching:
+        return 1
+    return 0
+
+
+def cmd_gitguard(workspace):
+    """Scan git history for accidentally committed credentials.
+
+    Uses git log --diff-filter=A to find credential files that were added
+    (and possibly later removed) from the repository.
+    """
+    print("=" * 60)
+    print("OPENCLAW VAULT FULL -- GIT GUARD")
+    print("=" * 60)
+    print(f"Workspace: {workspace}")
+    print(f"Timestamp: {now_iso()}")
+    print()
+
+    git_dir = workspace / ".git"
+    if not git_dir.is_dir():
+        print("[INFO] Not a git repository. Git guard requires a git repo.")
+        print("=" * 60)
+        return 0
+
+    # Check git is available
+    stdout, rc = run_git(workspace, "rev-parse", "--is-inside-work-tree")
+    if rc != 0:
+        print("[ERROR] git is not available or this is not a valid git repo.", file=sys.stderr)
+        return 1
+
+    findings = []
+
+    # Strategy 1: Find credential files that were ever added via git log
+    # Use --diff-filter=A to find files that were Added at some point
+    # Check each credential pattern individually
+    credential_names_to_check = list(CREDENTIAL_FILES) + [
+        f"*{ext}" for ext in CREDENTIAL_EXTENSIONS
+    ]
+
+    print("Scanning git history for credential files...")
+    print()
+
+    # Search for files added with credential-like names
+    stdout, rc = run_git(
+        workspace, "log", "--all", "--diff-filter=A",
+        "--name-only", "--pretty=format:---COMMIT---%H---%ai---"
+    )
+
+    if rc != 0:
+        print("[WARNING] Could not read git log. Skipping history scan.")
+    else:
+        current_commit = ""
+        current_date = ""
+        seen_files = set()
+
+        for line in stdout.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("---COMMIT---"):
+                parts = line.split("---")
+                if len(parts) >= 4:
+                    current_commit = parts[2][:12]
+                    current_date = parts[3].split()[0] if parts[3] else "?"
+                continue
+
+            # Check if this file matches credential patterns
+            fname = Path(line).name
+            fsuffix = Path(line).suffix.lower()
+            is_cred = (
+                fname in CREDENTIAL_FILES
+                or fsuffix in CREDENTIAL_EXTENSIONS
+                or fname.startswith(".env")
+            )
+
+            if is_cred and line not in seen_files:
+                seen_files.add(line)
+                # Check if the file still exists in the working tree
+                still_exists = (workspace / line).is_file()
+                # Check if it exists in HEAD
+                head_stdout, head_rc = run_git(
+                    workspace, "cat-file", "-e", f"HEAD:{line}"
+                )
+                in_head = (head_rc == 0)
+
+                if still_exists and in_head:
+                    severity = "CRITICAL"
+                    detail = "Credential file is tracked in git (currently in HEAD and working tree)"
+                elif not still_exists and not in_head:
+                    severity = "WARNING"
+                    detail = "Credential file was added then removed -- may still be in git history"
+                elif in_head and not still_exists:
+                    severity = "WARNING"
+                    detail = "Credential file is in HEAD but missing from working tree"
+                else:
+                    severity = "WARNING"
+                    detail = "Credential file exists in working tree but not in HEAD (check older commits)"
+
+                findings.append({
+                    "file": line,
+                    "severity": severity,
+                    "commit": current_commit,
+                    "date": current_date,
+                    "detail": detail,
+                    "in_head": in_head,
+                    "in_worktree": still_exists,
+                })
+
+    # Strategy 2: Check for .env in current git tracked files
+    stdout, rc = run_git(workspace, "ls-files")
+    if rc == 0:
+        for tracked_file in stdout.strip().split("\n"):
+            tracked_file = tracked_file.strip()
+            if not tracked_file:
+                continue
+            fname = Path(tracked_file).name
+            fsuffix = Path(tracked_file).suffix.lower()
+            is_cred = (
+                fname in CREDENTIAL_FILES
+                or fsuffix in CREDENTIAL_EXTENSIONS
+                or fname.startswith(".env")
+            )
+            if is_cred:
+                already = any(f["file"] == tracked_file for f in findings)
+                if not already:
+                    findings.append({
+                        "file": tracked_file,
+                        "severity": "CRITICAL",
+                        "commit": "HEAD",
+                        "date": "current",
+                        "detail": "Credential file is currently tracked by git",
+                        "in_head": True,
+                        "in_worktree": (workspace / tracked_file).is_file(),
+                    })
+
+    # Print results
+    if not findings:
+        print("[CLEAN] No credential files found in git history.")
+        print("=" * 60)
+        return 0
+
+    severity_order = {"CRITICAL": 0, "WARNING": 1, "INFO": 2}
+    for finding in sorted(findings, key=lambda f: severity_order.get(f["severity"], 3)):
+        sev = finding["severity"]
+        print(f"  [{sev}] {finding['file']}")
+        print(f"          {finding['detail']}")
+        print(f"          Commit: {finding['commit']}  |  Date: {finding['date']}")
+        if finding.get("in_head"):
+            print(f"          Still in HEAD: YES -- credential is accessible via git")
+        if not finding.get("in_worktree") and not finding.get("in_head"):
+            print(f"          WARNING: File removed but may persist in git reflog/history")
+        print()
+
+    critical = sum(1 for f in findings if f["severity"] == "CRITICAL")
+    warnings = sum(1 for f in findings if f["severity"] == "WARNING")
+
+    print("-" * 40)
+    print("SUMMARY")
+    print("-" * 40)
+    print(f"  Critical: {critical}")
+    print(f"  Warnings: {warnings}")
+    print(f"  Total:    {len(findings)}")
+    print()
+
+    if critical:
+        print("ACTION REQUIRED: Credentials found in git history.")
+        print("  1. Remove tracked credential files: git rm --cached <file>")
+        print("  2. Add to .gitignore")
+        print("  3. Consider git filter-branch or BFG to purge from history")
+        print("  4. Rotate any exposed credentials immediately")
+    elif warnings:
+        print("REVIEW: Credential files found in git history.")
+        print("  Consider purging with BFG Repo-Cleaner if these contained real secrets.")
+
+    print("=" * 60)
+    return 2 if critical else (1 if warnings else 0)
+
+
+def cmdtect(workspace, max_age_days=None):
+    """Full automated protection sweep.
+
+    Runs all audit and exposure checks, auto-fixes permissions,
+    quarantines high-risk exposed credential files, checks rotation,
+    and produces a comprehensive report. Recommended for session startup.
+    """
+    threshold = max_age_days if max_age_days is not None else STALE_THRESHOLD_DAYS
+
+    print("=" * 60)
+    print("OPENCLAW VAULT FULL -- FULLTECT")
+    print("=" * 60)
+    print(f"Workspace: {workspace}")
+    print(f"Timestamp: {now_iso()}")
+    print(f"Mode: Full automated protection sweep")
+    print()
+
+    actions_taken = []
+    overall_exit = 0
+
+    # --- Phase 1: Audit ---
+    print("[1/5] Running credential audit...")
+    audit_findings = []
+    audit_findings.extend(check_env_permissions(workspace))
+    audit_findings.extend(check_shell_history(workspace))
+    audit_findings.extend(check_git_config(workspace))
+    audit_findings.extend(check_config_credentials(workspace))
+    audit_findings.extend(check_log_credentials(workspace))
+    audit_findings.extend(check_gitignore_coverage(workspace))
+    audit_findings.extend(check_stale_credentials(workspace))
+
+    audit_critical = sum(1 for f in audit_findings if f["severity"] == "CRITICAL")
+    audit_warnings = sum(1 for f in audit_findings if f["severity"] == "WARNING")
+    print(f"       Found {audit_critical} critical, {audit_warnings} warnings, {len(audit_findings)} total")
+    print()
+
+    # --- Phase 2: Exposure ---
+    print("[2/5] Checking exposure vectors...")
+    exposure_findings = []
+    exposure_findings.extend(check_public_directory_exposure(workspace))
+    exposure_findings.extend(check_docker_credentials(workspace))
+    exposure_findings.extend(check_shell_aliases(workspace))
+    exposure_findings.extend(check_url_credentials_in_code(workspace))
+
+    exp_critical = sum(1 for f in exposure_findings if f["severity"] == "CRITICAL")
+    exp_warnings = sum(1 for f in exposure_findings if f["severity"] == "WARNING")
+    print(f"       Found {exp_critical} critical, {exp_warnings} warnings, {len(exposure_findings)} total")
+    print()
+
+    # --- Phase 3: Fix permissions ---
+    print("[3/5] Fixing credential file permissions...")
+    cred_files = collect_files(
+        workspace, names=CREDENTIAL_FILES, extensions=CREDENTIAL_EXTENSIONS,
+    )
+    # Also gather .env* files
+    for root, dirs, filenames in os.walk(workspace):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS
+                   and not d.startswith(".quarantine")]
+        rel_root = Path(root).relative_to(workspace)
+        parts = rel_root.parts
+        if len(parts) >= 2 and parts[0] == "skills" and parts[1] in SELF_SKILL_DIRS:
+            continue
+        for fname in filenames:
+            fpath = Path(root) / fname
+            if fname.startswith(".env") and fpath not in cred_files:
+                cred_files.append(fpath)
+
+    perm_fixed = 0
+    for fpath in cred_files:
+        rel = fpath.relative_to(workspace)
+        if sys.platform == "win32":
+            username = os.environ.get("USERNAME", os.environ.get("USER", ""))
+            if username:
+                try:
+                    subprocess.run(
+                        ["icacls", str(fpath), "/inheritance:r",
+                         "/grant:r", f"{username}:(R,W)"],
+                        capture_output=True, text=True, timeout=15,
+                    )
+                    perm_fixed += 1
+                except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                    pass
+        else:
+            try:
+                current_mode = fpath.stat().st_mode
+                desired = stat.S_IRUSR | stat.S_IWUSR  # 0o600
+                if (current_mode & 0o777) != desired:
+                    os.chmod(fpath, desired)
+                    perm_fixed += 1
+            except (OSError, PermissionError):
+                pass
+
+    if perm_fixed:
+        actions_taken.append(f"Fixed permissions on {perm_fixed} file(s)")
+    print(f"       Fixed {perm_fixed} file(s)")
+    print()
+
+    # --- Phase 4: Quarantine high-risk exposed files ---
+    print("[4/5] Quarantining high-risk exposed files...")
+    quarantined = 0
+    # Quarantine credential files found in public directories
+    for finding in exposure_findings:
+        if finding["severity"] == "CRITICAL" and finding["type"] == "public_exposure":
+            target = workspace / finding["file"]
+            if target.is_file():
+                qdir = quarantine_dir(workspace)
+                qdir.mkdir(parents=True, exist_ok=True)
+                ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                safe_name = finding["file"].replace(os.sep, "__").replace("/", "__")
+                q_name = f"{ts}__{safe_name}"
+                q_path = qdir / q_name
+                metadata = {
+                    "original_path": finding["file"],
+                    "original_absolute": str(target),
+                    "quarantined_at": now_iso(),
+                    "reason": f"Auto-quarantined: {finding['detail']}",
+                    "quarantine_file": q_name,
+                }
+                try:
+                    shutil.move(str(target), str(q_path))
+                    meta_path = qdir / f"{q_name}.meta.json"
+                    with open(meta_path, "w", encoding="utf-8") as f:
+                        json.dump(metadata, f, indent=2)
+                    print(f"       [QUARANTINED] {finding['file']}")
+                    quarantined += 1
+                except (OSError, PermissionError):
+                    pass
+
+    if quarantined:
+        actions_taken.append(f"Quarantined {quarantined} high-risk file(s)")
+    else:
+        print("       No files needed quarantine")
+    print()
+
+    # --- Phase 5: Rotation check ---
+    print("[5/5] Checking credential rotation...")
+    # Re-collect since some may have been quarantined
+    remaining_creds = collect_files(
+        workspace, names=CREDENTIAL_FILES, extensions=CREDENTIAL_EXTENSIONS,
+    )
+    overdue_count = 0
+    approaching_count = 0
+    for fpath in remaining_creds:
+        age = file_age_days(fpath)
+        if age < 0:
+            continue
+        if age > threshold:
+            overdue_count += 1
+        elif age > threshold * 0.75:
+            approaching_count += 1
+
+    if overdue_count:
+        actions_taken.append(f"Found {overdue_count} credential(s) overdue for rotation")
+    print(f"       Overdue: {overdue_count}  |  Approaching: {approaching_count}")
+    print()
+
+    # --- Final report ---
+    all_findings = audit_findings + exposure_findings
+    total_critical = sum(1 for f in all_findings if f["severity"] == "CRITICAL")
+    total_warnings = sum(1 for f in all_findings if f["severity"] == "WARNING")
+
+    print("=" * 60)
+    print("FULLTECTION REPORT")
+    print("=" * 60)
+
+    if actions_taken:
+        print()
+        print("Actions taken:")
+        for action in actions_taken:
+            print(f"  + {action}")
+        print()
+
+    if all_findings:
+        print("Remaining findings:")
+        severity_order = {"CRITICAL": 0, "WARNING": 1, "INFO": 2}
+        for finding in sorted(all_findings, key=lambda f: severity_order.get(f["severity"], 3)):
+            # Skip findings for files we quarantined
+            if any(finding.get("file", "") in a for a in actions_taken):
+                continue
+            sev = finding["severity"]
+            loc = finding["file"]
+            if "line" in finding and finding["line"]:
+                loc = f"{finding['file']}:{finding['line']}"
+            print(f"  [{sev}] {loc}")
+            print(f"          {finding['detail']}")
+            if "match" in finding and finding["match"]:
+                print(f"          Match: {finding['match']}")
+            print()
+
+    print("-" * 40)
+    print("SUMMARY")
+    print("-" * 40)
+    print(f"  Audit findings:    {len(audit_findings)} ({audit_critical} critical)")
+    print(f"  Exposure findings: {len(exposure_findings)} ({exp_critical} critical)")
+    print(f"  Permissions fixed: {perm_fixed}")
+    print(f"  Files quarantined: {quarantined}")
+    print(f"  Rotation overdue:  {overdue_count}")
+    print(f"  Actions taken:     {len(actions_taken)}")
+    print()
+
+    if total_critical or overdue_count:
+        overall_exit = 2
+        print("STATUS: CRITICAL -- Immediate action required on remaining findings")
+    elif total_warnings or approaching_count:
+        overall_exit = 1
+        print("STATUS: WARNING -- Review remaining findings")
+    else:
+        print("STATUS: FULLTECTED -- All credential checks passed")
+
+    print("=" * 60)
+    return overall_exit
+
+
+# ---------------------------------------------------------------------------
 # Report formatting
 # ---------------------------------------------------------------------------
 
@@ -889,7 +1596,7 @@ def _report(report_type, findings):
     print("-" * 40)
 
     if not findings:
-        print(f"[CLEAN] No credential issues detected.")
+        print("[CLEAN] No credential issues detected.")
         print("=" * 60)
         return 0
 
@@ -917,10 +1624,7 @@ def _report(report_type, findings):
 
     if critical:
         print("ACTION REQUIRED: Credential exposure detected.")
-        print("Review flagged items and remediate immediately.")
-        print()
-        print("Upgrade to openclaw-vault-pro for automated remediation:")
-        print("  auto-fix permissions, rotation reminders, secure injection")
+        print("Run 'protect' for automated remediation.")
     elif warnings:
         print("REVIEW NEEDED: Potential credential lifecycle issues detected.")
 
@@ -939,16 +1643,24 @@ def _report(report_type, findings):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="OpenClaw Vault — Credential lifecycle protection"
+        description="OpenClaw Vault — Full credential lifecycle security"
     )
     parser.add_argument(
         "command",
-        choices=["audit", "exposure", "inventory", "status"],
+        choices=[
+            "audit", "exposure", "inventory", "status",
+            "fix-permissions", "quarantine", "unquarantine",
+            "rotate-check", "gitguard", "protect",
+        ],
         nargs="?",
         default=None,
         help="Command to run",
     )
+    parser.add_argument("target", nargs="?", default=None,
+                        help="Target file (for quarantine/unquarantine)")
     parser.add_argument("--workspace", "-w", help="Workspace path")
+    parser.add_argument("--max-age", type=int, default=None,
+                        help="Max credential age in days (default: 90)")
     args = parser.parse_args()
 
     if args.command is None:
@@ -960,6 +1672,7 @@ def main():
         print(f"Workspace not found: {workspace}", file=sys.stderr)
         sys.exit(1)
 
+    # Basic commands
     if args.command == "audit":
         sys.exit(cmd_audit(workspace))
     elif args.command == "exposure":
@@ -968,11 +1681,25 @@ def main():
         sys.exit(cmd_inventory(workspace))
     elif args.command == "status":
         sys.exit(cmd_status(workspace))
-    elif args.command in ("fix-permissions", "rotate", "policy", "inject", "auto-remediate"):
-        print(f"'{args.command}' is a Pro feature.")
-        print("Upgrade to openclaw-vault-pro for:")
-        print("  fix-permissions, rotate, policy, inject, auto-remediate")
-        sys.exit(1)
+    # Pro commands
+    elif args.command == "fix-permissions":
+        sys.exit(cmd_fix_permissions(workspace))
+    elif args.command == "quarantine":
+        if not args.target:
+            print("Usage: vault.py quarantine <file>", file=sys.stderr)
+            sys.exit(1)
+        sys.exit(cmd_quarantine(workspace, args.target))
+    elif args.command == "unquarantine":
+        if not args.target:
+            print("Usage: vault.py unquarantine <file>", file=sys.stderr)
+            sys.exit(1)
+        sys.exit(cmd_unquarantine(workspace, args.target))
+    elif args.command == "rotate-check":
+        sys.exit(cmd_rotate_check(workspace, args.max_age))
+    elif args.command == "gitguard":
+        sys.exit(cmd_gitguard(workspace))
+    elif args.command == "protect":
+        sys.exit(cmdtect(workspace, args.max_age))
 
 
 if __name__ == "__main__":

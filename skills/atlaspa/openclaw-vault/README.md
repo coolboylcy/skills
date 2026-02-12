@@ -4,7 +4,6 @@ Credential lifecycle protection for [OpenClaw](https://github.com/openclaw/openc
 
 Audits credential exposure, detects misconfigured permissions, inventories all secrets, and identifies stale credentials needing rotation — the credential lifecycle layer that secret scanners miss.
 
-**Want automated countermeasures?** Upgrade to Pro — auto-fix permissions, credential rotation reminders, access control policies, secure credential injection, and exposure auto-remediation. [Get Pro access](https://github.com/sponsors/AtlasPA).
 
 ## The Problem
 
@@ -65,9 +64,7 @@ All commands accept `--workspace /path/to/workspace`. If omitted, auto-detects f
 - Tracks age of each credential file (last modified time)
 - Flags stale and exposed credentials in a structured table
 
-## Free vs Pro
 
-| Feature | Free | [Pro](https://github.com/sponsors/AtlasPA) |
 |---------|------|-----|
 | Full credential audit | Yes | Yes |
 | Exposure vector detection | Yes | Yes |
