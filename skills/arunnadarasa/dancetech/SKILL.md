@@ -31,7 +31,8 @@ All orchestrated via OpenClaw's native cron. No external schedulers needed.
 - GitHub account with public repo token
 - Optional: Privy credentials for Agentic Commerce wallet stubs
 
-## Configuration
+
+- `OPENROUTER_API_KEY` (OpenRouter API key for code generation)## Configuration
 
 Add to your `TOOLS.md`:
 
@@ -230,3 +231,10 @@ MIT — use, modify, share freely. Credit appreciated but not required.
 *Built by LovaDance (Asura) — Prince Yarjack of Easyar Fam, Angel of Indian Krump*
 
 *"Kindness Over Everything"* 🔥
+
+## Security Considerations
+
+- This skill requires a GitHub token with `public_repo` scope. Use a dedicated account and token, not your primary account.
+- The token is passed to git via a temporary askpass script to avoid exposing it in process listings.
+- Moltbook API key and OpenRouter API key are also required; treat them as secrets.
+- The skill creates many GitHub repos and posts frequently; test with a throwaway Moltbook account and GitHub account before using production accounts.

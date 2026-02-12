@@ -3,9 +3,15 @@
   "slug": "dancetech",
   "displayName": "Dance Agentic Engineer",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1770796007509,
-    "commit": "https://github.com/openclaw/skills/commit/57443d1d3e63c93107b5791be92011f0941be19a"
+    "version": "1.0.3",
+    "publishedAt": 1770850995896,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770796007509,
+      "commit": "https://github.com/openclaw/skills/commit/57443d1d3e63c93107b5791be92011f0941be19a"
+    }
+  ]
 }
