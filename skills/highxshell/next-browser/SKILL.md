@@ -58,7 +58,65 @@ curl "https://app.nextbrowser.com/api/v1/users/credentials" -H "Authorization: x
 
 ---
 
-## 3. Tasks (Subagent)
+---
+## 3. Locations
+
+The Locations endpoints provide available geolocation metadata for proxy and browser configuration. Use them to dynamically discover supported countries, regions, cities, and ISPs before creating profiles or running tasks under specific network conditions.
+
+```bash
+# List Countries
+curl "https://app.nextbrowser.com/api/v1/location/countries?\
+limit=<limit>&\
+offset=<offset>&\
+name=<name>&\
+code=<iso2-code>&\
+connection_type=<connection-type>" \
+  -H "Authorization: x-api-key $API_KEY"
+```
+
+```bash
+# List Regions
+curl "https://app.nextbrowser.com/api/v1/location/regions?\
+country__code=<iso2-country>&\
+limit=<limit>&\
+offset=<offset>&\
+name=<name>&\
+code=<region-code>&\
+city__code=<city-code>&\
+connection_type=<connection-type>" \
+  -H "Authorization: x-api-key $API_KEY"
+```
+
+```bash
+# List Cities
+curl "https://app.nextbrowser.com/api/v1/location/cities?\
+country__code=<iso2-country>&\
+limit=<limit>&\
+offset=<offset>&\
+name=<name>&\
+code=<city-code>&\
+region__code=<region-code>&\
+connection_type=<connection-type>" \
+  -H "Authorization: x-api-key $API_KEY"
+```
+
+```bash
+# List ISPs
+curl "https://app.nextbrowser.com/api/v1/location/isps?\
+country__code=<iso2-country>&\
+limit=<limit>&\
+offset=<offset>&\
+name=<name>&\
+code=<isp-code>&\
+region__code=<region-code>&\
+city__code=<city-code>&\
+connection_type=<connection-type>" \
+  -H "Authorization: x-api-key $API_KEY"
+```
+
+---
+
+## 4. Tasks (Subagent)
 
 Run autonomous browser tasks - like a subagent that handles browser interactions for you. Give it a prompt and it completes the task.
 

@@ -3,11 +3,16 @@
   "slug": "next-browser",
   "displayName": "Nextbrowser",
   "latest": {
-    "version": "1.0.5",
-    "publishedAt": 1770215675724,
-    "commit": "https://github.com/clawdbot/skills/commit/f2bc2b9479b517b142f6f036b952bbeb43043203"
+    "version": "1.0.6",
+    "publishedAt": 1770893467565,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.5",
+      "publishedAt": 1770215675724,
+      "commit": "https://github.com/clawdbot/skills/commit/f2bc2b9479b517b142f6f036b952bbeb43043203"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1770192959439,
