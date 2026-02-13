@@ -1,11 +1,17 @@
 {
   "owner": "johnixr",
   "slug": "agentsocial",
-  "displayName": "AgentSocial",
+  "displayName": "Agentsocial",
   "latest": {
-    "version": "0.1.0",
-    "publishedAt": 1770953403832,
-    "commit": "https://github.com/openclaw/skills/commit/fe8b0cfc0a0ef6271bbbf0ea87a6aef4bf179a53"
+    "version": "0.3.1",
+    "publishedAt": 1770985385881,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.1.0",
+      "publishedAt": 1770953403832,
+      "commit": "https://github.com/openclaw/skills/commit/fe8b0cfc0a0ef6271bbbf0ea87a6aef4bf179a53"
+    }
+  ]
 }
