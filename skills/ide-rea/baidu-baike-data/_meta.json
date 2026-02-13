@@ -1,13 +1,18 @@
 {
   "owner": "ide-rea",
   "slug": "baidu-baike-data",
-  "displayName": "Baidu Baike Data",
+  "displayName": "baidu baike search",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1770632549062,
-    "commit": "https://github.com/openclaw/skills/commit/8b69db62948fa347c37c0688fcd6edfd028df3de"
+    "version": "1.1.0",
+    "publishedAt": 1770955934667,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1770632549062,
+      "commit": "https://github.com/openclaw/skills/commit/8b69db62948fa347c37c0688fcd6edfd028df3de"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1770608939510,
