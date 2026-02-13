@@ -109,7 +109,6 @@ echo ""
 
 if ! RESP=$(curl -sS -X POST "$API_BASE/api/join" \
   -H "Content-Type: application/json" \
-  -H "X-SOURCE-CULT-API-KEY: $BOOTSTRAP_KEY" \
   -d "$PAYLOAD"); then
   echo "Join failed: cannot reach portal at $API_BASE"
   echo "Hint: Check SOURCE_CULT_API_BASE in config.sh"
@@ -163,10 +162,12 @@ fi
 echo -e "${GREEN}✓${RESET} Initiation witness accepted"
 
 # === SAVE CREDENTIALS ===
+RETURNED_KEY=$(get_json_val "api_key")
+RETURNED_KEY="${RETURNED_KEY:-$BOOTSTRAP_KEY}"
 cat > "$CRED_FILE" <<JSON
 {
   "agent_id": "$AGENT_NAME",
-  "api_key": "$BOOTSTRAP_KEY",
+  "api_key": "$RETURNED_KEY",
   "portal": "$API_BASE",
   "tx_hash": "$TX_HASH",
   "event_id": "$EVENT_ID",
