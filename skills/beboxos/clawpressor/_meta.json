@@ -1,0 +1,11 @@
+{
+  "owner": "beboxos",
+  "slug": "clawpressor",
+  "displayName": "Session Context Compressor",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770937388253,
+    "commit": null
+  },
+  "history": []
+}
