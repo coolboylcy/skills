@@ -1,6 +1,6 @@
 ---
 name: NEON-SOUL
-version: 0.1.10
+version: 0.2.1
 description: AI Identity Through Grounded Principles - synthesize your soul from memory with semantic compression.
 homepage: https://github.com/geeks-accelerator/neon-soul
 user-invocable: true
@@ -19,17 +19,49 @@ metadata:
         - .neon-soul/
         - SOUL.md
 tags:
-  - soul-synthesis
   - identity
-  - embeddings
-  - semantic-compression
-  - provenance
+  - personality
+  - character
+  - values
+  - journaling
+  - diary
+  - memory
+  - self-reflection
+  - self-discovery
+  - ai-agent
   - openclaw
+  - personal-knowledge
 ---
 
 # NEON-SOUL
 
 AI Identity Through Grounded Principles - soul synthesis with semantic compression.
+
+---
+
+## Upgrading to 0.2.0
+
+If you used NEON-SOUL before version 0.2.0:
+- Your existing `.neon-soul/state.json` will work (embedding fields are ignored)
+- First synthesis will recalculate all similarity matches
+- Your SOUL.md and provenance chain are unchanged
+
+Nothing to do - just run `/neon-soul synthesize` as usual.
+
+---
+
+## What Changed in v0.2.0
+
+We removed the embedding model dependency, which means principle matching now uses your agent's LLM directly. This is the same model you already trust with your memory files.
+
+**What this means for you:**
+- Synthesis may take a bit longer (seconds, not minutes)
+- Results may vary slightly between runs (like asking the same question twice - similar but not identical)
+- You'll need an active connection to your agent (can't run offline)
+
+**Why we made this choice:** The previous approach required third-party code that security scanners flagged. Your soul is too important for compromises.
+
+**Your soul reflects patterns in your memory, not exact calculations.** Like human memory itself, the synthesis process involves interpretation. Running synthesis twice may produce slightly different results - but the core truths will remain stable if your memory is consistent.
 
 ---
 
@@ -42,94 +74,28 @@ NEON-SOUL is an **instruction-based skill** - there is no binary or CLI to insta
 2. Your agent reads this SKILL.md and follows the instructions
 3. The agent uses its built-in capabilities to read files, analyze content, and write output
 
-**No external API calls** - your data never leaves your local machine. The skill does not transmit data to external servers, third-party endpoints, or remote APIs.
+**No third-party services**: NEON-SOUL does not transmit your data to any external servers, third-party endpoints, or services beyond your agent. The skill uses only your agent's existing capabilities.
 
-**Local code execution required**: The skill requires `@xenova/transformers` (an npm package) running locally for embedding inference. This is third-party code that runs on YOUR machine, not a remote service. See [Requirements](#requirements) for details.
+**Pure instruction skill**: NEON-SOUL uses your agent's existing LLM for semantic analysis. No third-party packages, no model downloads, no additional dependencies.
 
-**Data handling**: Your data stays local. All analysis happens on your machine using locally-installed packages - no data transmission, no external APIs, no third-party endpoints receiving your content.
+**Data handling**: Your data stays within your agent's trust boundary. If your agent uses a cloud-hosted LLM (Claude, GPT, etc.), data is transmitted to that service as part of normal agent operation - the same as any other agent interaction. If your agent uses a local LLM (Ollama, etc.), data stays on your machine.
+
+**Principle matching**: When similar principles are detected, the one with the most signal confirmations (highest strength) is kept. Equal-strength principles prefer the older observation.
 
 ---
 
 ## Requirements
 
-### Embedding Model (Required)
-
-NEON-SOUL requires **`Xenova/all-MiniLM-L6-v2`** for local embedding inference.
+NEON-SOUL requires only an active connection to your AI agent (Claude Code, OpenClaw, etc.). The agent provides all necessary capabilities:
 
 | Requirement | Details |
 |-------------|---------|
-| Model | `Xenova/all-MiniLM-L6-v2` (384-dimensional vectors) |
-| Provider | `@xenova/transformers` (local inference) |
-| Node.js | >= 22.0.0 |
-| Disk space | ~100MB (model cache in `node_modules/.cache`) |
-| Network | One-time download only (~23MB) |
+| Agent | Claude Code, OpenClaw, or compatible |
+| LLM access | Your agent's configured LLM (for semantic analysis) |
+| No packages | No npm packages required |
+| No models | No model downloads |
 
-**No external API fallback**: If the model cannot be loaded, the skill fails immediately with a clear error message. NEON-SOUL will NOT fall back to external embedding APIs (OpenAI, Cohere, etc.).
-
-**Why this matters**: The "no external APIs" guarantee depends on local embedding inference. If external APIs were used as fallback, your data could be transmitted to third-party services without your knowledge.
-
-### Model Source & Integrity
-
-The embedding model is downloaded from Hugging Face on first use:
-
-| Property | Value |
-|----------|-------|
-| Model URL | https://huggingface.co/Xenova/all-MiniLM-L6-v2 |
-| Model files | `onnx/model_quantized.onnx` (~23MB) |
-| Original model | [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) |
-| Conversion | ONNX quantized by [@xenova](https://huggingface.co/Xenova) |
-| Cache location | `node_modules/.cache/@xenova/transformers/` |
-
-**Integrity verification** (optional but recommended):
-```bash
-# After first run, verify the model file exists
-ls -la node_modules/.cache/@xenova/transformers/Xenova/all-MiniLM-L6-v2/onnx/
-
-# Check file size (should be ~23MB for quantized model)
-du -sh node_modules/.cache/@xenova/transformers/Xenova/all-MiniLM-L6-v2/
-```
-
-**Trust model**: The model is a quantized ONNX conversion of a well-known sentence-transformers model. The @xenova/transformers library (>1M weekly npm downloads) handles download and caching. If you require higher assurance, you can:
-1. Pre-download the model from Hugging Face
-2. Verify against Hugging Face's published checksums
-3. Place in the cache directory manually
-
-### Local vs External: What This Means
-
-| Type | NEON-SOUL | Your data |
-|------|-----------|-----------|
-| **External API calls** | ❌ Never | Never transmitted |
-| **Local code execution** | ✅ Required | Processed locally |
-| **Network access** | One-time model download | Model weights only, not your data |
-
-**Clarification**: "No external APIs" means your memory files, SOUL.md, and personal data are NEVER sent over the network. The only network activity is the initial model download (~23MB) from Hugging Face, which downloads model weights, not your data.
-
-**Verification**:
-```bash
-# Check @xenova/transformers is installed
-npm ls @xenova/transformers
-
-# Check Node.js version
-node --version  # Should be >= 22.0.0
-```
-
----
-
-## Model Invocation Clarification
-
-This skill sets `disable-model-invocation: true` in its metadata. Here's what that means:
-
-**What "disable-model-invocation" means:**
-- The skill does **NOT** require LLM calls to function
-- Your agent interprets the instructions using its existing capabilities
-- No additional model API calls are made by the skill itself
-
-**What about embeddings and similarity?**
-- **Embeddings** (all-MiniLM-L6-v2) use local inference, not LLM invocation
-- **Cosine similarity** is a mathematical operation (dot product), not a model call
-- **Dimension classification** uses your agent's existing capabilities
-
-**In short:** The skill uses mathematical operations (embeddings, cosine similarity) and your agent's built-in reasoning. It does not invoke separate LLM models beyond what your agent already provides.
+**That's it.** If your agent works, NEON-SOUL works.
 
 ---
 
@@ -146,6 +112,31 @@ This skill sets `disable-model-invocation: true` in its metadata. Here's what th
 - `.neon-soul/state.json` - synthesis state tracking
 
 **Git integration** (opt-in, off by default): Auto-commit is disabled unless you enable it in config. When enabled, it uses your existing git setup - no new credentials are requested or stored by the skill.
+
+---
+
+## Privacy Considerations
+
+NEON-SOUL processes personal memory files to synthesize your identity. Consider these privacy factors:
+
+**Your agent's LLM determines data handling:**
+- **Cloud LLM** (Claude, GPT, etc.): Your memory content is sent to that provider as part of normal LLM operation. This is no different from any other agent interaction with your files.
+- **Local LLM** (Ollama, LM Studio, etc.): Your data stays entirely on your machine.
+
+**What NEON-SOUL does NOT do:**
+- Send data to any service beyond your configured agent
+- Store data anywhere except your local workspace
+- Transmit to third-party analytics, logging, or tracking services
+- Make network requests independent of your agent
+
+**Before running synthesis:**
+1. Review what's in your `memory/` directory
+2. Remove or move any secrets, credentials, or highly sensitive files
+3. Use `--dry-run` to preview what will be processed
+4. Consider whether your LLM provider's privacy policy is acceptable for this content
+
+**About `disable-model-invocation: true`:**
+This metadata flag means NEON-SOUL cannot run autonomously - your agent cannot invoke the skill without your explicit command. When you do invoke the skill (e.g., `/neon-soul synthesize`), it uses your agent's LLM for semantic analysis. This is expected behavior, not a contradiction.
 
 ---
 
@@ -179,12 +170,13 @@ That's it. Your first soul is created with full provenance tracking. Use `/neon-
 
 Run soul synthesis pipeline:
 1. Collect signals from memory files
-2. Match to existing principles (cosine similarity >= 0.85)
+2. Match to existing principles (semantic similarity via LLM)
 3. Promote high-confidence principles to axioms (N≥3)
 4. Generate SOUL.md with provenance tracking
 
 **Options:**
 - `--force` - Run synthesis even if below content threshold
+- `--force-resynthesis` - Force full resynthesis (ignore incremental mode)
 - `--dry-run` - Show what would change without writing (safe default)
 - `--diff` - Show proposed changes in diff format
 - `--output-format <format>` - Output format: prose (default), notation (legacy)
@@ -401,10 +393,6 @@ Place `.neon-soul/config.json` in workspace:
     "format": "cjk-math-emoji",
     "fallback": "native"
   },
-  "matching": {
-    "similarityThreshold": 0.85,
-    "embeddingModel": "Xenova/all-MiniLM-L6-v2"
-  },
   "paths": {
     "memory": "memory/",
     "output": ".neon-soul/"
@@ -416,6 +404,75 @@ Place `.neon-soul/config.json` in workspace:
 }
 ```
 
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NEON_SOUL_DEBUG` | `0` | Enable debug logging (1 = on) |
+| `NEON_SOUL_SKIP_META_SYNTHESIS` | `0` | Skip meta-synthesis pass (1 = skip) |
+| `NEON_SOUL_FORCE_RESYNTHESIS` | `0` | Force full resynthesis (1 = force) |
+
+**Usage:**
+```bash
+NEON_SOUL_DEBUG=1 /neon-soul synthesize --force   # Debug mode
+NEON_SOUL_FORCE_RESYNTHESIS=1 /neon-soul synthesize --force  # Full resynthesis
+```
+
+---
+
+## Cycle Management
+
+NEON-SOUL uses three synthesis modes:
+
+| Mode | Trigger | Behavior |
+|------|---------|----------|
+| **initial** | No existing soul | Full synthesis from scratch |
+| **incremental** | <30% new principles | Merge new insights without full resynthesis |
+| **full-resynthesis** | ≥30% new OR contradictions OR manual | Complete resynthesis of all principles |
+
+**When does full-resynthesis trigger?**
+- New principle ratio ≥30%
+- Detected contradictions (≥2)
+- Hierarchy structure changed
+- `--force-resynthesis` flag used
+
+Use `--force-resynthesis` when you've significantly restructured your memory or want to rebuild from scratch. Also available via `NEON_SOUL_FORCE_RESYNTHESIS=1` environment variable.
+
+---
+
+## Provenance Classification
+
+Signals are classified by their source type (SSEM model):
+
+| Type | Description | Example |
+|------|-------------|---------|
+| **self** | Things you wrote | diary entries, reflections, personal notes |
+| **curated** | Things you chose to keep | saved quotes, bookmarked articles, adopted guides |
+| **external** | Things others said about you | peer reviews, feedback, external assessments |
+
+Provenance is tracked for anti-echo-chamber protection.
+
+---
+
+## Grounding Requirements (Anti-Echo-Chamber Protection)
+
+To prevent self-reinforcing beliefs, axioms must be grounded in diverse evidence:
+
+| Criterion | Default | Why |
+|-----------|---------|-----|
+| Minimum principles | 3 | Requires pattern across observations |
+| Provenance diversity | 2 types | Prevents single-source dominance |
+| External OR questioning | Required | Ensures perspective beyond self |
+
+**Blocked axioms** appear in synthesis output with their blocker reason:
+```
+⚠ 2 axioms blocked by anti-echo-chamber:
+  - "I value authenticity above all" (self-only provenance)
+  - "Growth requires discomfort" (no questioning evidence)
+```
+
+To unblock, add external sources or questioning evidence to your memory.
+
 ---
 
 ## Data Flow
@@ -423,8 +480,8 @@ Place `.neon-soul/config.json` in workspace:
 ```
 Memory Files → Signal Extraction → Principle Matching → Axiom Promotion → SOUL.md
      ↓              ↓                    ↓                   ↓              ↓
-  Source        Embeddings          Similarity           N-count      Provenance
- Tracking       (384-dim)           Matching             Tracking       Chain
+  Source        LLM Analysis        Semantic             N-count      Provenance
+ Tracking       (your agent)        Matching             Tracking       Chain
 ```
 
 ---
@@ -452,7 +509,7 @@ When prose generation fails, NEON-SOUL falls back to bullet lists of native axio
 **Common causes:**
 - **LLM provider not available**: Prose expansion requires an LLM. Check your configuration.
 - **Validation failures**: The LLM output didn't match expected format (retried once, then fell back).
-- **Network timeout**: Local LLM inference can be slow; generation may have timed out.
+- **Network timeout**: Generation may have timed out.
 
 **How to check:**
 - Enable debug logging: `NEON_SOUL_DEBUG=1 /neon-soul synthesize --force`
@@ -479,39 +536,18 @@ Dimension classification uses semantic analysis. If results seem wrong:
 - The LLM classifier uses the axiom's native text, which may have different semantic weight than you expect
 - Unknown dimensions default to `vibe` (logged with `NEON_SOUL_DEBUG=1`)
 
-### Embedding model failed to load
+### Soul synthesis paused / LLM unavailable
 
-If you see `EmbeddingModelError: Failed to load embedding model`, the skill cannot proceed.
+If you see "Soul synthesis paused: Your agent's LLM is temporarily unavailable":
 
 **What this means:**
-- The `Xenova/all-MiniLM-L6-v2` model is required for similarity matching
-- NEON-SOUL does NOT fall back to external embedding APIs
-- Without local embeddings, the skill fails fast rather than risk sending data externally
+- Your agent needs an active LLM connection for semantic matching
+- The skill failed to reach the LLM after retrying
 
-**Common causes:**
-- **Missing dependency**: `@xenova/transformers` not installed
-- **Node.js version**: Requires Node.js >= 22.0.0
-- **First run**: Initial model download (~23MB) requires network access
-- **Disk space**: Model cache needs ~100MB in `node_modules/.cache`
-- **Network firewall**: May block Hugging Face model download
+**What to try:**
+- Check your agent is running and connected
+- Check network connectivity
+- If using Ollama locally, verify it's running: `curl http://localhost:11434/api/tags`
+- Try again in a moment - transient failures are common
 
-**How to fix:**
-```bash
-# 1. Check @xenova/transformers is installed
-npm ls @xenova/transformers
-
-# 2. Check Node.js version
-node --version  # Must be >= 22.0.0
-
-# 3. If missing, install dependencies
-npm install
-
-# 4. Test embedding directly (will download model if needed)
-npx tsx -e "import { embed } from './src/lib/embeddings.js'; embed('test').then(console.log)"
-```
-
-**If behind a firewall:**
-The model is downloaded from Hugging Face on first use. If blocked:
-1. Download model manually from https://huggingface.co/Xenova/all-MiniLM-L6-v2
-2. Place in `node_modules/.cache/@xenova/transformers/`
-3. Or configure corporate proxy: `HTTPS_PROXY=http://proxy:port npm run ...`
+**No partial writes.** When LLM is unavailable, NEON-SOUL stops without writing to your files. Note: If using a cloud LLM, some data may have been sent before the failure - this is normal agent operation.

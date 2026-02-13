@@ -3,11 +3,16 @@
   "slug": "neon-soul",
   "displayName": "NEON-SOUL",
   "latest": {
-    "version": "0.1.10",
-    "publishedAt": 1770933151027,
-    "commit": "https://github.com/openclaw/skills/commit/037b46593c9827d55193835b9aa9b7baa157f71e"
+    "version": "0.2.1",
+    "publishedAt": 1770953223395,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.1.10",
+      "publishedAt": 1770933151027,
+      "commit": "https://github.com/openclaw/skills/commit/037b46593c9827d55193835b9aa9b7baa157f71e"
+    },
     {
       "version": "0.1.8",
       "publishedAt": 1770845463025,
