@@ -1,6 +1,5 @@
 ---
-slug: "ifc-qto-extraction"
-display_name: "IFC QTO Extraction"
+name: "ifc-qto-extraction"
 description: "Extract quantities from IFC/Revit models for quantity takeoff. Uses DDC converters to get element counts, areas, volumes, lengths with grouping and reporting."
 ---
 
