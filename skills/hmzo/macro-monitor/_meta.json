@@ -1,11 +1,17 @@
 {
   "owner": "hmzo",
   "slug": "macro-monitor",
-  "displayName": "宏观数据监控",
+  "displayName": "Macro Monitor",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1770818960436,
-    "commit": "https://github.com/openclaw/skills/commit/c4b830a1f72547465dd82ef475b63fbeddcc5025"
+    "version": "1.0.2",
+    "publishedAt": 1770978201675,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770818960436,
+      "commit": "https://github.com/openclaw/skills/commit/c4b830a1f72547465dd82ef475b63fbeddcc5025"
+    }
+  ]
 }
