@@ -1,6 +1,18 @@
 ---
 name: korea-metropolitan-bus-alerts
 description: Create and manage scheduled bus arrival alerts using Korea TAGO (국토교통부) OpenAPI and Clawdbot cron. Use when a user wants to register weekday/weekend schedules like "평일 오전 7시, <정류소명>, <노선들>" and receive automatic arrival summaries via their configured Gateway messaging (DM only).
+metadata:
+  {
+    "openclaw": {
+      "emoji": "🚌",
+      "requires": {
+        "env": ["TAGO_SERVICE_KEY"],
+        "bins": ["python3", "systemctl"],
+        "optionalBins": ["clawdbot"]
+      },
+      "primaryEnv": "TAGO_SERVICE_KEY"
+    }
+  }
 ---
 
 # 수도권 버스 도착 알림 (Clawdbot cron)
@@ -19,6 +31,8 @@ Then the system sends arrival summaries to the **registering user (DM)** on sche
 - A running Clawdbot Gateway (Telegram/Slack/etc. already configured)
 - Clawdbot cron enabled/usable
 - A data.go.kr API key for TAGO
+- (setup 자동화 사용 시) `systemctl --user` 가 동작하는 환경 (systemd user service)
+- (rule_wizard에서 cron 등록까지 하려면) `clawdbot` CLI
 
 ## One-time setup: TAGO API key
 You must set a TAGO service key in your environment (never commit or paste it into markdown).
