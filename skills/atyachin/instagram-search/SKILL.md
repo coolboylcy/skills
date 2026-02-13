@@ -7,6 +7,7 @@ metadata:
     "openclaw":
       {
         "requires": { "bins": ["mcporter"], "skills": ["xpoz-setup"], "network": ["mcp.xpoz.ai"], "credentials": "Xpoz account (free tier) — auth via xpoz-setup skill (OAuth 2.1)" },
+        "install": [{"id": "node", "kind": "node", "package": "mcporter", "bins": ["mcporter"], "label": "Install mcporter (npm)"}],
       },
   }
 tags:
@@ -36,6 +37,10 @@ Find influencers, track hashtags, discover content trends, and export results. N
 👉 **Follow [`xpoz-setup`](https://clawhub.ai/skills/xpoz-setup)** — handles auth automatically.
 
 ---
+
+## Setup
+
+Run `xpoz-setup` skill. Verify: `mcporter call xpoz.checkAccessKeyStatus`
 
 ## What You Can Search
 
