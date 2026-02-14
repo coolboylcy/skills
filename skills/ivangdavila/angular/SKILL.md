@@ -1,59 +1,34 @@
 ---
 name: Angular
-description: Avoid common Angular mistakes — subscription leaks, change detection, dependency injection, and module organization.
-metadata: {"clawdbot":{"emoji":"🅰️","requires":{"bins":["node"]},"os":["linux","darwin","win32"]}}
+slug: angular
+version: 1.0.1
+description: Build reliable Angular apps avoiding RxJS leaks, change detection traps, and DI pitfalls.
 ---
 
-## Subscription Leaks
-- Manual subscribe needs unsubscribe — in `ngOnDestroy` or use `takeUntilDestroyed()`
-- `async` pipe auto-unsubscribes — prefer over manual subscribe in templates
-- `takeUntilDestroyed()` in inject context — cleaner than Subject + takeUntil pattern
-- HTTP observables complete automatically — but others don't, always handle cleanup
+## When to Use
 
-## Change Detection
-- Default checks entire component tree — expensive with large apps
-- `OnPush` only checks on input change or event — add `changeDetection: ChangeDetectionStrategy.OnPush`
-- Mutating objects doesn't trigger OnPush — create new reference: `{...obj}` or `[...arr]`
-- `markForCheck()` to manually trigger — when async changes data outside Angular
+User needs Angular expertise — component architecture, RxJS patterns, change detection, dependency injection, routing, and forms.
 
-## Dependency Injection
-- `providedIn: 'root'` for singleton services — tree-shakeable, no module registration needed
-- Component-level `providers` creates new instance — per component, not shared
-- `@Optional()` for optional dependencies — prevents error if not provided
-- `@Inject(TOKEN)` for injection tokens — not just classes
+## Quick Reference
 
-## Lifecycle Hooks
-- `ngOnInit` after inputs set — use for initialization, not constructor
-- `ngOnChanges` before `ngOnInit` — called on every input change, receives `SimpleChanges`
-- `ngAfterViewInit` for DOM access — `@ViewChild` not available until then
-- `ngOnDestroy` for cleanup — subscriptions, timers, event listeners
-
-## Templates
-- `*ngFor` needs `trackBy` for performance — prevents re-rendering entire list
-- `trackBy` function returns unique identifier — `trackByFn = (i, item) => item.id`
-- `@if` and `@for` (Angular 17+) replace `*ngIf`/`*ngFor` — better performance, cleaner syntax
-- `ng-container` for structural directives — no DOM element added
-
-## Reactive Forms
-- `FormGroup` and `FormControl` for reactive — not two-way binding
-- Validators at control level — `Validators.required`, `Validators.email`
-- `valueChanges` is Observable — subscribe or use async pipe
-- `patchValue` for partial update — `setValue` requires all fields
-
-## Modules vs Standalone
-- Standalone components don't need module — `standalone: true` in decorator
-- Import directly in other standalone components — no module declaration needed
-- Mixing: standalone can import modules — modules can import standalone
-- New projects prefer standalone — modules for legacy or complex DI
-
-## Routing
-- Lazy load with `loadComponent` or `loadChildren` — reduces initial bundle
-- Guards return `boolean`, `UrlTree`, or Observable — `UrlTree` for redirects
-- Resolvers pre-fetch data — available in `ActivatedRoute.data`
-- Route params: `snapshot` once, `paramMap` Observable — for navigation without destroy
+| Topic | File |
+|-------|------|
+| Components & change detection | `components.md` |
+| RxJS & subscriptions | `rxjs.md` |
+| Forms & validation | `forms.md` |
+| Dependency injection | `di.md` |
+| Routing & guards | `routing.md` |
+| HTTP & interceptors | `http.md` |
 
 ## Common Mistakes
-- `ElementRef.nativeElement` direct DOM access — breaks SSR, use Renderer2
-- `setTimeout` outside Angular zone — use `NgZone.run()` or change detection won't trigger
-- Circular dependency in DI — use `forwardRef()` or restructure
-- `HttpClient` methods return cold Observable — each subscribe makes new request
+
+- `OnPush` with mutated objects won't trigger change detection — always create new reference: `{...obj}` or `[...arr]`
+- `@ViewChild` is undefined in constructor/`ngOnInit` — access in `ngAfterViewInit` or later
+- `*ngFor` without `trackBy` re-renders entire list on any change — add `trackBy` returning stable ID
+- Manual `subscribe()` without unsubscribe leaks memory — use `async` pipe, `takeUntilDestroyed()`, or unsubscribe in `ngOnDestroy`
+- `HttpClient` returns cold Observable — each `subscribe()` fires new HTTP request
+- `setTimeout`/`setInterval` outside NgZone — change detection won't run, use `NgZone.run()` or signals
+- Circular DI dependency crashes app — use `forwardRef()` or restructure services
+- `ElementRef.nativeElement` direct DOM access breaks SSR — use `Renderer2` or `@defer`
+- Route params via `snapshot` miss navigation changes — use `paramMap` Observable for same-component navigation
+- `setValue()` on FormGroup requires ALL fields — use `patchValue()` for partial updates
