@@ -1,11 +1,61 @@
 ---
 name: clawvault
-version: 1.12.1
-description: Agent memory system with checkpoint/recover, structured storage, observational memory, and session transcript repair. Integrates with OpenClaw's qmd memory backend for BM25+vector+reranker search. Use when: storing/searching memories, preventing context death, repairing broken sessions. Don't use when: general file I/O.
+version: 2.0.4
+description: "Agent memory system with memory graph, context profiles, checkpoint/recover, structured storage, semantic search, and observational memory. Use when: storing/searching memories, preventing context death, graph-aware context retrieval, repairing broken sessions. Don't use when: general file I/O."
 author: Versatly
 repository: https://github.com/Versatly/clawvault
 homepage: https://clawvault.dev
-metadata: {"openclaw":{"emoji":"🐘","requires":{"bins":["clawvault"]},"env":{"CLAWVAULT_PATH":{"required":false,"description":"Vault directory path (auto-discovered if not set)"},"GEMINI_API_KEY":{"required":false,"description":"Only used by observe --compress for LLM compression. No other command uses this."}},"hooks":{"clawvault":{"events":["gateway:startup","command:new"],"capabilities":["executes clawvault CLI via child_process","reads vault state files","injects recovery alerts into session on context death","runs clawvault checkpoint before /new","runs clawvault observe --compress on session transcript (if GEMINI_API_KEY set)"],"does_not":["modify session transcripts (only the repair-session CLI command does that, never the hook)","make network calls (the hook itself makes zero network calls; observe --compress may call Gemini API)","access files outside the vault directory and session transcript path"]}},"install":[{"id":"node","kind":"node","package":"clawvault","bins":["clawvault"],"label":"Install ClawVault CLI (npm)"}]}}
+metadata:
+  {
+    "openclaw":
+      {
+        "emoji": "🐘",
+        "kind": "cli",
+        "requires":
+          {
+            "bins": ["clawvault"],
+            "env_optional": ["CLAWVAULT_PATH", "GEMINI_API_KEY", "OPENCLAW_HOME", "OPENCLAW_STATE_DIR"]
+          },
+        "install":
+          [
+            {
+              "id": "node",
+              "kind": "node",
+              "package": "clawvault",
+              "bins": ["clawvault"],
+              "label": "Install ClawVault CLI (npm)"
+            }
+          ],
+        "hooks":
+          {
+            "clawvault":
+              {
+                "events": ["gateway:startup", "command:new", "session:start"],
+                "capabilities":
+                  [
+                    "auto-checkpoint before session reset",
+                    "context death detection and alert injection",
+                    "session start context injection via --profile auto"
+                  ],
+                "does_not":
+                  [
+                    "make network calls (except optional GEMINI_API_KEY for observe --compress)",
+                    "access external APIs or cloud services",
+                    "send telemetry or analytics",
+                    "modify files outside vault directory and OpenClaw session transcripts"
+                  ]
+              }
+          },
+        "capabilities":
+          [
+            "reads/writes markdown files in vault directory",
+            "reads/modifies OpenClaw session transcripts (repair-session, with backup)",
+            "builds memory graph index (.clawvault/graph-index.json)",
+            "runs qmd for semantic search (optional, graceful fallback)",
+            "LLM API calls for observe --compress (optional, requires GEMINI_API_KEY)"
+          ]
+      }
+  }
 ---
 
 # ClawVault 🐘
@@ -16,44 +66,20 @@ An elephant never forgets. Structured memory for OpenClaw agents.
 
 ## Security & Transparency
 
-**What this skill does — full disclosure:**
-
-| Capability | Scope | Opt-in? |
-|---|---|---|
-| Read/write markdown files | Your vault directory only (`CLAWVAULT_PATH` or auto-discovered) | Always active |
-| Search vault (keyword + semantic) | Read-only queries via `qmd` CLI | Always active |
-| Checkpoint/recover/wake/sleep | Writes state files inside `.clawvault/` in your vault | Always active |
-| `repair-session` — fix broken session transcripts | Reads + modifies JSONL files in `~/.openclaw/agents/`. **Always creates `.bak` backup before writing.** Use `--dry-run` to preview changes without modifying anything. | Explicit command only |
-| OpenClaw hook (`handler.js`) | Runs on `gateway:startup` and `command:new` events. Calls `clawvault checkpoint` and `clawvault recover`. Does NOT make network calls. | **Opt-in** — must run `openclaw hooks enable clawvault` |
-| `observe --compress` — LLM compression | Sends session transcript text to Gemini Flash API to extract observations. **This is the ONLY feature that makes external API calls.** Requires `GEMINI_API_KEY` to be set. Without the key, this feature is completely inert. | Explicit command only + requires API key |
-
-**Network calls:** Zero by default. The only feature that contacts an external API is `observe --compress`, and only when you explicitly run it with a valid `GEMINI_API_KEY`. All other commands are pure local filesystem operations.
+**What this skill does:**
+- Reads/writes markdown files in your vault directory (`CLAWVAULT_PATH` or auto-discovered)
+- `repair-session` reads and modifies OpenClaw session transcripts (`~/.openclaw/agents/`) — creates backups before writing
+- Installs an OpenClaw **hook** (`hooks/clawvault/handler.js`) that runs on `gateway:startup` and `command:new` events to auto-checkpoint and detect context death. The hook is **opt-in** — enable via `openclaw hooks enable clawvault`
+- `observe --compress` makes LLM API calls (Gemini Flash by default) to compress session transcripts into observations
 
 **Environment variables used:**
 - `CLAWVAULT_PATH` — vault location (optional, auto-discovered if not set)
-- `OPENCLAW_HOME` / `OPENCLAW_STATE_DIR` — used by `repair-session` to locate session transcripts
-- `GEMINI_API_KEY` — used **only** by `observe --compress` for LLM compression. If not set, observe runs without compression (rule-based fallback). No other command reads this key.
-- `CLAWVAULT_NO_LLM=1` — force-disable all LLM calls even if API key is present
+- `OPENCLAW_HOME` / `OPENCLAW_STATE_DIR` — used by `repair-session` to find session transcripts
+- `GEMINI_API_KEY` — used by `observe` for LLM compression (optional, only if using observe features)
 
-**No cloud sync. No telemetry. No analytics. No phone-home. All data stays on your machine.**
+**No cloud sync — all data stays local. No network calls except LLM API for observe compression.**
 
-## Hook Behavior (`hooks/clawvault/handler.js`)
-
-The bundled hook is **opt-in** — it does nothing until you run `openclaw hooks enable clawvault`.
-
-When enabled, it handles two events:
-
-| Event | What it does | Network calls? |
-|---|---|---|
-| `gateway:startup` | Runs `clawvault recover --clear` to check for context death. If detected, injects a recovery alert into the session. | **None** |
-| `command:new` | Runs `clawvault checkpoint` to save state before reset. Then runs `clawvault observe --compress` on the session transcript if a transcript file exists. | **Only if `GEMINI_API_KEY` is set** (for observe compression). Without the key, observe uses rule-based fallback with zero network calls. |
-
-**What the hook does NOT do:**
-- Does NOT modify session transcripts (that's `repair-session`, a separate explicit CLI command)
-- Does NOT read or write files outside the vault directory
-- Does NOT phone home, collect analytics, or contact any server except the optional Gemini API for observe
-
-The hook executes the `clawvault` CLI binary via `child_process.execSync`. The binary must be installed separately (`npm install -g clawvault`). The hook source is fully readable at `hooks/clawvault/handler.js`.
+**This is a full CLI tool, not instruction-only.** It writes files, registers hooks, and runs code.
 
 ## Install
 
@@ -89,6 +115,56 @@ clawvault sleep "PR review + type guards" --next "respond to CI" --blocked "wait
 
 # Health check when something feels off
 clawvault doctor
+```
+
+## New in v2.0.0
+
+### Memory Graph
+
+ClawVault builds a typed knowledge graph from wiki-links, tags, and frontmatter:
+
+```bash
+# View graph summary
+clawvault graph
+
+# Refresh graph index
+clawvault graph --refresh
+```
+
+Graph is stored at `.clawvault/graph-index.json` — schema versioned, incremental rebuild.
+
+### Graph-Aware Context Retrieval
+
+```bash
+# Default context (semantic + graph neighbors)
+clawvault context "database decision"
+
+# With a profile preset
+clawvault context --profile planning "Q1 roadmap"
+clawvault context --profile incident "production outage"
+clawvault context --profile handoff "session end"
+
+# Auto profile (used by OpenClaw hook)
+clawvault context --profile auto "current task"
+```
+
+### Context Profiles
+
+| Profile | Purpose |
+|---------|---------|
+| `default` | Balanced retrieval |
+| `planning` | Broader strategic context |
+| `incident` | Recent events, blockers, urgent items |
+| `handoff` | Session transition context |
+
+### OpenClaw Compat Diagnostics
+
+```bash
+# Check hook wiring, event routing, handler safety
+clawvault compat
+
+# Strict mode for CI
+clawvault compat --strict
 ```
 
 ## Core Commands
@@ -250,6 +326,9 @@ Backups are created automatically (use `--no-backup` to skip).
 - **Too many orphan links** — run `clawvault link --orphans`
 - **Inbox backlog warning** — process or archive inbox items
 - **"unexpected tool_use_id" error** — run `clawvault repair-session`
+- **OpenClaw integration drift** — run `clawvault compat`
+- **Graph out of date** — run `clawvault graph --refresh`
+- **Wrong context for task** — try `clawvault context --profile incident` or `--profile planning`
 
 ## Integration with qmd
 
@@ -272,29 +351,6 @@ qmd update && qmd embed
 - `OPENCLAW_HOME` — OpenClaw home directory (used by repair-session)
 - `OPENCLAW_STATE_DIR` — OpenClaw state directory (used by repair-session)
 - `GEMINI_API_KEY` — Used by `observe` for LLM-powered compression (optional)
-
-## Architecture: ClawVault + qmd
-
-ClawVault and qmd serve complementary roles:
-
-- **ClawVault** handles structured memory: storing, categorizing, routing observations, session continuity (wake/sleep/checkpoint), and entity linking. It writes markdown files organized by category.
-- **qmd** handles search: BM25 keyword search, vector embeddings for semantic search, and reranker for accuracy. It indexes the markdown files ClawVault produces.
-
-Together: ClawVault writes → qmd indexes → you search with `qmd query` (BM25 + vectors + neural reranker for best accuracy).
-
-### OpenClaw Config Recommendation
-
-```yaml
-memory:
-  backend: "qmd"
-  vault: "${CLAWVAULT_PATH}"
-```
-
-The default `qmd query` pipeline uses BM25 keyword matching, vector embeddings, and a neural reranker for the most accurate results.
-
-### Low-Memory Environments
-
-The neural reranker requires ~8GB+ RAM. On constrained machines (e.g., small VPS, WSL2 with limited memory), `qmd query` may OOM. You can set `qmd.command` in your OpenClaw config to a wrapper script that routes to `qmd vsearch` (vectors only, no reranker) instead. This is a host-specific workaround, not the recommended default.
 
 ## Links
 
