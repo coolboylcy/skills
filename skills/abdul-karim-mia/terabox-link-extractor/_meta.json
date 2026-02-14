@@ -3,9 +3,15 @@
   "slug": "terabox-link-extractor",
   "displayName": "Terabox Link Extractor",
   "latest": {
-    "version": "0.2.0",
-    "publishedAt": 1770600211355,
-    "commit": "https://github.com/openclaw/skills/commit/0d7bd3a671989cf9fc4744e6f31499625f7fba9d"
+    "version": "1.4.0",
+    "publishedAt": 1771066839319,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.2.0",
+      "publishedAt": 1770600211355,
+      "commit": "https://github.com/openclaw/skills/commit/0d7bd3a671989cf9fc4744e6f31499625f7fba9d"
+    }
+  ]
 }
