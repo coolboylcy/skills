@@ -20,7 +20,6 @@ import math
 import random
 import argparse
 import urllib.request
-import urllib.parse
 from datetime import datetime
 
 API_BASE = "https://api.synthdata.co"
@@ -220,61 +219,7 @@ def print_comparison(assets_data):
         print(f"{ticker:<8} {name:<12} {price:>12} {vol_str:>10} {forecast_str:>10} {emoji} {level}")
 
 
-def generate_forecast_chart(assets_data):
-    """Generate bar chart URL via QuickChart"""
-    labels = []
-    vol_values = []
-    forecast_values = []
-    colors = []
-    
-    for ticker in ASSETS:
-        if ticker in assets_data and "error" not in assets_data[ticker]:
-            data = assets_data[ticker]
-            metrics = extract_metrics(data)
-            vol = metrics.get("vol_current")
-            forecast = metrics.get("vol_forecast_avg")
-            if vol is None:
-                continue
-                
-            labels.append(ticker)
-            vol_values.append(round(vol, 1))
-            forecast_values.append(round(forecast, 1) if forecast else None)
-            
-            # Color by level
-            if vol < 20:
-                colors.append("rgba(75, 192, 192, 0.8)")
-            elif vol < 40:
-                colors.append("rgba(255, 206, 86, 0.8)")
-            elif vol < 60:
-                colors.append("rgba(255, 159, 64, 0.8)")
-            else:
-                colors.append("rgba(255, 99, 132, 0.8)")
-    
-    chart_config = {
-        "type": "bar",
-        "data": {
-            "labels": labels,
-            "datasets": [
-                {
-                    "label": "Current Vol %",
-                    "data": vol_values,
-                    "backgroundColor": colors
-                },
-                {
-                    "label": "Forecast Vol %",
-                    "data": forecast_values,
-                    "backgroundColor": "rgba(100, 100, 100, 0.4)"
-                }
-            ]
-        },
-        "options": {
-            "title": {"display": True, "text": f"Synthdata Volatility — {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"},
-            "scales": {"yAxes": [{"ticks": {"beginAtZero": True}}]}
-        }
-    }
-    
-    encoded = urllib.parse.quote(json.dumps(chart_config))
-    return f"https://quickchart.io/chart?c={encoded}"
+
 
 
 def monte_carlo(price, vol_annual, hours=24, paths=500):
@@ -322,38 +267,7 @@ def monte_carlo_stats(paths):
     return stats
 
 
-def generate_monte_carlo_chart(ticker, price, stats, hours):
-    """Generate Monte Carlo fan chart"""
-    # Create labels - show every 4 hours for readability
-    labels = []
-    for i in range(hours + 1):
-        if i == 0:
-            labels.append("Now")
-        elif i % 4 == 0 or i == hours:
-            labels.append(f"{i}h")
-        else:
-            labels.append("")
-    
-    chart_config = {
-        "type": "line",
-        "data": {
-            "labels": labels,
-            "datasets": [
-                {"label": "95th", "data": [round(x, 2) for x in stats["p95"]], "borderColor": "rgba(255,99,132,0.3)", "fill": False, "borderDash": [5, 5], "pointRadius": 0},
-                {"label": "75th", "data": [round(x, 2) for x in stats["p75"]], "borderColor": "rgba(255,159,64,0.5)", "fill": False, "pointRadius": 0},
-                {"label": "Median", "data": [round(x, 2) for x in stats["p50"]], "borderColor": "rgba(54,162,235,1)", "fill": False, "borderWidth": 3, "pointRadius": 0},
-                {"label": "25th", "data": [round(x, 2) for x in stats["p25"]], "borderColor": "rgba(255,159,64,0.5)", "fill": False, "pointRadius": 0},
-                {"label": "5th", "data": [round(x, 2) for x in stats["p5"]], "borderColor": "rgba(255,99,132,0.3)", "fill": False, "borderDash": [5, 5], "pointRadius": 0},
-            ]
-        },
-        "options": {
-            "title": {"display": True, "text": f"{ticker} Price Simulation — {hours}h Forecast"},
-            "legend": {"position": "right"}
-        }
-    }
-    
-    encoded = urllib.parse.quote(json.dumps(chart_config))
-    return f"https://quickchart.io/chart?c={encoded}&w=600&h=400"
+
 
 
 def main():
@@ -362,7 +276,6 @@ def main():
     parser.add_argument("--all", action="store_true", help="Show all assets")
     parser.add_argument("--compare", action="store_true", help="Compare assets in table")
     parser.add_argument("--forecast", action="store_true", help="Full forecast")
-    parser.add_argument("--chart", action="store_true", help="Generate chart URL")
     parser.add_argument("--simulate", action="store_true", help="Monte Carlo simulation")
     parser.add_argument("--hours", type=int, default=24, help="Simulation hours (max 24)")
     parser.add_argument("--paths", type=int, default=500, help="Simulation paths")
@@ -424,10 +337,6 @@ def main():
                     print(f"   Median:          {format_price(stats['p50'][-1])}")
                     print(f"   75th percentile: {format_price(stats['p75'][-1])}")
                     print(f"   95th percentile: {format_price(stats['p95'][-1])}")
-                    
-                    if args.chart:
-                        url = generate_monte_carlo_chart(ticker, price, stats, hours)
-                        print(f"\n   📊 Chart: {url}")
             else:
                 print(f"Error: Missing price or volatility data for {ticker}")
         return
@@ -435,10 +344,6 @@ def main():
     # Comparison table
     if args.compare or args.forecast or args.all:
         print_comparison(assets_data)
-        
-        if args.chart:
-            url = generate_forecast_chart(assets_data)
-            print(f"\n📊 Chart: {url}")
         return
     
     # Single asset details

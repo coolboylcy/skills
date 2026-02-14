@@ -3,11 +3,16 @@
   "slug": "synth-data",
   "displayName": "Synth Data",
   "latest": {
-    "version": "1.0.3",
-    "publishedAt": 1770203134353,
-    "commit": "https://github.com/clawdbot/skills/commit/836ebfc891bc232c2ea02b07990a3df379eda032"
+    "version": "1.1.5",
+    "publishedAt": 1770914369073,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.3",
+      "publishedAt": 1770203134353,
+      "commit": "https://github.com/clawdbot/skills/commit/836ebfc891bc232c2ea02b07990a3df379eda032"
+    },
     {
       "version": "1.0.2",
       "publishedAt": 1770115056696,

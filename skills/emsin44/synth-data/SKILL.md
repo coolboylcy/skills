@@ -1,6 +1,14 @@
 ---
 name: synth-data
-description: Query volatility forecasts from Synthdata.co for crypto, commodities, and stocks. Compare assets, run Monte Carlo simulations, and generate charts.
+description: Query volatility forecasts from Synthdata.co for crypto, commodities, and stocks. Compare assets and run Monte Carlo simulations.
+metadata:
+  {
+    "openclaw":
+      {
+        "emoji": "📊",
+        "requires": { "bins": ["python3"], "env": ["SYNTHDATA_API_KEY"] }
+      }
+  }
 ---
 
 # Synthdata Volatility Skill
@@ -28,9 +36,6 @@ python3 scripts/synth.py --all
 
 # Monte Carlo simulation (24h max)
 python3 scripts/synth.py BTC --simulate --hours 12
-
-# Generate chart
-python3 scripts/synth.py --all --chart
 ```
 
 ## Available Assets
@@ -85,7 +90,7 @@ Get a ranked table of all assets by volatility.
 
 ### 3. Monte Carlo Projections
 ```bash
-python3 scripts/synth.py BTC --simulate --hours 24 --paths 1000 --chart
+python3 scripts/synth.py BTC --simulate --hours 24 --paths 1000
 ```
 Generate probabilistic price ranges using forecast volatility (24h max - Synthdata forecast window).
 
