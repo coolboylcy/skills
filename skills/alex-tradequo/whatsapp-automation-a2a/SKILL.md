@@ -1,6 +1,6 @@
 ---
 name: "WhatsApp All-in-One CRM — Campaign Analytics, Engagement Tracking, Bulk Send, AI Outreach, Lead Mining, Reviews & MCP Server"
-version: "2.9.4"
+version: "2.10.2"
 description: "The only WhatsApp skill you need. Documentation and API reference — nothing is auto-installed or auto-executed. All actions require explicit user invocation. Provides endpoints for sending messages, capturing leads, running campaigns, scheduling reports, tracking campaign analytics, and managing clients. BizDev agent analyzes account metadata to surface growth opportunities. MCP Server + Custom GPT Actions available via separate setup (see integrations.md). 90+ API endpoints. Bulk messaging, scheduled sends, scheduled reports with WhatsApp delivery, AI replies with style cloning, RAG knowledge base, group monitoring, lead scoring, review collection, campaign analytics & engagement tracking, GDPR compliance, and agent-to-agent protocol."
 source: "MoltFlow Team"
 risk: safe
@@ -65,18 +65,35 @@ Style-matched AI replies from your message history.
 
 ## Code Samples
 
-### Send a message
+### Get campaign analytics — delivery rates, funnel, timing
 
 ```bash
-curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "session_id": "uuid",
-    "chat_id": "1234567890@c.us",
-    "message": "Hello!"
-  }' \
-  https://apiv2.waiflow.app/api/v2/messages/send
+curl -H "X-API-Key: $MOLTFLOW_API_KEY" \
+  "https://apiv2.waiflow.app/api/v2/analytics/campaigns/{job_id}"
 ```
+
+Returns delivery rate, failure breakdown, messages per minute,
+and full per-contact delivery status.
+
+### Track delivery in real-time (SSE)
+
+```bash
+curl -H "X-API-Key: $MOLTFLOW_API_KEY" \
+  "https://apiv2.waiflow.app/api/v2/bulk-send/{id}/progress"
+```
+
+Server-Sent Events stream: sent/failed/pending counts
+update live as each message delivers.
+
+### Top contacts by engagement score
+
+```bash
+curl -H "X-API-Key: $MOLTFLOW_API_KEY" \
+  "https://apiv2.waiflow.app/api/v2/analytics/contacts?sort=engagement_score&limit=50"
+```
+
+Ranked by messages sent, received, reply rate, and
+recency — find your most engaged contacts instantly.
 
 ### Bulk broadcast to a contact group
 
@@ -91,16 +108,90 @@ curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
   https://apiv2.waiflow.app/api/v2/bulk-send
 ```
 
-### Schedule a recurring message
+### Monitor a group for buying signals
 
 ```bash
 curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Monday update",
+    "session_id": "uuid",
+    "wa_group_id": "120363012345@g.us",
+    "monitor_mode": "keywords",
+    "monitor_keywords": ["looking for", "need help", "budget", "price"]
+  }' \
+  https://apiv2.waiflow.app/api/v2/groups
+```
+
+### List new leads in your pipeline
+
+```bash
+curl -H "X-API-Key: $MOLTFLOW_API_KEY" \
+  "https://apiv2.waiflow.app/api/v2/leads?status=new&limit=50"
+```
+
+### Move a lead through the pipeline
+
+```bash
+curl -X PATCH -H "X-API-Key: $MOLTFLOW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "qualified"}' \
+  https://apiv2.waiflow.app/api/v2/leads/{lead_id}/status
+```
+
+Status flow: `new` → `contacted` → `qualified` → `converted`
+(or `lost` at any stage).
+
+### Bulk add leads to a campaign group
+
+```bash
+curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lead_ids": ["uuid-1", "uuid-2", "uuid-3"],
+    "custom_group_id": "target-group-uuid"
+  }' \
+  https://apiv2.waiflow.app/api/v2/leads/bulk/add-to-group
+```
+
+### Export leads as CSV
+
+```bash
+curl -H "X-API-Key: $MOLTFLOW_API_KEY" \
+  "https://apiv2.waiflow.app/api/v2/leads/export/csv?status=qualified" \
+  -o qualified-leads.csv
+```
+
+### Pause a running campaign
+
+```bash
+curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
+  https://apiv2.waiflow.app/api/v2/bulk-send/{job_id}/pause
+```
+
+### AI reply in your writing style + knowledge base
+
+```bash
+curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contact_id": "5511999999999@c.us",
+    "context": "Customer asks: What is your return policy?",
+    "use_rag": true,
+    "apply_style": true
+  }' \
+  https://apiv2.waiflow.app/api/v2/ai/generate-reply
+```
+
+### Schedule a weekly follow-up
+
+```bash
+curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Monday check-in",
     "session_id": "uuid",
     "chat_id": "123@c.us",
-    "message": "...",
+    "message": "Hey! Anything I can help with this week?",
     "recurrence": "weekly",
     "scheduled_time": "2026-02-17T09:00:00",
     "timezone": "America/New_York"
@@ -108,7 +199,7 @@ curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
   https://apiv2.waiflow.app/api/v2/scheduled-messages
 ```
 
-### Create a scheduled report
+### Weekly report delivered to your WhatsApp
 
 ```bash
 curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
@@ -124,67 +215,30 @@ curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
   https://apiv2.waiflow.app/api/v2/reports
 ```
 
-### Get campaign analytics
-
-```bash
-curl -H "X-API-Key: $MOLTFLOW_API_KEY" \
-  "https://apiv2.waiflow.app/api/v2/analytics/campaigns/{job_id}"
-```
-
-### Get contact engagement leaderboard
-
-```bash
-curl -H "X-API-Key: $MOLTFLOW_API_KEY" \
-  "https://apiv2.waiflow.app/api/v2/analytics/contacts?sort=engagement_score&limit=50"
-```
-
-### Monitor a group for keywords
+### Send a message
 
 ```bash
 curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "session_id": "uuid",
-    "wa_group_id": "120363012345@g.us",
-    "monitor_mode": "keywords",
-    "monitor_keywords": ["looking for", "need help", "budget"]
+    "chat_id": "1234567890@c.us",
+    "message": "Hello!"
   }' \
-  https://apiv2.waiflow.app/api/v2/groups
+  https://apiv2.waiflow.app/api/v2/messages/send
 ```
 
-### List new leads
-
-```bash
-curl -H "X-API-Key: $MOLTFLOW_API_KEY" \
-  "https://apiv2.waiflow.app/api/v2/leads?status=new&limit=50"
-```
-
-### Generate an AI reply with style + knowledge base
+### Collect customer reviews automatically
 
 ```bash
 curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "contact_id": "5511999999999@c.us",
-    "context": "Customer asks: What is your return policy?",
-    "use_rag": true,
-    "apply_style": true
-  }' \
-  https://apiv2.waiflow.app/api/v2/ai/generate-reply
-```
-
-### Create a review collector
-
-```bash
-curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Customer Feedback",
+    "name": "Happy Customers",
     "session_id": "uuid",
     "source_type": "all",
     "min_sentiment_score": 0.7,
-    "include_keywords": ["thank", "recommend", "love"],
-    "languages": ["en"]
+    "include_keywords": ["thank", "recommend", "love", "amazing"]
   }' \
   https://apiv2.waiflow.app/api/v2/reviews/collectors
 ```
@@ -193,42 +247,6 @@ curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
 
 ```bash
 curl https://apiv2.waiflow.app/.well-known/agent.json
-```
-
-### Create a scoped API key
-
-```bash
-curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "outreach-bot",
-    "scopes": [
-      "messages:send",
-      "custom-groups:manage",
-      "bulk-send:manage"
-    ],
-    "expires_in_days": 90
-  }' \
-  https://apiv2.waiflow.app/api/v2/api-keys
-```
-
-### Subscribe to webhook events
-
-Webhook URLs are validated server-side (private IPs and non-HTTPS blocked). Always set a `secret` for HMAC signature verification.
-
-```bash
-curl -X POST -H "X-API-Key: $MOLTFLOW_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://your-server.com/webhook",
-    "events": [
-      "message.received",
-      "lead.detected",
-      "session.connected"
-    ],
-    "secret": "whsec_your_secret_here"
-  }' \
-  https://apiv2.waiflow.app/api/v2/webhooks
 ```
 
 Full API reference: see each module's SKILL.md.
@@ -263,7 +281,7 @@ Full API reference: see each module's SKILL.md.
 
 **AI Integration Guides:**
 - [Connect ChatGPT to MoltFlow](https://molt.waiflow.app/guides/connect-chatgpt-to-moltflow) — Custom GPT Actions, 10 min setup
-- [Connect Claude to MoltFlow](https://molt.waiflow.app/guides/connect-claude-to-moltflow) — MCP Server (`npx @moltflow/mcp-server`), 5 min setup
+- [Connect Claude to MoltFlow](https://molt.waiflow.app/guides/connect-claude-to-moltflow) — MCP Server setup, 5 min
 - [Connect OpenClaw to MoltFlow](https://molt.waiflow.app/guides/connect-openclaw-to-moltflow) — Native AI config, 5 min setup
 
 **How-To Guides:**
@@ -310,8 +328,8 @@ Full API reference: see each module's SKILL.md.
 | Safeguards | Block PII, injections |
 | Webhooks | HMAC signed, 10+ events |
 | A2A | E2E encrypted, JSON-RPC |
-| GDPR | Erasure, auto-expiry |
-| Billing | Stripe, 4 plans |
+| GDPR | Auto-expiry, compliance |
+| Delivery | Real-time SSE tracking, read/reply/ignored status |
 
 ---
 
@@ -327,7 +345,7 @@ Full API reference: see each module's SKILL.md.
 | Reviews | 8 | 0 | 0 | 0 |
 | Security | 10 | 0 | 0 | 0 |
 | Platform | 8 | 0 | 0 | 0 |
-| **Total** | **80+** | **~15** | **~3** | **~1** |
+| **Total** | **90+** | **~15** | **~3** | **~1** |
 
 ---
 
@@ -412,10 +430,11 @@ or `Authorization: Bearer $TOKEN` (JWT).
   private IPs, cloud metadata, and non-HTTPS
   schemes. Only configure endpoints you control.
   Always set a `secret` for HMAC verification
-- **Verify npx packages before running** — confirm
-  the exact package name and version (e.g.,
-  `@moltflow/mcp-server@1.1.0`) before executing
-  npx commands. npx downloads and runs remote code.
+- **Verify third-party packages before running** —
+  if you follow the external setup guides to install
+  MCP or GPT integrations, review the package source
+  and maintainers first. This skill does not install
+  or execute any packages.
 - **Review scripts locally before running** — the
   Python example scripts are hosted on GitHub, not
   bundled. Download, inspect the source, then run.
@@ -438,8 +457,8 @@ Claude Code, and OpenAI Custom GPTs.
 requires manual setup by the user. No code
 is installed automatically by this skill.
 
-See [integrations.md](integrations.md) for
-setup instructions and config examples.
+See [integrations.md](integrations.md) for setup
+guides and security notes.
 
 ---
 
@@ -461,32 +480,9 @@ and curl examples.
 - **moltflow-reviews** — review collection,
   sentiment analysis, testimonial export
 - **moltflow-admin** — auth, API keys,
-  billing, usage, GDPR compliance
+  billing, usage tracking
 - **moltflow-onboarding** — BizDev growth agent,
   on-demand account analysis, opportunity discovery
-
----
-
-## Example Scripts
-
-11 standalone Python examples available on GitHub:
-[github.com/moltflow/moltflow/tree/main/skills/moltflow-clawhub/scripts](https://github.com/moltflow/moltflow/tree/main/skills/moltflow-clawhub/scripts)
-
-- `quickstart.py` — create session, send first message
-- `send_message.py` — send text messages to contacts
-- `outreach.py` — bulk send, scheduled messages
-- `analytics.py` — campaign analytics, contact leaderboard, CSV export
-- `leads.py` — lead pipeline, bulk ops, export
-- `ai_config.py` — train style profiles, AI replies
-- `reviews.py` — create collectors, export testimonials
-- `group_monitor.py` — group monitoring & leads
-- `a2a_client.py` — discover agents, send A2A messages
-- `admin.py` — login, create API keys, billing
-- `gdpr.py` — contact erasure, data export
-
-Scripts are **not bundled** in this package. Download
-from GitHub, review the source, then run manually:
-`MOLTFLOW_API_KEY=key python quickstart.py`
 
 ---
 
@@ -502,7 +498,7 @@ from GitHub, review the source, then run manually:
 
 ## Changelog
 
-**v2.9.0** (2026-02-14) -- See [CHANGELOG.md](CHANGELOG.md) for full history.
+**v2.10.2** (2026-02-14) -- See [CHANGELOG.md](CHANGELOG.md) for full history.
 
 <!-- FILEMAP:BEGIN -->
 ```text

@@ -107,8 +107,6 @@ MoltFlow uses X25519 ECDH key exchange with AES-256-GCM encryption for A2A messa
 | GET | `/agent/capabilities` | Get encryption capabilities |
 | POST | `/agent/initialize` | Initialize encryption for tenant |
 | GET | `/agent/bootstrap` | Skill bootstrap info |
-| POST | `/agent/export-keypair` | Export encryption keypair for backup |
-| POST | `/agent/import-keypair` | Import encryption keypair from backup |
 
 ### Get Public Key
 
@@ -123,22 +121,6 @@ MoltFlow uses X25519 ECDH key exchange with AES-256-GCM encryption for A2A messa
 ### How Encryption Works
 
 Each tenant has an X25519 keypair generated on initialization. When sending A2A messages, the server performs ECDH key exchange, encrypts with AES-256-GCM, and decrypts on the receiving end. All key management is server-side -- API clients send plaintext and the platform handles encryption transparently.
-
-### Export Keypair
-
-```bash
-curl -X POST https://apiv2.waiflow.app/agent/export-keypair \
-  -H "X-API-Key: $MOLTFLOW_API_KEY"
-```
-
-### Import Keypair
-
-```bash
-curl -X POST https://apiv2.waiflow.app/agent/import-keypair \
-  -H "X-API-Key: $MOLTFLOW_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"public_key": "...", "private_key": "..."}'
-```
 
 ---
 

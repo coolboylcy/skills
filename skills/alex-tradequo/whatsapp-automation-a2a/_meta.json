@@ -1,13 +1,18 @@
 {
   "owner": "alex-tradequo",
   "slug": "whatsapp-automation-a2a",
-  "displayName": "WhatsApp All-in-One — Mine Groups for Leads, AI Outreach, Bulk Campaigns & MCP",
+  "displayName": "WhatsApp All-in-One CRM — Campaign Analytics, Engagement Tracking, Bulk Send, AI Outreach, Lead Mining, Reviews & MCP Server",
   "latest": {
-    "version": "2.9.4",
-    "publishedAt": 1771100427387,
-    "commit": "https://github.com/openclaw/skills/commit/e940d9726624859de0e00e2e185803c570f87e0a"
+    "version": "2.10.2",
+    "publishedAt": 1771103112615,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.9.4",
+      "publishedAt": 1771100427387,
+      "commit": "https://github.com/openclaw/skills/commit/e940d9726624859de0e00e2e185803c570f87e0a"
+    },
     {
       "version": "2.8.5",
       "publishedAt": 1771054263558,
