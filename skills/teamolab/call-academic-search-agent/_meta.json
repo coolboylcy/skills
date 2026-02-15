@@ -1,0 +1,11 @@
+{
+  "owner": "teamolab",
+  "slug": "call-academic-search-agent",
+  "displayName": "Call Academic Search Agent",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1771140488232,
+    "commit": null
+  },
+  "history": []
+}
