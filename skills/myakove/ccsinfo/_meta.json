@@ -3,11 +3,16 @@
   "slug": "ccsinfo",
   "displayName": "Ccsinfo",
   "latest": {
-    "version": "0.1.5",
-    "publishedAt": 1770985831303,
-    "commit": "https://github.com/openclaw/skills/commit/8788d1b6cbcd9d76d65559f814e651095c529051"
+    "version": "0.1.6",
+    "publishedAt": 1771149374521,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.1.5",
+      "publishedAt": 1770985831303,
+      "commit": "https://github.com/openclaw/skills/commit/8788d1b6cbcd9d76d65559f814e651095c529051"
+    },
     {
       "version": "0.1.4",
       "publishedAt": 1770940912854,
