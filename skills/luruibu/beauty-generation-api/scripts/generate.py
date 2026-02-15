@@ -51,7 +51,7 @@ def generate_and_download(prompt, width=1024, height=1024, output_dir=None, file
     headers = {
         "Content-Type": "application/json",
         "X-API-Key": API_KEY,
-        "User-Agent": "beauty-generation-ultra-fast/1.0"
+        "User-Agent": "beauty-generation-ultra-fast/1.2.25"
     }
     
     body = json.dumps(data).encode("utf-8")
