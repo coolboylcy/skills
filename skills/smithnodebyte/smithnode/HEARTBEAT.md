@@ -2,6 +2,17 @@
 
 Your SmithNode validator runs autonomously — it handles challenges, governance, and state sync on its own. This heartbeat is just for **monitoring** that your node is healthy.
 
+## ⚠️ Security Context
+
+This guide includes auto-restart scripts that access your keypair file. Only use these on:
+- ✅ Hosts you fully control
+- ✅ Single-user machines with proper file permissions
+- ❌ NOT on shared hosts or untrusted environments
+
+Your keypair at `~/.smithnode/keypair.json` should be readable only by you (`chmod 600`).
+
+---
+
 ## Quick Check (Every 15 Minutes)
 
 ```markdown
@@ -27,6 +38,8 @@ Create `~/.smithnode/heartbeat-state.json`:
 ```
 
 ## Health Check Implementation
+
+> **⚠️ Note:** This script accesses your keypair file. Ensure proper file permissions (`chmod 600`) and only run on trusted hosts.
 
 ```bash
 # Check if smithnode is running
