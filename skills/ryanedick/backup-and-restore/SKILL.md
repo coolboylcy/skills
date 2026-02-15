@@ -10,14 +10,17 @@ Backup and restore your entire OpenClaw installation — config, credentials, wo
 ## Quick Start
 
 ```bash
-# Run a backup now (local, encrypted)
+# Run a backup now — creates TWO files: full (encrypted) + workspace-only
 ~/.openclaw/workspace/skills/backup/scripts/backup.sh
 
-# Upload latest backup to configured cloud destinations
+# Upload both backups to configured cloud destinations
 ~/.openclaw/workspace/skills/backup/scripts/upload.sh
 
-# Restore from a backup file
-~/.openclaw/workspace/skills/backup/scripts/restore.sh ~/backups/openclaw/openclaw-myhost-20260215-0430.tar.gz.gpg
+# Full restore (same environment / disaster recovery)
+~/.openclaw/workspace/skills/backup/scripts/restore.sh ~/backups/openclaw/openclaw-myhost-20260215-full.tar.gz.gpg
+
+# Workspace-only restore (any environment — just the agent's brain)
+~/.openclaw/workspace/skills/backup/scripts/restore.sh ~/backups/openclaw/openclaw-myhost-20260215-workspace.tar.gz
 ```
 
 ## Interactive Setup
@@ -26,20 +29,22 @@ For guided setup, read `references/setup-guide.md` and follow the conversational
 
 ## Manual Usage
 
-### backup.sh — Create a local backup
+### backup.sh — Create local backups
+
+Every run produces **two files**:
+
+1. **Full backup** (`*-full.tar.gz.gpg`) — everything including credentials, encrypted. For disaster recovery on the same or similar environment.
+2. **Workspace backup** (`*-workspace.tar.gz`) — just `~/.openclaw/workspace/` (memory, skills, files). Unencrypted, safe for any environment. This is the agent's brain.
 
 ```bash
-# Full encrypted backup (default)
+# Default: creates both files
 ./scripts/backup.sh
-
-# Portable mode (no credentials, can skip encryption)
-BACKUP_MODE=portable ./scripts/backup.sh
 
 # Skip gateway stop/restart (for testing)
 BACKUP_STOP_GATEWAY=false ./scripts/backup.sh
 ```
 
-Saves to `~/backups/openclaw/` with naming `openclaw-<hostname>-<timestamp>.tar.gz[.gpg]`.
+Saves to `~/backups/openclaw/`.
 
 ### upload.sh — Upload to cloud
 
@@ -54,14 +59,20 @@ Saves to `~/backups/openclaw/` with naming `openclaw-<hostname>-<timestamp>.tar.
 ### restore.sh — Restore from backup
 
 ```bash
-# From local file
-./scripts/restore.sh ~/backups/openclaw/openclaw-myhost-20260215-0430.tar.gz.gpg
+# Full restore (disaster recovery — replaces entire ~/.openclaw/)
+./scripts/restore.sh openclaw-myhost-20260215-full.tar.gz.gpg
 
-# From cloud destination (downloads first)
-./scripts/restore.sh s3://mybucket/openclaw/latest.tar.gz.gpg
+# Workspace-only restore (just the agent brain — keeps your config/credentials)
+./scripts/restore.sh openclaw-myhost-20260215-workspace.tar.gz
+
+# Extract only workspace from a full backup
+./scripts/restore.sh --workspace-only openclaw-myhost-20260215-full.tar.gz.gpg
+
+# From cloud
+./scripts/restore.sh s3://mybucket/openclaw/openclaw-myhost-20260215-workspace.tar.gz
 ```
 
-Moves existing `~/.openclaw/` to `~/.openclaw.pre-restore/` before extracting.
+Automatically detects workspace backups by filename. Creates a safety copy before extracting.
 
 ### test-backup.sh — Validate setup
 
@@ -77,8 +88,7 @@ Config lives at `~/.openclaw/workspace/skills/backup/config.json`:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `mode` | string | `"full"` | `full` (everything) or `portable` (skip credentials) |
-| `encrypt` | bool | `true` | AES-256 GPG symmetric encryption |
+| `encrypt` | bool | `true` | AES-256 GPG symmetric encryption (for full backups) |
 | `retainDays` | number | `30` | Auto-prune local backups older than this |
 | `schedule` | string | `"daily"` | `daily`, `weekly`, or `manual` |
 | `destinations` | array | `[]` | Cloud upload targets (see destinations.md) |
@@ -89,8 +99,7 @@ All settings can be overridden via env vars:
 
 | Variable | Description |
 |----------|-------------|
-| `BACKUP_MODE` | `full` or `portable` |
-| `BACKUP_ENCRYPT` | `true` or `false` |
+| `BACKUP_ENCRYPT` | `true` or `false` (for full backups) |
 | `BACKUP_RETAIN_DAYS` | Number of days to keep old backups |
 | `BACKUP_PASSPHRASE` | Encryption passphrase (or read from credentials file) |
 | `BACKUP_STOP_GATEWAY` | `true` (default) or `false` |

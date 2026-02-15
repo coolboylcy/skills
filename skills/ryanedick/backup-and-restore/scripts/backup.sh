@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# backup.sh — Create a local encrypted backup of ~/.openclaw/
+# backup.sh — Create local backups of ~/.openclaw/
+# Always produces two files:
+#   1. Full backup (encrypted) — everything, for disaster recovery on same/similar environment
+#   2. Workspace-only backup — just the workspace (memory, skills, files), safe for any environment
 # Part of the OpenClaw backup skill.
 set -euo pipefail
 
@@ -19,7 +22,6 @@ log()  { echo "[backup] $(date '+%H:%M:%S') $*"; }
 die()  { echo "[backup] ERROR: $*" >&2; exit 1; }
 
 read_config() {
-  # Read a key from config.json; return empty string if missing
   local key="$1"
   if [[ -f "$CONFIG_FILE" ]] && command -v jq &>/dev/null; then
     jq -r ".$key // empty" "$CONFIG_FILE" 2>/dev/null || true
@@ -29,9 +31,6 @@ read_config() {
 # ---------------------------------------------------------------------------
 # Configuration (config.json → env var → default)
 # ---------------------------------------------------------------------------
-MODE="${BACKUP_MODE:-$(read_config mode)}"
-MODE="${MODE:-full}"
-
 ENCRYPT="${BACKUP_ENCRYPT:-$(read_config encrypt)}"
 ENCRYPT="${ENCRYPT:-true}"
 
@@ -53,10 +52,6 @@ fi
 # ---------------------------------------------------------------------------
 [[ -d "$OPENCLAW_DIR" ]] || die "OpenClaw directory not found at $OPENCLAW_DIR"
 
-if [[ "$MODE" == "full" && "$ENCRYPT" != "true" ]]; then
-  die "Full-mode backups include credentials and MUST be encrypted. Set BACKUP_ENCRYPT=true and provide a passphrase, or use BACKUP_MODE=portable to skip credentials."
-fi
-
 if [[ "$ENCRYPT" == "true" && -z "$PASSPHRASE" ]]; then
   die "Encryption enabled but no passphrase found. Set BACKUP_PASSPHRASE or create $CRED_DIR/backup-passphrase"
 fi
@@ -72,16 +67,6 @@ mkdir -p "$BACKUP_DIR"
 
 TIMESTAMP="$(date '+%Y%m%d-%H%M')"
 HOSTNAME_SHORT="$(hostname -s 2>/dev/null || echo unknown)"
-ARCHIVE_NAME="openclaw-${HOSTNAME_SHORT}-${TIMESTAMP}.tar.gz"
-
-# Build tar exclude list
-EXCLUDES=()
-if [[ "$MODE" == "portable" ]]; then
-  EXCLUDES+=(--exclude='./credentials')
-  log "Mode: portable (excluding credentials/)"
-else
-  log "Mode: full"
-fi
 
 # ---------------------------------------------------------------------------
 # Stop gateway for consistency
@@ -95,7 +80,6 @@ if [[ "$STOP_GATEWAY" == "true" ]]; then
   fi
 fi
 
-# Ensure gateway restarts on exit if we stopped it
 cleanup() {
   if [[ "$GATEWAY_WAS_RUNNING" == "true" ]]; then
     log "Restarting gateway..."
@@ -105,31 +89,37 @@ cleanup() {
 trap cleanup EXIT
 
 # ---------------------------------------------------------------------------
-# Create archive
+# 1. Full backup (encrypted)
 # ---------------------------------------------------------------------------
-log "Creating archive..."
-ARCHIVE_PATH="$BACKUP_DIR/$ARCHIVE_NAME"
+FULL_NAME="openclaw-${HOSTNAME_SHORT}-${TIMESTAMP}-full.tar.gz"
+FULL_PATH="$BACKUP_DIR/$FULL_NAME"
 
-tar czf "$ARCHIVE_PATH" \
-  -C "$HOME" \
-  "${EXCLUDES[@]}" \
-  .openclaw/
+log "Creating full backup..."
+tar czf "$FULL_PATH" -C "$HOME" .openclaw/
+log "Full archive: $FULL_PATH ($(du -h "$FULL_PATH" | cut -f1))"
 
-log "Archive created: $ARCHIVE_PATH ($(du -h "$ARCHIVE_PATH" | cut -f1))"
-
-# ---------------------------------------------------------------------------
-# Encrypt
-# ---------------------------------------------------------------------------
 if [[ "$ENCRYPT" == "true" ]]; then
-  log "Encrypting with AES-256 (GPG symmetric)..."
+  log "Encrypting full backup with AES-256..."
   gpg --batch --yes --symmetric --cipher-algo AES256 \
     --passphrase "$PASSPHRASE" \
-    --output "${ARCHIVE_PATH}.gpg" \
-    "$ARCHIVE_PATH"
-  rm -f "$ARCHIVE_PATH"
-  ARCHIVE_PATH="${ARCHIVE_PATH}.gpg"
-  log "Encrypted: $ARCHIVE_PATH ($(du -h "$ARCHIVE_PATH" | cut -f1))"
+    --output "${FULL_PATH}.gpg" \
+    "$FULL_PATH"
+  rm -f "$FULL_PATH"
+  FULL_PATH="${FULL_PATH}.gpg"
+  log "Encrypted: $FULL_PATH ($(du -h "$FULL_PATH" | cut -f1))"
+else
+  log "WARNING: Full backup is NOT encrypted — contains credentials in plaintext"
 fi
+
+# ---------------------------------------------------------------------------
+# 2. Workspace-only backup (unencrypted, safe for any environment)
+# ---------------------------------------------------------------------------
+WS_NAME="openclaw-${HOSTNAME_SHORT}-${TIMESTAMP}-workspace.tar.gz"
+WS_PATH="$BACKUP_DIR/$WS_NAME"
+
+log "Creating workspace-only backup..."
+tar czf "$WS_PATH" -C "$HOME" .openclaw/workspace/
+log "Workspace archive: $WS_PATH ($(du -h "$WS_PATH" | cut -f1))"
 
 # ---------------------------------------------------------------------------
 # Prune old backups
@@ -144,5 +134,9 @@ fi
 # ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
-log "Backup complete: $ARCHIVE_PATH"
-echo "$ARCHIVE_PATH"
+log "Backup complete:"
+log "  Full:      $FULL_PATH"
+log "  Workspace: $WS_PATH"
+
+# Output the full backup path (used by upload.sh)
+echo "$FULL_PATH"

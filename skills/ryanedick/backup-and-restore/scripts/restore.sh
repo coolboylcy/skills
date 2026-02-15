@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # restore.sh — Restore OpenClaw from a backup file.
+# Use a *-full.tar.gz(.gpg) file for full disaster recovery (same environment).
+# Use a *-workspace.tar.gz file to restore just the agent workspace (any environment).
 # Part of the OpenClaw backup skill.
 set -euo pipefail
 
@@ -16,19 +18,42 @@ log()  { echo "[restore] $(date '+%H:%M:%S') $*"; }
 die()  { echo "[restore] ERROR: $*" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
-# Usage
+# Parse arguments
 # ---------------------------------------------------------------------------
-if [[ "${1:-}" == "" ]]; then
-  echo "Usage: restore.sh <backup-file-or-cloud-url>"
+WORKSPACE_ONLY=false
+SOURCE=""
+
+for arg in "$@"; do
+  case "$arg" in
+    --workspace-only) WORKSPACE_ONLY=true ;;
+    -*) die "Unknown option: $arg" ;;
+    *) SOURCE="$arg" ;;
+  esac
+done
+
+if [[ -z "$SOURCE" ]]; then
+  echo "Usage: restore.sh [--workspace-only] <backup-file-or-cloud-url>"
+  echo ""
+  echo "Backup types:"
+  echo "  *-full.tar.gz.gpg     Full restore (config, credentials, workspace, sessions)"
+  echo "  *-workspace.tar.gz    Workspace only (memory, skills, files — safe for any environment)"
+  echo ""
+  echo "Options:"
+  echo "  --workspace-only      Only extract the workspace from a full backup"
   echo ""
   echo "Examples:"
-  echo "  restore.sh ~/backups/openclaw/openclaw-myhost-20260215-0430.tar.gz.gpg"
-  echo "  restore.sh s3://mybucket/openclaw/openclaw-myhost-20260215-0430.tar.gz.gpg"
-  echo "  restore.sh gs://mybucket/openclaw/backup.tar.gz"
+  echo "  restore.sh openclaw-myhost-20260215-full.tar.gz.gpg"
+  echo "  restore.sh openclaw-myhost-20260215-workspace.tar.gz"
+  echo "  restore.sh --workspace-only openclaw-myhost-20260215-full.tar.gz.gpg"
+  echo "  restore.sh s3://mybucket/openclaw/openclaw-myhost-20260215-full.tar.gz.gpg"
   exit 1
 fi
 
-SOURCE="$1"
+# Auto-detect workspace backup by filename
+if [[ "$SOURCE" == *-workspace.tar.gz* ]]; then
+  WORKSPACE_ONLY=true
+fi
+
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
@@ -37,9 +62,7 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 # ---------------------------------------------------------------------------
 if [[ "$SOURCE" == s3://* ]]; then
   log "Downloading from S3..."
-  FILENAME="$(basename "$SOURCE")"
-  LOCAL_FILE="$WORK_DIR/$FILENAME"
-
+  LOCAL_FILE="$WORK_DIR/$(basename "$SOURCE")"
   if [[ -f "$CRED_DIR/aws-credentials" ]]; then
     source "$CRED_DIR/aws-credentials"
   fi
@@ -47,9 +70,7 @@ if [[ "$SOURCE" == s3://* ]]; then
 
 elif [[ "$SOURCE" == gs://* ]]; then
   log "Downloading from GCS..."
-  FILENAME="$(basename "$SOURCE")"
-  LOCAL_FILE="$WORK_DIR/$FILENAME"
-
+  LOCAL_FILE="$WORK_DIR/$(basename "$SOURCE")"
   if [[ -f "$CRED_DIR/gcs-key.json" ]]; then
     gcloud auth activate-service-account --key-file="$CRED_DIR/gcs-key.json" 2>/dev/null || true
   fi
@@ -63,6 +84,11 @@ else
 fi
 
 log "Restoring from: $LOCAL_FILE"
+if [[ "$WORKSPACE_ONLY" == "true" ]]; then
+  log "Mode: workspace-only (memory, skills, files)"
+else
+  log "Mode: full restore (config, credentials, workspace, sessions)"
+fi
 
 # ---------------------------------------------------------------------------
 # Decrypt if needed
@@ -77,12 +103,7 @@ if [[ "$ARCHIVE" == *.gpg ]]; then
   fi
   [[ -n "$PASSPHRASE" ]] || die "Encrypted backup but no passphrase. Set BACKUP_PASSPHRASE or create $CRED_DIR/backup-passphrase"
 
-  DECRYPTED="${ARCHIVE%.gpg}"
-  # If source was remote, decrypted is already in WORK_DIR; if local, put decrypted in WORK_DIR
-  if [[ "$(dirname "$DECRYPTED")" != "$WORK_DIR" ]]; then
-    DECRYPTED="$WORK_DIR/$(basename "$DECRYPTED")"
-  fi
-
+  DECRYPTED="$WORK_DIR/$(basename "${ARCHIVE%.gpg}")"
   gpg --batch --yes --decrypt \
     --passphrase "$PASSPHRASE" \
     --output "$DECRYPTED" \
@@ -96,36 +117,71 @@ fi
 # Stop gateway
 # ---------------------------------------------------------------------------
 if command -v openclaw &>/dev/null; then
-  log "Stopping gateway..."
-  openclaw gateway stop 2>/dev/null || true
-fi
-
-# ---------------------------------------------------------------------------
-# Safety copy of existing state
-# ---------------------------------------------------------------------------
-if [[ -d "$OPENCLAW_DIR" ]]; then
-  SAFETY="$HOME/.openclaw.pre-restore"
-  if [[ -d "$SAFETY" ]]; then
-    log "Removing previous pre-restore safety copy..."
-    rm -rf "$SAFETY"
+  if openclaw gateway status 2>/dev/null | grep -qi "running"; then
+    log "Stopping gateway..."
+    openclaw gateway stop 2>/dev/null || true
   fi
-  log "Moving existing ~/.openclaw/ → ~/.openclaw.pre-restore/"
-  mv "$OPENCLAW_DIR" "$SAFETY"
 fi
 
 # ---------------------------------------------------------------------------
-# Extract
+# Restore
 # ---------------------------------------------------------------------------
-log "Extracting backup..."
-mkdir -p "$HOME"
-tar xzf "$ARCHIVE" -C "$HOME"
+if [[ "$WORKSPACE_ONLY" == "true" ]]; then
+  # Workspace-only: only replace the workspace directory
+  WORKSPACE_DIR="$OPENCLAW_DIR/workspace"
 
-log "Restore complete!"
+  if [[ -d "$WORKSPACE_DIR" ]]; then
+    SAFETY="${WORKSPACE_DIR}.pre-restore"
+    [[ -d "$SAFETY" ]] && rm -rf "$SAFETY"
+    log "Moving existing workspace → ${SAFETY}/"
+    mv "$WORKSPACE_DIR" "$SAFETY"
+  fi
+
+  log "Extracting workspace..."
+  # Handle both archive types:
+  # - workspace archive: contains .openclaw/workspace/
+  # - full archive with --workspace-only: contains .openclaw/ (extract only workspace subdir)
+  if tar -tzf "$ARCHIVE" 2>/dev/null | head -1 | grep -q "^\.openclaw/workspace/"; then
+    # Workspace-only archive or full archive — extract just the workspace path
+    tar xzf "$ARCHIVE" -C "$HOME" .openclaw/workspace/
+  else
+    die "Could not find workspace directory in archive"
+  fi
+
+  log "Workspace restored to $WORKSPACE_DIR"
+else
+  # Full restore: replace entire ~/.openclaw/
+  if [[ -d "$OPENCLAW_DIR" ]]; then
+    SAFETY="$HOME/.openclaw.pre-restore"
+    [[ -d "$SAFETY" ]] && rm -rf "$SAFETY"
+    log "Moving existing ~/.openclaw/ → ~/.openclaw.pre-restore/"
+    mv "$OPENCLAW_DIR" "$SAFETY"
+  fi
+
+  log "Extracting full backup..."
+  tar xzf "$ARCHIVE" -C "$HOME"
+  log "Full restore complete"
+fi
+
+# ---------------------------------------------------------------------------
+# Done
+# ---------------------------------------------------------------------------
 echo ""
-echo "Your previous state is saved at ~/.openclaw.pre-restore/"
-echo ""
-echo "Next steps:"
-echo "  1. Review the restored files at ~/.openclaw/"
-echo "  2. Start the gateway:  openclaw gateway start"
-echo "  3. If everything works, you can remove the safety copy:"
-echo "     rm -rf ~/.openclaw.pre-restore/"
+if [[ "$WORKSPACE_ONLY" == "true" ]]; then
+  log "Workspace restored! Your gateway config and credentials are untouched."
+  echo ""
+  echo "Next steps:"
+  echo "  1. Start the gateway:  openclaw gateway start"
+  echo "  2. Your agent's memory, skills, and files are restored"
+  echo "  3. Previous workspace saved at: ${WORKSPACE_DIR}.pre-restore/"
+else
+  log "Full restore complete!"
+  echo ""
+  echo "Your previous state is saved at ~/.openclaw.pre-restore/"
+  echo ""
+  echo "Next steps:"
+  echo "  1. Review the restored files at ~/.openclaw/"
+  echo "  2. Start the gateway:  openclaw gateway start"
+  echo "  3. If everything works, remove the safety copy:"
+  echo "     rm -rf ~/.openclaw.pre-restore/"
+fi

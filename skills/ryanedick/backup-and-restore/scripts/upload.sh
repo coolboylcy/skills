@@ -24,18 +24,27 @@ require_cmd() {
 }
 
 # ---------------------------------------------------------------------------
-# Find backup file
+# Find backup files
 # ---------------------------------------------------------------------------
+BACKUP_FILES=()
 if [[ "${1:-}" != "" && -f "${1:-}" ]]; then
-  BACKUP_FILE="$1"
+  BACKUP_FILES+=("$1")
 else
-  # Find the latest backup
-  BACKUP_FILE="$(ls -t "$BACKUP_DIR"/openclaw-*.tar.gz* 2>/dev/null | head -1 || true)"
-  [[ -n "$BACKUP_FILE" ]] || die "No backup files found in $BACKUP_DIR"
+  # Find the latest full and workspace backups
+  LATEST_FULL="$(ls -t "$BACKUP_DIR"/openclaw-*-full.tar.gz* 2>/dev/null | head -1 || true)"
+  LATEST_WS="$(ls -t "$BACKUP_DIR"/openclaw-*-workspace.tar.gz* 2>/dev/null | head -1 || true)"
+
+  # Fallback: try old naming format (pre-1.0.2)
+  if [[ -z "$LATEST_FULL" && -z "$LATEST_WS" ]]; then
+    LATEST_FULL="$(ls -t "$BACKUP_DIR"/openclaw-*.tar.gz* 2>/dev/null | head -1 || true)"
+  fi
+
+  [[ -n "$LATEST_FULL" ]] && BACKUP_FILES+=("$LATEST_FULL")
+  [[ -n "$LATEST_WS" ]] && BACKUP_FILES+=("$LATEST_WS")
+  [[ ${#BACKUP_FILES[@]} -gt 0 ]] || die "No backup files found in $BACKUP_DIR"
 fi
 
-log "Uploading: $BACKUP_FILE"
-FILENAME="$(basename "$BACKUP_FILE")"
+log "Uploading ${#BACKUP_FILES[@]} file(s)"
 
 # ---------------------------------------------------------------------------
 # Read destinations from config
@@ -135,29 +144,36 @@ upload_rsync() {
 }
 
 # ---------------------------------------------------------------------------
-# Process each destination
+# Process each file × each destination
 # ---------------------------------------------------------------------------
 SUCCESSES=0
 FAILURES=0
+TOTAL=0
 
-for i in $(seq 0 $((DEST_COUNT - 1))); do
-  DEST=$(jq ".destinations[$i]" "$CONFIG_FILE")
-  DTYPE=$(echo "$DEST" | jq -r '.type')
+for BACKUP_FILE in "${BACKUP_FILES[@]}"; do
+  FILENAME="$(basename "$BACKUP_FILE")"
+  log "Uploading: $FILENAME"
 
-  log "Uploading to $DTYPE..."
+  for i in $(seq 0 $((DEST_COUNT - 1))); do
+    DEST=$(jq ".destinations[$i]" "$CONFIG_FILE")
+    DTYPE=$(echo "$DEST" | jq -r '.type')
+    TOTAL=$((TOTAL + 1))
 
-  if upload_"$DTYPE" "$DEST" 2>&1; then
-    log "✓ $DTYPE upload succeeded"
-    SUCCESSES=$((SUCCESSES + 1))
-  else
-    warn "✗ $DTYPE upload failed"
-    FAILURES=$((FAILURES + 1))
-  fi
+    log "  → $DTYPE..."
+
+    if upload_"$DTYPE" "$DEST" 2>&1; then
+      log "  ✓ $DTYPE upload succeeded"
+      SUCCESSES=$((SUCCESSES + 1))
+    else
+      warn "  ✗ $DTYPE upload failed"
+      FAILURES=$((FAILURES + 1))
+    fi
+  done
 done
 
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-log "Upload complete: $SUCCESSES succeeded, $FAILURES failed (of $DEST_COUNT)"
+log "Upload complete: $SUCCESSES succeeded, $FAILURES failed (of $TOTAL uploads)"
 
 [[ "$FAILURES" -eq 0 ]] || exit 1

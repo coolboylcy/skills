@@ -97,9 +97,9 @@ sudo snap install google-cloud-cli --classic
 
 **CLI needed:** `rclone`
 ```bash
-# Install:
-curl https://rclone.org/install.sh | sudo bash
-# or: sudo apt install rclone
+# Install via package manager (recommended):
+sudo apt install rclone
+# or see https://rclone.org/install/ for other methods
 ```
 
 **Setup:**
