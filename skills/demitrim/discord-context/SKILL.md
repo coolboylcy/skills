@@ -1,98 +1,43 @@
 ---
 name: discord-context
-description: Manage Discord forum thread context. Pre-loads QMD content into threads for AI context awareness.
-metadata:
- {
-   "openclaw": {
-     "requires": { "bins": ["curl"] },
-     "user-invocable": true
-   }
- }
+description: Sync and cache per-thread context for Discord Forum channels. Use when handling /discord-context commands to poll active threads, list cached context, inspect a thread cache, or link a thread to a memory QMD file.
+user-invocable: true
+metadata: {"openclaw":{"requires":{"bins":["node"],"env":["DISCORD_TOKEN"]}}}
 ---
 
 # discord-context
 
-Manage Discord forum thread context. Pre-loads QMD content into threads for AI context awareness.
+Run `node {baseDir}/scripts/discord-context-cli.js <command> ...`.
 
-## Setup
+## Commands
 
-Requires:
-- Discord bot token configured in OpenClaw
-- `curl` command available
-- OpenClaw workspace at `~/.openclaw/workspace` (default)
+- `poll [--guild <id>] [--forum <id>] [--workspace <path>]`
+  - Pull active threads from Discord and refresh cache for new/updated threads.
+  - Requires `DISCORD_TOKEN` plus guild/forum IDs (flags or env vars).
 
-The skill expects:
-- Cache directory: `memory/discord-cache/`
-- QMD files in: `memory/*.md`
+- `context [threadId] [--workspace <path>] [--json]`
+  - Without `threadId`: list cached threads.
+  - With `threadId`: print cached context and metadata for one thread.
 
-## Slash Command
+- `link <threadId> <qmdName> [--workspace <path>]`
+  - Link a thread to `memory/<qmdName>.md` and refresh cached context text.
 
-When the user invokes `/discord-context <args>`, handle it as follows:
+## Environment
 
-### `/discord-context poll`
-Execute the poll script and report results.
-```
-Run: node {baseDir}/scripts/discord-context-cli.js poll
-```
+- `DISCORD_TOKEN` (required for `poll`)
+- `DISCORD_GUILD_ID` (default guild id for `poll`)
+- `DISCORD_FORUM_CHANNEL_ID` (default forum id for `poll`)
+- `OPENCLAW_WORKSPACE` (defaults to `~/.openclaw/workspace`)
 
-### `/discord-context context`
-List all cached threads with their context.
-```
-Run: node {baseDir}/scripts/discord-context-cli.js context
-```
+## Security Rules
 
-### `/discord-context context <thread_id>`
-Show context for a specific thread.
-```
-Run: node {baseDir}/scripts/discord-context-cli.js context <thread_id>
-```
+- Never hardcode Discord tokens.
+- Accept only numeric thread/guild/forum IDs.
+- Accept only `[a-zA-Z0-9_-]+` for `qmdName`.
+- Keep all reads/writes inside the workspace `memory/` tree.
 
-### `/discord-context link <thread_id> <qmd_name>`
-Link a QMD to a thread.
-```
-Run: node {baseDir}/scripts/discord-context-cli.js link <thread_id> <qmd_name>
-```
+## Paths
 
-### `/discord-context help`
-Show this help text.
-
-## Examples
-
-```
-/discord-context poll
-/discord-context context
-/discord-context context 1472595645192867983
-/discord-context link 1472595645192867983 skills
-```
-
-## How It Works
-
-1. **Polling** (cron every 2 hours): Checks agent-hub forum for new activity, loads matching QMD content
-2. **Caching**: Context stored in `memory/discord-cache/thread-{id}-context.txt`
-3. **Dump**: Posts cached context to thread on demand
-
-## Thread → QMD Mapping
-
-Threads map to QMDs by name (spaces → dashes):
-- `Skills` → `memory/skills.md`
-- `Mission Control` → `memory/mission-control.md`
-- `Philosophy time` → `memory/philosophy-time.md`
-- `DOCUMENTATION` → `memory/documentation.md`
-- `Nightly Work` → `memory/nightly-work.md`
-- `mc-refactor-14022026` → `memory/mc-refactor-14022026.md`
-
-## Implementation Details
-
-The skill includes:
-- `scripts/discord-context-cli.js` — main CLI entry point
-- `scripts/discord-context-poll.sh` — polling script (called by cron)
-
-Cache directory: `memory/discord-cache/`
-
-## Installation Notes
-
-After installing:
-1. Ensure your Discord bot has access to your forum channels
-2. Configure the forum channel ID in the polling script if needed
-3. Create QMD files in your memory/ folder matching your thread names
-4. Set up a cron job to run poll every 2 hours (optional)
+- Cache metadata: `memory/discord-cache/thread-<id>.json`
+- Cache text: `memory/discord-cache/thread-<id>-context.txt`
+- Source context files: `memory/*.md`

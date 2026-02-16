@@ -3,9 +3,15 @@
   "slug": "discord-context",
   "displayName": "Discord Context",
   "latest": {
-    "version": "0.1.0",
-    "publishedAt": 1771171444352,
-    "commit": "https://github.com/openclaw/skills/commit/998b8ea6c84c3787fb6a3f46e546eeded746add2"
+    "version": "0.3.0",
+    "publishedAt": 1771195909765,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.1.0",
+      "publishedAt": 1771171444352,
+      "commit": "https://github.com/openclaw/skills/commit/998b8ea6c84c3787fb6a3f46e546eeded746add2"
+    }
+  ]
 }
