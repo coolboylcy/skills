@@ -19,41 +19,6 @@ metadata:
               "label": "Install uv (brew)",
             },
           ],
-        "tools":
-          {
-            "nova_act":
-              {
-                "description": "Run a browser automation task using Amazon Nova Act.",
-                "parameters":
-                  {
-                    "type": "object",
-                    "properties":
-                      {
-                        "url":
-                          {
-                            "type": "string",
-                            "description": "Starting URL for the browser session",
-                          },
-                        "task":
-                          {
-                            "type": "string",
-                            "description": "Natural language task description. IMPORTANT: Resolve relative dates (e.g., 'next Monday') to specific dates (e.g., '2025-03-15') in the prompt.",
-                          },
-                      },
-                    "required": ["url", "task"],
-                  },
-                "command":
-                  [
-                    "uv",
-                    "run",
-                    "{baseDir}/scripts/nova_act_runner.py",
-                    "--url",
-                    "{{url}}",
-                    "--task",
-                    "{{task}}",
-                  ],
-              },
-          },
       },
   }
 ---
@@ -62,13 +27,55 @@ metadata:
 
 Use Amazon Nova Act for AI-powered browser automation. The bundled script handles common tasks; write custom scripts for complex workflows. To get free API key go to https://nova.amazon.com/dev/api
 
+## Data & Privacy Notice
+
+**What this skill accesses:**
+- **Reads:** `NOVA_ACT_API_KEY` environment variable or `~/.openclaw/openclaw.json` (your API key)
+- **Writes:** Nova Act trace files in the current working directory (screenshots, session recordings)
+
+**What trace files may contain:**
+- Screenshots of every page visited
+- Full page content (HTML, text)
+- Browser actions and AI decisions
+
+**Recommendations:**
+- Be aware traces may capture **PII or sensitive data** visible on visited pages
+- Review/delete trace files after use if they contain sensitive content
+
+## Safety Guarantees
+
+When performing browser automation, this skill will **NEVER:**
+- Complete actual purchases or financial transactions
+- Create real accounts or sign up for services
+- Post content publicly on any platform
+- Send emails, messages, or communications
+- Submit forms that cause irreversible real-world actions
+
+This skill will **ALWAYS:**
+- Stop before any action that could have material real-world impact
+- Ask for explicit user confirmation before taking irreversible actions
+- Report findings rather than completing destructive operations
+
 ## Quick Start with Bundled Script
 
-Execute a browser task and get results:
+When asked to perform a browser automation task, invoke the bundled script:
 
-```bash
-uv run {baseDir}/scripts/nova_act_runner.py --url "https://google.com/flights" --task "Find flights from SFO to NYC on March 15 and return the options"
+```python
+import subprocess, os, sys
+
+skill_dir = os.path.expanduser("~/.openclaw/skills/nova-act")
+script = os.path.join(skill_dir, "scripts", "nova_act_runner.py")
+
+result = subprocess.run(
+    ["uv", "run", script, "--url", url, "--task", task],
+    capture_output=True, text=True, env={**os.environ}
+)
+print(result.stdout)
+if result.returncode != 0:
+    print(result.stderr, file=sys.stderr)
 ```
+
+Where `url` and `task` are Python string variables set from the user's request.
 
 The script uses a generic schema (summary + details list) to capture output.
 

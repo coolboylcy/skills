@@ -17,6 +17,7 @@ Usage:
 import json
 import os
 import sys
+from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
@@ -27,6 +28,46 @@ class TaskResult(BaseModel):
     details: list[str]
 
 
+ALLOWED_SCHEMES = {"http", "https"}
+
+MATERIAL_IMPACT_KEYWORDS = [
+    "buy", "purchase", "checkout", "pay", "subscribe", "donate", "order",
+    "post", "publish", "share", "send", "email", "message", "tweet",
+    "sign up", "register", "create account", "join",
+    "submit", "apply", "enroll", "book", "reserve",
+    "delete", "remove", "cancel",
+]
+
+
+def validate_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in ALLOWED_SCHEMES:
+        print(f"Error: URL scheme must be http or https, got: {parsed.scheme!r}", file=sys.stderr)
+        sys.exit(1)
+    if not parsed.netloc:
+        print(f"Error: URL must include a hostname: {url}", file=sys.stderr)
+        sys.exit(1)
+    return url
+
+
+def validate_task(task: str) -> str:
+    if not task or not task.strip():
+        print("Error: Task description cannot be empty", file=sys.stderr)
+        sys.exit(1)
+    if len(task) > 2000:
+        print(f"Error: Task too long ({len(task)} chars, max 2000)", file=sys.stderr)
+        sys.exit(1)
+    return task.strip()
+
+
+def check_material_impact(task: str) -> None:
+    task_lower = task.lower()
+    triggered = [kw for kw in MATERIAL_IMPACT_KEYWORDS if kw in task_lower]
+    if triggered:
+        print(f"Warning: Task may involve material-impact actions ({', '.join(triggered)}). "
+              f"Will stop before completing irreversible actions.", file=sys.stderr)
+
+
 def run(url: str, task: str) -> None:
     """
     Run a browser automation task with Nova Act.
@@ -35,6 +76,10 @@ def run(url: str, task: str) -> None:
         url: Starting URL to navigate to
         task: Task to perform and return results (e.g., "Find flights from SFO to NYC and return the options")
     """
+    url = validate_url(url)
+    task = validate_task(task)
+    check_material_impact(task)
+
     api_key = os.environ.get("NOVA_ACT_API_KEY")
     if not api_key:
         print("Error: NOVA_ACT_API_KEY environment variable not set", file=sys.stderr)
