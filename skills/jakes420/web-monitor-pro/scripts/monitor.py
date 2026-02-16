@@ -54,9 +54,9 @@ except ImportError:
 import urllib.request
 import urllib.error
 
-VERSION = "3.4.0"
+VERSION = "3.5.0"
 
-WHATS_NEW = "OpenClaw engine for anti-bot sites. Use --engine openclaw + --content-file to feed externally-fetched content."
+WHATS_NEW = "Quickstart command with smart suggestions. Better first-run experience."
 
 # --- Storage paths ---
 STORE_DIR = Path(os.environ.get("WEB_MONITOR_DIR", Path.home() / ".web-monitor"))
@@ -1086,9 +1086,105 @@ def cmd_debug(args):
     print()
 
 
+def cmd_quickstart(args):
+    """Smart first-run helper. Reports available engines and suggests monitoring setups."""
+    ensure_dirs()
+    monitors = load_monitors()
+
+    engines = ["curl"]
+    if HAS_CLOUDSCRAPER:
+        engines.append("cloudscraper")
+    if HAS_PLAYWRIGHT:
+        engines.append("playwright")
+
+    suggestions = [
+        {
+            "category": "price",
+            "icon": "💰",
+            "label": "Price Drop Alert",
+            "description": "Track product prices on Amazon, Takealot, eBay, or any store",
+            "command": 'monitor.py watch "<product-url>"',
+            "template": "price-drop",
+        },
+        {
+            "category": "restock",
+            "icon": "📦",
+            "label": "Back in Stock Alert",
+            "description": "Get notified when a sold-out item comes back",
+            "command": 'monitor.py template use restock "<product-url>"',
+            "template": "restock",
+        },
+        {
+            "category": "news",
+            "icon": "📰",
+            "label": "Page Change Tracker",
+            "description": "Watch news sites, blogs, docs, or competitor pages for updates",
+            "command": 'monitor.py watch "<page-url>"',
+            "template": "content-update",
+        },
+        {
+            "category": "sale",
+            "icon": "🏷️",
+            "label": "Sale & Discount Watcher",
+            "description": "Get alerted when a sale or discount appears on a page",
+            "command": 'monitor.py template use sale "<deals-page-url>"',
+            "template": "sale",
+        },
+    ]
+
+    result = {
+        "status": "ok",
+        "version": VERSION,
+        "total_monitors": len(monitors),
+        "data_dir": str(STORE_DIR),
+        "engines_available": engines,
+        "suggestions": suggestions,
+        "templates": list(TEMPLATES.keys()),
+        "tips": [],
+    }
+
+    if not HAS_CLOUDSCRAPER:
+        result["tips"].append("Install cloudscraper for Cloudflare-protected sites: pip3 install cloudscraper")
+    if not HAS_PLAYWRIGHT:
+        result["tips"].append("Install Playwright for JS-heavy sites (Amazon, SPAs): pip3 install playwright && python3 -m playwright install chromium")
+
+    if len(monitors) == 0:
+        result["tips"].append("Start with: monitor.py watch <url> - it auto-detects if it's a price page, stock page, or content page")
+
+    # Also print human-readable
+    print()
+    print(_bold("👁️  Web Monitor Pro v" + VERSION))
+    print()
+
+    if len(monitors) > 0:
+        active = sum(1 for m in monitors.values() if m.get("enabled", True))
+        print(f"  You have {_bold(str(len(monitors)))} monitors ({active} active)")
+        print()
+    else:
+        print("  No monitors yet. Here's what you can track:")
+        print()
+        for s in suggestions:
+            print(f"  {s['icon']} {_bold(s['label'])}")
+            print(f"     {s['description']}")
+            print(f"     {_cyan(s['command'])}")
+            print()
+
+    print(f"  Engines: {', '.join(engines)}")
+    if result["tips"]:
+        print()
+        for tip in result["tips"]:
+            print(f"  💡 {tip}")
+    print()
+
+    print(json.dumps(result, indent=2))
+
+
 def cmd_help(args):
     print()
     print(_bold("👁️  Web Monitor Pro v" + VERSION))
+    print()
+    print(_bold("Get started:"))
+    print(f"  quickstart                 Smart setup with suggestions and engine check")
     print()
     print(_bold("Start monitoring:"))
     print(f"  watch <url>                Auto-detect and set up monitoring")
@@ -2913,6 +3009,9 @@ def main():
         return
     if sys.argv[1] == "setup":
         cmd_setup(None)
+        return
+    if sys.argv[1] == "quickstart":
+        cmd_quickstart(None)
         return
     if sys.argv[1] == "debug":
         cmd_debug(None)

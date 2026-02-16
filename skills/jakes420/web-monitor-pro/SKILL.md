@@ -1,6 +1,6 @@
 ---
 name: web-monitor
-version: 3.4.2
+version: 3.5.0
 description: "Monitor web pages for changes, price drops, stock availability, and custom conditions. Use when a user asks to watch/track/monitor a URL, get notified about price changes, check if something is back in stock, or track any website for updates. Also handles listing, removing, checking, and reporting on existing monitors. v3 adds change summaries, visual diffs, price comparison, templates, JS rendering, and webhooks."
 metadata:
   {
@@ -19,10 +19,21 @@ Watch any web page. Know when it changes.
 ## Quick Start
 
 ```bash
-python3 scripts/monitor.py setup
+python3 scripts/monitor.py quickstart                        # shows suggestions + engine status
 python3 scripts/monitor.py watch "https://example.com/product"
 python3 scripts/monitor.py check
 ```
+
+### First Run
+
+Use `quickstart` on first run. It:
+1. Creates the data directory
+2. Checks which fetch engines are available (curl, cloudscraper, playwright)
+3. Returns suggestions for popular monitoring scenarios (price drops, restocks, page changes, sales)
+4. Lists available templates
+5. Shows tips for missing engines
+
+The agent can use this info to ask the user what they want to monitor and set it up for them.
 
 ## What It Does
 
