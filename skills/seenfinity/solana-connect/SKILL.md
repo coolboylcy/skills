@@ -14,14 +14,14 @@ metadata:
             {
               "id": "npm",
               "kind": "npm",
-              "package": "@solana/web3.js",
-              "label": "Install Solana web3.js",
+              "package": "@solana/kit",
+              "label": "Install Solana Kit (SDK v2)",
             },
             {
               "id": "npm",
               "kind": "npm", 
-              "package": "@solana/spl-token",
-              "label": "Install SPL Token library",
+              "package": "tweetnacl",
+              "label": "Install TweetNaCl for wallet generation",
             },
           ],
       },

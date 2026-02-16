@@ -1,6 +1,7 @@
-# OpenClaw Solana Connect
+# OpenClaw Solana Connect v2.0
 
 > The missing link between OpenClaw agents and Solana blockchain
+> **Now using @solana/kit (Solana Web3.js v2)**
 
 A purpose-built toolkit that enables autonomous AI agents running on OpenClaw to interact seamlessly with the Solana blockchain.
 
