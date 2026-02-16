@@ -8,8 +8,8 @@ import { SogniClientWrapper, ClientEvent, getMaxContextImages } from '@sogni-ai/
 import JSON5 from 'json5';
 import { createHash, randomBytes } from 'crypto';
 import { spawnSync } from 'child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, mkdtempSync, statSync } from 'fs';
-import { join, dirname, basename, extname } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, mkdtempSync, statSync, readdirSync, realpathSync, lstatSync } from 'fs';
+import { join, dirname, basename, extname, sep } from 'path';
 import { homedir, tmpdir } from 'os';
 import sharp from 'sharp';
 
@@ -46,8 +46,11 @@ function sanitizePath(p, label) {
   return p;
 }
 
-const LAST_RENDER_PATH = join(homedir(), '.config', 'sogni', 'last-render.json');
-const OPENCLAW_CONFIG_PATH = process.env.OPENCLAW_CONFIG_PATH || join(homedir(), '.openclaw', 'openclaw.json');
+const DEFAULT_CREDENTIALS_PATH = join(homedir(), '.config', 'sogni', 'credentials');
+const DEFAULT_LAST_RENDER_PATH = join(homedir(), '.config', 'sogni', 'last-render.json');
+const DEFAULT_OPENCLAW_CONFIG_PATH = join(homedir(), '.openclaw', 'openclaw.json');
+const DEFAULT_MEDIA_INBOUND_DIR = join(homedir(), '.clawdbot', 'media', 'inbound');
+const OPENCLAW_CONFIG_PATH = process.env.OPENCLAW_CONFIG_PATH || DEFAULT_OPENCLAW_CONFIG_PATH;
 const IS_OPENCLAW_INVOCATION = Boolean(process.env.OPENCLAW_PLUGIN_CONFIG);
 const RAW_ARGS = process.argv.slice(2);
 const CLI_WANTS_JSON = RAW_ARGS.includes('--json');
@@ -71,6 +74,24 @@ const VIDEO_WORKFLOW_DEFAULT_MODELS = {
 
 function isLtx2Model(modelId) { return modelId?.startsWith('ltx2-') || false; }
 function isWanModel(modelId) { return modelId?.startsWith('wan_') || false; }
+
+function expandHomePath(rawPath) {
+  if (typeof rawPath !== 'string') return rawPath;
+  if (rawPath === '~') return homedir();
+  if (rawPath.startsWith('~/') || rawPath.startsWith('~\\')) {
+    return join(homedir(), rawPath.slice(2));
+  }
+  return rawPath;
+}
+
+function resolveConfiguredPath(rawPath, fallbackPath, label) {
+  const candidate = expandHomePath(rawPath) || fallbackPath;
+  return sanitizePath(candidate, label);
+}
+
+function isPathWithinBase(basePath, targetPath) {
+  return targetPath === basePath || targetPath.startsWith(`${basePath}${sep}`);
+}
 
 function buildCliErrorPayload({ message, code, details, hint, prompt }) {
   const payload = {
@@ -641,6 +662,23 @@ function loadOpenClawPluginConfig() {
   }
 }
 
+const openclawConfig = loadOpenClawPluginConfig();
+const CREDENTIALS_PATH = resolveConfiguredPath(
+  process.env.SOGNI_CREDENTIALS_PATH || openclawConfig?.credentialsPath,
+  DEFAULT_CREDENTIALS_PATH,
+  'SOGNI credentials path'
+);
+const LAST_RENDER_PATH = resolveConfiguredPath(
+  process.env.SOGNI_LAST_RENDER_PATH || openclawConfig?.lastRenderPath,
+  DEFAULT_LAST_RENDER_PATH,
+  'SOGNI last render path'
+);
+const MEDIA_INBOUND_DIR = resolveConfiguredPath(
+  process.env.SOGNI_MEDIA_INBOUND_DIR || openclawConfig?.mediaInboundDir,
+  DEFAULT_MEDIA_INBOUND_DIR,
+  'SOGNI media inbound path'
+);
+
 // Parse arguments
 const args = process.argv.slice(2);
 const options = {
@@ -696,7 +734,12 @@ const options = {
   sam2Coordinates: null, // SAM2 coordinates for animate-replace [{x,y}]
   trimEndFrame: false, // Trim last frame for seamless stitching
   firstFrameStrength: null, // Keyframe interpolation (0.0-1.0)
-  lastFrameStrength: null // Keyframe interpolation (0.0-1.0)
+  lastFrameStrength: null, // Keyframe interpolation (0.0-1.0)
+  extractLastFrame: null, // --extract-last-frame <video> <image>
+  extractLastFrameOutput: null,
+  concatVideos: null, // --concat-videos <out> <clip1> <clip2> [...]
+  concatVideosClips: null,
+  listMedia: null // --list-media [images|audio|all]
 };
 const cliSet = {
   output: false,
@@ -993,6 +1036,39 @@ for (let i = 0; i < args.length; i++) {
     i++;
     options.lastFrameStrength = parseNumberValue(raw, arg);
     cliSet.lastFrameStrength = true;
+  } else if (arg === '--extract-last-frame') {
+    const videoArg = requireFlagValue(args, i, arg);
+    i++;
+    const imageArg = requireFlagValue(args, i, arg + ' (output image)');
+    i++;
+    options.extractLastFrame = videoArg;
+    options.extractLastFrameOutput = imageArg;
+  } else if (arg === '--concat-videos') {
+    // Consume remaining positional args: <output> <clip1> <clip2> [clip3...]
+    const outArg = requireFlagValue(args, i, arg + ' (output path)');
+    i++;
+    const clips = [];
+    while (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+      i++;
+      clips.push(args[i]);
+    }
+    if (clips.length < 2) {
+      fatalCliError('--concat-videos requires at least 2 clip paths after the output path.', {
+        code: 'INVALID_ARGUMENT',
+        details: { flag: '--concat-videos', clipsProvided: clips.length }
+      });
+    }
+    options.concatVideos = outArg;
+    options.concatVideosClips = clips;
+  } else if (arg === '--list-media') {
+    // Optional type argument (images|audio|all), default: images
+    const next = args[i + 1];
+    if (next && !next.startsWith('-') && ['images', 'audio', 'all'].includes(next)) {
+      i++;
+      options.listMedia = next;
+    } else {
+      options.listMedia = 'images';
+    }
   } else if (arg === '--last-image') {
     // Use image from last render as reference/context
     if (existsSync(LAST_RENDER_PATH)) {
@@ -1098,6 +1174,9 @@ General:
   --token-type <type>   Token type: spark|sogni (default: spark)
   --balance, --balances Show SPARK/SOGNI balances and exit
   --version, -V         Show sogni-gen version and exit
+  --extract-last-frame <video> <image>  Extract last frame from a video (safe ffmpeg wrapper)
+  --concat-videos <out> <clips...>      Concatenate video clips (safe ffmpeg wrapper, min 2 clips)
+  --list-media [type]   List recent inbound media files (images|audio|all, default: images)
   --last                Show last render info (JSON)
   --json                Output JSON with all details
   --strict-size         Do not auto-adjust video size to satisfy i2v reference resizing constraints
@@ -1156,7 +1235,6 @@ Examples:
   }
 }
 
-const openclawConfig = loadOpenClawPluginConfig();
 let timeoutFromConfig = false;
 if (openclawConfig) {
   const isNumber = (value) => Number.isFinite(value);
@@ -1440,7 +1518,7 @@ if (options.video) {
   options.model = options.model || openclawConfig?.defaultImageModel || 'z_image_turbo_bf16';
 }
 
-if (!options.prompt && !options.estimateVideoCost && !options.multiAngle && !options.showBalance && !options.showVersion) {
+if (!options.prompt && !options.estimateVideoCost && !options.multiAngle && !options.showBalance && !options.showVersion && !options.extractLastFrame && !options.concatVideos && !options.listMedia) {
   fatalCliError('No prompt provided. Use --help for usage.', { code: 'INVALID_ARGUMENT' });
 }
 
@@ -1717,7 +1795,7 @@ if (options.lastSeed) {
   }
 }
 
-if (!options.estimateVideoCost && !options.showVersion && (options.seed === null || options.seed === undefined)) {
+if (!options.estimateVideoCost && !options.showVersion && !options.extractLastFrame && !options.concatVideos && !options.listMedia && (options.seed === null || options.seed === undefined)) {
   const strategy = options.seedStrategy || openclawConfig?.seedStrategy || 'prompt-hash';
   const normalized = normalizeSeedStrategy(strategy) || 'prompt-hash';
   options.seedStrategy = normalized;
@@ -1729,10 +1807,8 @@ if (!options.estimateVideoCost && !options.showVersion && (options.seed === null
 
 // Load credentials
 function loadCredentials() {
-  const credPath = join(homedir(), '.config', 'sogni', 'credentials');
-  
-  if (existsSync(credPath)) {
-    const content = readFileSync(credPath, 'utf8');
+  if (existsSync(CREDENTIALS_PATH)) {
+    const content = readFileSync(CREDENTIALS_PATH, 'utf8');
     const creds = {};
     for (const line of content.split('\n')) {
       const [key, val] = line.split('=');
@@ -1752,10 +1828,10 @@ function loadCredentials() {
 
   const err = new Error('No Sogni credentials found.');
   err.code = 'MISSING_CREDENTIALS';
-  err.hint = 'Set SOGNI_USERNAME/SOGNI_PASSWORD or create ~/.config/sogni/credentials.';
+  err.hint = 'Set SOGNI_USERNAME/SOGNI_PASSWORD or configure SOGNI_CREDENTIALS_PATH.';
   err.details = {
     triedEnv: ['SOGNI_USERNAME', 'SOGNI_PASSWORD'],
-    triedFile: credPath
+    triedFile: CREDENTIALS_PATH
   };
   throw err;
 }
@@ -2455,6 +2531,120 @@ async function main() {
         }));
       } else {
         console.log(PACKAGE_VERSION);
+      }
+      return;
+    }
+
+    // --- Utility commands (no Sogni auth required) ---
+
+    if (options.extractLastFrame) {
+      const videoPath = sanitizePath(options.extractLastFrame, '--extract-last-frame video');
+      const outputPath = sanitizePath(options.extractLastFrameOutput, '--extract-last-frame output');
+      if (!existsSync(videoPath)) {
+        const err = new Error(`Video file not found: ${videoPath}`);
+        err.code = 'FILE_NOT_FOUND';
+        throw err;
+      }
+      extractLastFrameFromVideo(videoPath, outputPath);
+      if (options.json || JSON_ERROR_MODE) {
+        console.log(JSON.stringify({
+          success: true,
+          type: 'extract-last-frame',
+          outputPath,
+          timestamp: new Date().toISOString()
+        }));
+      } else {
+        console.log(`Extracted last frame to: ${outputPath}`);
+      }
+      return;
+    }
+
+    if (options.concatVideos) {
+      const outputPath = sanitizePath(options.concatVideos, '--concat-videos output');
+      const clips = options.concatVideosClips.map((c, i) => sanitizePath(c, `clip[${i}]`));
+      for (const clip of clips) {
+        if (!existsSync(clip)) {
+          const err = new Error(`Clip file not found: ${clip}`);
+          err.code = 'FILE_NOT_FOUND';
+          throw err;
+        }
+      }
+      buildConcatVideoFromClips(outputPath, clips);
+      if (options.json || JSON_ERROR_MODE) {
+        console.log(JSON.stringify({
+          success: true,
+          type: 'concat-videos',
+          outputPath,
+          clipCount: clips.length,
+          timestamp: new Date().toISOString()
+        }));
+      } else {
+        console.log(`Concatenated ${clips.length} clips to: ${outputPath}`);
+      }
+      return;
+    }
+
+    if (options.listMedia) {
+      const mediaType = options.listMedia;
+      const baseDir = MEDIA_INBOUND_DIR;
+
+      const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+      const AUDIO_EXTS = new Set(['.m4a', '.mp3', '.wav', '.ogg']);
+
+      let allowedExts;
+      if (mediaType === 'images') allowedExts = IMAGE_EXTS;
+      else if (mediaType === 'audio') allowedExts = AUDIO_EXTS;
+      else allowedExts = new Set([...IMAGE_EXTS, ...AUDIO_EXTS]);
+
+      const files = [];
+      if (existsSync(baseDir)) {
+        // Validate the base directory itself isn't a symlink pointing outside its expected parent.
+        const allowedRoot = realpathSync(dirname(baseDir));
+        const resolvedBase = realpathSync(baseDir);
+        if (!isPathWithinBase(allowedRoot, resolvedBase)) {
+          const err = new Error('Media directory resolves outside of its expected root.');
+          err.code = 'INVALID_PATH';
+          throw err;
+        }
+
+        const entries = readdirSync(baseDir);
+        for (const entry of entries) {
+          const ext = extname(entry).toLowerCase();
+          if (!allowedExts.has(ext)) continue;
+          const fullPath = join(baseDir, entry);
+          // Skip symlinks
+          const lstats = lstatSync(fullPath);
+          if (lstats.isSymbolicLink()) continue;
+          if (!lstats.isFile()) continue;
+          files.push({
+            path: fullPath,
+            name: entry,
+            size: lstats.size,
+            modified: lstats.mtime.toISOString()
+          });
+        }
+        // Sort by mtime descending, return top 5
+        files.sort((a, b) => b.modified.localeCompare(a.modified));
+        files.splice(5);
+      }
+
+      if (options.json || JSON_ERROR_MODE) {
+        console.log(JSON.stringify({
+          success: true,
+          type: 'list-media',
+          mediaType,
+          files,
+          timestamp: new Date().toISOString()
+        }));
+      } else {
+        if (files.length === 0) {
+          console.log(`No ${mediaType} files found in ${baseDir}`);
+        } else {
+          console.log(`Recent ${mediaType} (${files.length}):`);
+          for (const f of files) {
+            console.log(`  ${f.name}  (${f.size} bytes, ${f.modified})`);
+          }
+        }
       }
       return;
     }

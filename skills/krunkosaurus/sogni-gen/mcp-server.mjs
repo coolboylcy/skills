@@ -28,7 +28,11 @@ import { homedir } from 'os';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const SOGNI_GEN = join(__dirname, 'sogni-gen.mjs');
-const CREDENTIALS_PATH = join(homedir(), '.config', 'sogni', 'credentials');
+const DEFAULT_CREDENTIALS_PATH = join(homedir(), '.config', 'sogni', 'credentials');
+const DEFAULT_DOWNLOADS_DIR = join(homedir(), 'Downloads', 'sogni');
+const CREDENTIALS_PATH = process.env.SOGNI_CREDENTIALS_PATH?.trim() || DEFAULT_CREDENTIALS_PATH;
+const DOWNLOADS_DIR = process.env.SOGNI_DOWNLOADS_DIR?.trim() || DEFAULT_DOWNLOADS_DIR;
+const MCP_SAVE_DOWNLOADS = process.env.SOGNI_MCP_SAVE_DOWNLOADS !== '0';
 const SERVER_VERSION = (() => {
   try {
     const pkg = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
@@ -139,6 +143,7 @@ function checkCredentials() {
           '   chmod 600 ~/.config/sogni/credentials',
           '',
           'Or set SOGNI_USERNAME and SOGNI_PASSWORD environment variables.',
+          'Optional: set SOGNI_CREDENTIALS_PATH to use a different credentials file path.',
         ].join('\n'),
       },
     ],
@@ -204,15 +209,16 @@ async function formatSuccess(result) {
         ? (url.match(/\.(png|jpg|jpeg|webp|gif)/i)?.[1]?.toLowerCase() || 'png')
         : (url.match(/\.(mp4|webm|mov)/i)?.[1]?.toLowerCase() || 'mp4');
 
-      // Save to ~/Downloads/sogni/ so the user can find it easily
-      const { mkdirSync, writeFileSync } = await import('fs');
-      const downloadsDir = join(homedir(), 'Downloads', 'sogni');
-      mkdirSync(downloadsDir, { recursive: true });
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const filename = `sogni-${timestamp}-${savedPaths.length}.${ext}`;
-      const filePath = join(downloadsDir, filename);
-      writeFileSync(filePath, buf);
-      savedPaths.push(filePath);
+      // Save to local disk (default: ~/Downloads/sogni) so terminal users can open files.
+      if (MCP_SAVE_DOWNLOADS) {
+        const { mkdirSync, writeFileSync } = await import('fs');
+        mkdirSync(DOWNLOADS_DIR, { recursive: true });
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filename = `sogni-${timestamp}-${savedPaths.length}.${ext}`;
+        const filePath = join(DOWNLOADS_DIR, filename);
+        writeFileSync(filePath, buf);
+        savedPaths.push(filePath);
+      }
 
       // For images, also embed as base64 (Claude Desktop can render these)
       if (isImage) {
@@ -580,6 +586,58 @@ The face likeness is preserved while applying the style from the prompt.`,
       properties: {},
     },
   },
+  {
+    name: 'extract_last_frame',
+    description: 'Extract the last frame from a video file as an image. Safe ffmpeg wrapper with input sanitization.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        video_path: {
+          type: 'string',
+          description: 'Path to the source video file',
+        },
+        output_path: {
+          type: 'string',
+          description: 'Path to save the extracted frame image (e.g. /tmp/lastframe.png)',
+        },
+      },
+      required: ['video_path', 'output_path'],
+    },
+  },
+  {
+    name: 'concat_videos',
+    description: 'Concatenate multiple video clips into a single video file. Safe ffmpeg wrapper with input sanitization. Requires at least 2 clips.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        output_path: {
+          type: 'string',
+          description: 'Path for the concatenated output video',
+        },
+        clips: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of video clip file paths to concatenate (minimum 2)',
+          minItems: 2,
+        },
+      },
+      required: ['output_path', 'clips'],
+    },
+  },
+  {
+    name: 'list_media',
+    description: 'List recent inbound media files (images, audio, or all) from the user media directory (~/.clawdbot/media/inbound/). Returns the 5 most recent files sorted by modification time.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          enum: ['images', 'audio', 'all'],
+          description: 'Type of media to list (default: images)',
+        },
+      },
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -697,6 +755,40 @@ Defaults:
   return { content: [{ type: 'text', text }] };
 }
 
+async function handleExtractLastFrame(params) {
+  const videoPath = sanitizeString(params.video_path, 'video_path');
+  const outputPath = sanitizeString(params.output_path, 'output_path');
+  const result = await runSogniGen(['--extract-last-frame', videoPath, outputPath], { timeoutMs: 30_000 });
+  if (result.success === false) return formatError(result);
+  return { content: [{ type: 'text', text: `Extracted last frame to: ${result.outputPath || outputPath}` }] };
+}
+
+async function handleConcatVideos(params) {
+  const outputPath = sanitizeString(params.output_path, 'output_path');
+  if (!params.clips || params.clips.length < 2) {
+    return { content: [{ type: 'text', text: 'Error: At least 2 clips are required.' }], isError: true };
+  }
+  const clips = params.clips.map((c, i) => sanitizeString(c, `clips[${i}]`));
+  const result = await runSogniGen(['--concat-videos', outputPath, ...clips], { timeoutMs: 60_000 });
+  if (result.success === false) return formatError(result);
+  return { content: [{ type: 'text', text: `Concatenated ${result.clipCount || clips.length} clips to: ${result.outputPath || outputPath}` }] };
+}
+
+async function handleListMedia(params) {
+  const args = ['--list-media'];
+  if (params.type) {
+    args.push(validateEnum(params.type, ['images', 'audio', 'all'], 'type'));
+  }
+  const result = await runSogniGen(args, { timeoutMs: 10_000 });
+  if (result.success === false) return formatError(result);
+  const files = result.files || [];
+  if (files.length === 0) {
+    return { content: [{ type: 'text', text: `No ${result.mediaType || 'media'} files found.` }] };
+  }
+  const lines = files.map(f => `${f.name}  (${f.size} bytes, ${f.modified})\n  ${f.path}`);
+  return { content: [{ type: 'text', text: `Recent ${result.mediaType || 'media'} (${files.length}):\n${lines.join('\n')}` }] };
+}
+
 // ---------------------------------------------------------------------------
 // Server setup
 // ---------------------------------------------------------------------------
@@ -726,6 +818,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return handleListModels();
       case 'get_version':
         return await handleGetVersion();
+      case 'extract_last_frame':
+        return await handleExtractLastFrame(params);
+      case 'concat_videos':
+        return await handleConcatVideos(params);
+      case 'list_media':
+        return await handleListMedia(params);
       default:
         return {
           content: [{ type: 'text', text: `Unknown tool: ${name}` }],

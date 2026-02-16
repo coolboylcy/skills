@@ -1,13 +1,18 @@
 {
   "owner": "krunkosaurus",
   "slug": "sogni-gen",
-  "displayName": "Openclaw Sogni Gen",
+  "displayName": "Sogni Gen",
   "latest": {
-    "version": "1.5.2",
-    "publishedAt": 1771174148611,
-    "commit": "https://github.com/openclaw/skills/commit/d33aaf70651477a1ea4ef047fc42dd345df76809"
+    "version": "1.5.5",
+    "publishedAt": 1771220813488,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.5.2",
+      "publishedAt": 1771174148611,
+      "commit": "https://github.com/openclaw/skills/commit/d33aaf70651477a1ea4ef047fc42dd345df76809"
+    },
     {
       "version": "1.4.0",
       "publishedAt": 1771082958976,
