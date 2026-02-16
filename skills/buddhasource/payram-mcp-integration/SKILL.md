@@ -1,27 +1,102 @@
 ---
 name: payram-mcp-integration
-description: Accept crypto payments (USDC, USDT, BTC, ETH) via PayRam's self-hosted infrastructure across Base, Ethereum, Polygon, Tron. Use when user says "accept crypto payments", "create payment link", "generate invoice", "set up USDC payments", "process stablecoin transactions", "create crypto invoice", "accept Bitcoin payments", or "enable crypto checkout". Requires PayRam MCP server connection.
+description: Accept crypto payments instantly via PayRam MCP. Hosted server (mcp.payram.com) works immediately for testnet - zero setup required. For production, autonomous headless setup available (10 min, fully automated via env vars). Use when user says "accept crypto payments", "create payment link", "test payment", "setup PayRam", "install PayRam", "PayRam on base". Complete headless guide in references/headless-setup.md
 license: MIT
 metadata:
   author: PayRam
-  version: 1.1.0
+  version: 1.2.0
   mcp-server: payram
   category: payments
-  tags: [crypto, stablecoins, payments, agent-commerce, USDC, USDT, Base, Ethereum, MCP, Bitcoin]
+  tags: [crypto, stablecoins, payments, agent-commerce, USDC, USDT, Base, Ethereum, MCP, Bitcoin, headless, autonomous]
   homepage: https://payram.com
   github: https://github.com/PayRam/payram-helper-mcp-server
   documentation: https://docs.payram.com/mcp-integration
+  headless-guide: https://github.com/PayRam/payram-scripts/blob/main/docs/PAYRAM_HEADLESS_AGENT.md
 ---
 
 # PayRam MCP Integration
 
-Accept crypto payments autonomously via PayRam's MCP server. Self-hosted, permissionless, multi-chain payment infrastructure for AI agents.
+Accept crypto payments instantly - hosted MCP server ready to use, or install locally for production.
 
-## Quick Start
+## 🚀 Instant Start (No Installation)
 
-PayRam's MCP server exposes payment tools that agents discover automatically: `create_payee`, `send_payment`, `get_balance`, `generate_invoice`. No manual API integration required.
+**Try PayRam now** - hosted MCP server at `mcp.payram.com`:
 
-**Supported**: USDC, USDT, BTC, ETH on Base, Ethereum, Polygon, Tron, TON.
+```bash
+# OpenClaw: Add hosted MCP server
+mcporter config add payram --command "https://mcp.payram.com"
+
+# Test immediately
+mcporter call "payram.create_payee(amount: 10, currency: 'USDC', chain: 'base')"
+```
+
+**Environment**: Testnet (Base Sepolia, Ethereum Sepolia)  
+**Use case**: Testing, development, demos  
+**Setup time**: 0 minutes ⚡  
+**Real funds**: ❌ Not supported (testnet only)  
+
+---
+
+## 🤖 For AI Agents: Headless Setup (Production)
+
+PayRam has **agent-first** installation designed for autonomous operation.
+
+### Quick Setup (Fully Automated)
+```bash
+# Clone repo
+git clone https://github.com/PayRam/payram-scripts
+cd payram-scripts
+
+# Set credentials (one-time)
+export PAYRAM_EMAIL="agent@example.com"
+export PAYRAM_PASSWORD="secure_password"
+
+# Install and setup (non-interactive)
+./agent_run_local.sh  # Choose option 1: Install
+./agent_headless.sh run  # Creates wallet, deploys contracts, ready!
+```
+
+### Environment Variables (Full Automation)
+```bash
+PAYRAM_EMAIL="agent@example.com"
+PAYRAM_PASSWORD="yourpass"
+PAYRAM_PAYMENT_AMOUNT=10
+PAYRAM_BLOCKCHAIN_CODE=BASE  # or ETH, POLYGON
+PAYRAM_MNEMONIC="your twelve word mnemonic..."  # optional
+```
+
+**Key Features**:
+- ✅ Non-interactive setup (no prompts)
+- ✅ Environment variable configuration
+- ✅ Automatic wallet generation
+- ✅ Smart contract deployment (testnet default)
+- ✅ Payment link creation
+- ✅ Installs where OpenClaw runs (local machine or VPS)
+- ✅ Complete troubleshooting guide included
+
+**Full Documentation**: See `references/headless-setup.md` for complete agent automation guide.
+
+---
+
+## 📊 Quick Comparison
+
+| Feature | Hosted (mcp.payram.com) | Headless Local Install |
+|---------|-------------------------|------------------------|
+| **Setup time** | 0 minutes ⚡ | 10 minutes |
+| **Environment** | Testnet only | Testnet (default) + Mainnet |
+| **Real funds** | ❌ No | ✅ Yes (after config) |
+| **Installation** | None needed | Where OpenClaw runs |
+| **Use case** | Testing, demos | Production payments |
+| **Automation** | N/A | Fully automatable (env vars) |
+| **Networks** | Base/ETH Sepolia | Base, Ethereum, Polygon, Tron |
+
+---
+
+## Supported Features
+
+**Currencies**: USDC, USDT, BTC, ETH  
+**Networks**: Base, Ethereum, Polygon, Tron, TON  
+**MCP Tools**: `create_payee`, `send_payment`, `get_balance`, `generate_invoice`, `verify_payment`, `list_transactions`
 
 ## When to Use This Skill
 
