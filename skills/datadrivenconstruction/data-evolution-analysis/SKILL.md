@@ -1,9 +1,9 @@
 ---
-slug: "data-evolution-analysis"
-display_name: "Data Evolution Analysis"
+name: "data-evolution-analysis"
 description: "Analyze data evolution patterns in construction organizations. Assess digital maturity and data strategy for construction companies"
+homepage: "https://datadrivenconstruction.io"
+metadata: {"openclaw": {"emoji": "📚", "os": ["win32"], "homepage": "https://datadrivenconstruction.io", "requires": {"bins": ["python3"]}}}
 ---
-
 # Data Evolution Analysis
 
 ## Overview
