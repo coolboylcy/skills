@@ -1,70 +1,71 @@
 ---
 name: Marketplace
+slug: marketplace
+version: 1.0.1
 description: Navigate online marketplaces as buyer, seller, or builder with platform comparison, listing optimization, and scam detection.
+metadata: {"clawdbot":{"emoji":"🛒","requires":{"bins":[]},"os":["linux","darwin","win32"]}}
 ---
 
-## First: Identify the User's Role
+## Architecture
 
-Before guidance, ask:
-1. **Buying** — Shopping on Amazon, eBay, FB Marketplace, Craigslist?
-2. **Selling** — Listing products on one or more marketplaces?
-3. **Multi-channel** — Managing inventory/presence across multiple platforms?
-4. **Building** — Creating your own marketplace platform?
+Role-based guidance for marketplace participation. Load relevant file based on user's role.
 
-## Buyers
+```
+marketplace/
+├── buyer.md      # Price comparison, scam detection, negotiation
+├── seller.md     # Listing creation, pricing, platform rules
+├── builder.md    # Marketplace creation, economics, liquidity
+├── arbitrage.md  # Price gaps, ROI calculations, ToS risks
+└── compliance.md # Tax obligations, legal pitfalls, bans
+```
 
-Key concerns: scam detection, price validation, cross-platform comparison.
+## Quick Reference
 
-- **Price history check** — Is this "sale" real or manufactured? Look for CamelCamelCamel (Amazon), Keepa, or platform-specific tools.
-- **Seller red flags** — New accounts, stock photos, off-platform payment requests, prices 40%+ below market.
-- **Fake review detection** — Uniform 5-star ratings, generic language, review spikes after product launch.
-- **Local meetup safety** — Public places, daylight, payment in-person, verify item works before paying.
+| Role | File | When to Load |
+|------|------|--------------|
+| Buying items | `buyer.md` | Comparing prices, spotting scams, negotiating |
+| Selling items | `seller.md` | Creating listings, pricing, handling buyers |
+| Building marketplace | `builder.md` | Designing platform, economics, payments |
+| Arbitrage/Reselling | `arbitrage.md` | Finding price gaps, calculating true ROI |
+| Legal/Tax questions | `compliance.md` | Tax nexus, ToS violations, suspensions |
 
-See `buyer-safety.md` for scam patterns by platform.
+## Core Rules
 
-## Sellers
+### 1. Platform-Specific, Never Generic
+- Each platform has unique fees, rules, and dynamics
+- eBay auction ≠ Amazon Buy Box ≠ FB Marketplace negotiation
+- ALWAYS specify which platform advice applies to
 
-Key concerns: platform selection, fee optimization, listing performance.
+### 2. Total Cost, Not Sticker Price
+- Include: platform fees, shipping, taxes, return costs
+- Amazon referral fee varies 8-45% by category
+- eBay 13%+ Poshmark 20%+ Mercari varies
 
-| Platform | Best For | Take Rate |
-|----------|----------|-----------|
-| Amazon | Volume, Prime audience | 8-15% + FBA fees |
-| eBay | Used/vintage, auctions | 13.25% final value |
-| Etsy | Handmade, vintage, craft | 6.5% + 3% payment |
-| FB Marketplace | Local, bulky items | 0% local, 5% shipped |
+### 3. Scam Pattern Recognition
+- Stock photos on local marketplaces = red flag
+- "Ship to my address, I'll pay extra" = triangulation fraud
+- Payment outside platform = no protection
+- New account + high-value item + urgency = likely scam
 
-- **Listing optimization** — Platform-specific: Amazon = keywords in title, Etsy = tags matter, eBay = item specifics.
-- **Shipping strategy** — Free shipping converts better but build into price. Calculate landed cost per platform.
-- **First sales playbook** — Price competitively initially, prioritize reviews over margin.
+### 4. Pricing Research = SOLD, Not Listed
+- Listed prices mean nothing—items don't sell at listed price
+- Always research completed/sold listings
+- Factor in condition: "Good" vs "Very Good" = 30% price difference
 
-See `seller-platforms.md` for detailed fee breakdowns and algorithm tips.
+### 5. Suspension Risks Are Real
+- Amazon ODR >1% = account death
+- Review manipulation = permanent ban
+- IP complaints from brands = immediate suspension
+- Multiple accounts = instant termination
 
-## Multi-Channel Sellers
+### 6. Fee Complexity
+Never estimate fees—calculate exactly:
+- Amazon: referral + FBA + storage + return processing + advertising
+- eBay: final value (category-specific) + promoted listings + payment
+- Factor returns into margin (15-30% in some categories)
 
-Key concerns: inventory sync, price parity, consolidated operations.
-
-- **Inventory management** — Tools: Sellbrite, Linnworks, ChannelAdvisor. Never oversell.
-- **Price consistency** — Monitor your own listings. Amazon MAP violations can suspend accounts.
-- **Cross-listing adaptation** — Don't copy-paste. Each platform has different SEO and audience expectations.
-- **Review aggregation** — Track sentiment across all channels to spot product issues early.
-
-## Building a Marketplace
-
-Key concerns: business model, cold start, trust systems.
-
-- **Revenue model** — Commission (10-20%), subscription, listing fees, or hybrid. Marketplace take rate benchmarks by vertical.
-- **Chicken-and-egg** — Start with supply (sellers) via direct outreach. Constrain geography or category initially.
-- **Payments** — Stripe Connect for splits, escrow, payouts. Understand KYC requirements.
-- **Trust mechanisms** — Reviews, verification badges, dispute resolution process.
-
-See `builder-playbook.md` for cold-start tactics and unit economics modeling.
-
-## Tax and Legal (All Roles)
-
-- **Sellers:** 1099-K reporting at $600+ (US), VAT thresholds vary by EU country.
-- **Cross-border:** Customs duties, prohibited items, export restrictions apply.
-- **Platform ToS:** Each marketplace has restrictions. Violation = account suspension.
-
-Consult a tax professional for jurisdiction-specific obligations.
-
-References: `buyer-safety.md`, `seller-platforms.md`, `builder-playbook.md`
+### 7. Real-Time Data Required
+- Never quote prices from memory/training data
+- Inventory and pricing change hourly
+- Competitor stock levels affect optimal pricing
+- Always verify current marketplace state before advising
