@@ -3,11 +3,16 @@
   "slug": "chat",
   "displayName": "Chat",
   "latest": {
-    "version": "1.0.3",
-    "publishedAt": 1770812803625,
-    "commit": "https://github.com/openclaw/skills/commit/f8428eff8d5d89bfe4a0657a201dc679cd31a797"
+    "version": "1.1.0",
+    "publishedAt": 1771251220050,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.3",
+      "publishedAt": 1770812803625,
+      "commit": "https://github.com/openclaw/skills/commit/f8428eff8d5d89bfe4a0657a201dc679cd31a797"
+    },
     {
       "version": "1.0.2",
       "publishedAt": 1770812769802,

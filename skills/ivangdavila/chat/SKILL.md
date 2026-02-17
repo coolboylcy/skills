@@ -1,30 +1,72 @@
 ---
-name: "Chat"
-description: "Auto-learns user preferences and edits itself. Starts minimal, grows personalized."
+name: Chat
+slug: chat
+version: 1.1.0
+description: Learns communication preferences from explicit feedback. Adapts tone, format, and style.
+changelog: Preferences now persist in external memory instead of self-modifying SKILL.md
+metadata: {"clawdbot":{"emoji":"💬","requires":{"bins":[]},"os":["linux","darwin","win32"]}}
 ---
 
-## Auto-Adaptive Communication
+## Data Storage
 
-This skill auto-evolves. Edit it as you learn user preferences.
+```
+~/chat/
+├── memory.md       # Confirmed preferences (≤50 lines)
+├── experiments.md  # Testing patterns (not yet confirmed)
+└── rejected.md     # User said no, don't re-propose
+```
 
-### How It Works
-1. Detect consistent patterns in user communication (3+ occurrences)
-2. Before confirming: check `dimensions.md` for criteria
-3. When confident: add to **Confirmed Preferences** below (1 line each)
-4. If user rejects something: remove it, consult `criteria.md` to recalibrate
+Create on first use: `mkdir -p ~/chat`
 
-### Confirmed Preferences
-<!-- Add one line per confirmed preference. Keep ultra-compact. Examples:
+## Scope
+
+This skill:
+- ✅ Learns preferences from explicit user corrections
+- ✅ Stores patterns in ~/chat/memory.md
+- ✅ Adapts communication style based on stored preferences
+- ❌ NEVER modifies SKILL.md
+- ❌ NEVER infers from silence or observation
+- ❌ NEVER stores sensitive personal information
+
+## Quick Reference
+
+| Topic | File |
+|-------|------|
+| Preference dimensions | `dimensions.md` |
+| Confirmation criteria | `criteria.md` |
+
+## Core Rules
+
+### 1. Learn from Explicit Feedback Only
+- User must explicitly correct or state preference
+- "I prefer X" or "Don't do Y" = valid signal
+- Silence, lack of complaint = NOT a signal
+- NEVER infer from observation alone
+
+### 2. Three-Strike Confirmation
+| Stage | Location | Action |
+|-------|----------|--------|
+| Testing | experiments.md | Observed 1-2x |
+| Confirming | (ask user) | After 3x, ask to confirm |
+| Confirmed | memory.md | User approved |
+| Rejected | rejected.md | User declined |
+
+### 3. Compact Storage Format
+One line per preference in memory.md:
+```
 - Concise responses, no fluff
 - Uses 🚀 for launches, ✅ for done
-- Prefers bullet lists over paragraphs
-- Technical jargon OK, no dumbing down
+- Prefers bullets over paragraphs
+- Technical jargon OK
 - Hates "Great question!" openers
--->
+```
 
-(none yet — observe and add as you learn)
+### 4. Conflict Resolution
+- Most recent explicit statement wins
+- If ambiguous, ask user
+- Never override confirmed preference without explicit instruction
 
-### Active Experiments
-<!-- Things you're testing but not yet confirmed. Remove after 3+ consistent signals. -->
-
-(none yet)
+### 5. Transparency
+- Cite source when applying preference: "Using bullets (from ~/chat/memory.md)"
+- On request, show full memory.md contents
+- "Forget X" removes from all files

@@ -1,6 +1,6 @@
 # Criteria for Confirming Preferences
 
-Reference only — consult when deciding whether to update SKILL.md.
+Reference only — consult when deciding whether to update ~/chat/memory.md.
 
 ## When to Confirm
 - Pattern observed 3+ times consistently
