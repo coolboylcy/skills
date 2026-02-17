@@ -1,0 +1,11 @@
+{
+  "owner": "rvmey",
+  "slug": "triggercmd",
+  "displayName": "TRIGGERcmd - Run commands on your computers remotely",
+  "latest": {
+    "version": "1.0.3",
+    "publishedAt": 1771279114452,
+    "commit": null
+  },
+  "history": []
+}
