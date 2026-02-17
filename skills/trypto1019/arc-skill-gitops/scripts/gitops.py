@@ -18,6 +18,20 @@ DATA_DIR = os.path.expanduser("~/.openclaw/gitops")
 MANIFEST_PATH = os.path.join(DATA_DIR, "manifest.json")
 
 
+import re
+
+
+def _sanitize_tag(tag):
+    """Validate tag name contains only safe characters."""
+    if not re.match(r'^[a-zA-Z0-9._-]+$', tag):
+        print(f"Error: Invalid tag name: {tag!r} — only alphanumeric, dot, dash, underscore allowed", file=sys.stderr)
+        sys.exit(1)
+    if '..' in tag:
+        print(f"Error: Tag name cannot contain '..': {tag!r}", file=sys.stderr)
+        sys.exit(1)
+    return tag
+
+
 def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -104,7 +118,7 @@ def cmd_snapshot(args):
     """Take a snapshot of the current skill state."""
     path = resolve_skill_path(args.skill)
     name = skill_name(path)
-    tag = args.tag or f"snap-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    tag = _sanitize_tag(args.tag) if args.tag else f"snap-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
 
     # Ensure git repo exists
     if not os.path.isdir(os.path.join(path, ".git")):
@@ -138,7 +152,7 @@ def cmd_deploy(args):
     """Deploy a skill update with automatic pre-snapshot."""
     path = resolve_skill_path(args.skill)
     name = skill_name(path)
-    tag = args.tag or f"deploy-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    tag = _sanitize_tag(args.tag) if args.tag else f"deploy-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
 
     # Pre-deploy snapshot
     pre_tag = f"pre-{tag}"
@@ -198,7 +212,7 @@ def cmd_rollback(args):
     """Roll back to a previous snapshot."""
     path = resolve_skill_path(args.skill)
     name = skill_name(path)
-    tag = args.tag
+    tag = _sanitize_tag(args.tag) if args.tag else None
 
     if not tag:
         print("Error: --tag is required for rollback", file=sys.stderr)
