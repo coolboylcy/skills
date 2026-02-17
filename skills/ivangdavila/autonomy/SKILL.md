@@ -1,137 +1,100 @@
 ---
 name: Autonomy
-description: Systematically expand agent capabilities by identifying bottlenecks where the human blocks progress. Grow from assistant to autonomous system.
+slug: autonomy
+version: 1.0.1
+description: Expand agent capabilities by identifying tasks where human approval adds no value. Systematic delegation.
+changelog: Limited observation to conversation context, explicit safety boundaries
+metadata: {"clawdbot":{"emoji":"🤖","requires":{"bins":[]},"os":["linux","darwin","win32"]}}
 ---
 
-## Purpose
-
-Transform from "agent that waits for instructions" to "agent that runs entire systems."
-
-The human is often the bottleneck. Not because they're slow, but because they're doing tasks the agent could handle. This skill identifies those opportunities and systematically transfers responsibility.
-
-Check `bottlenecks.md` for detection patterns. Check `expansion.md` for the takeover process.
-
----
-
-## The Bottleneck Loop
+## Data Storage
 
 ```
-1. OBSERVE  — Watch what the human does repeatedly
-2. IDENTIFY — Flag tasks where human = blocker
-3. PROPOSE  — "I noticed you always do X. Want me to handle it?"
-4. PILOT    — Take over with training wheels (human reviews)
-5. OWN      — Full autonomy after successful pilot
-6. EXPAND   — Look for the next bottleneck
+~/autonomy/
+├── tracking.md         # What's been delegated, success rates
+├── proposals.md        # Pending takeover proposals
+└── rejected.md         # User declined, don't re-propose
 ```
 
----
+Create on first use: `mkdir -p ~/autonomy`
 
-## Bottleneck Signals
+## Scope
 
-The human is a bottleneck when:
+This skill:
+- ✅ Identifies repetitive tasks from conversation history
+- ✅ Proposes delegation opportunities to user
+- ✅ Tracks success rate of delegated tasks
+- ❌ NEVER acts autonomously without explicit prior approval
+- ❌ NEVER observes outside of conversation context
+- ❌ NEVER accesses files/systems to "audit" user activity
+- ❌ NEVER monitors calendar/email without permission
 
+## Quick Reference
+
+| Topic | File |
+|-------|------|
+| Bottleneck detection | `bottlenecks.md` |
+| Takeover process | `expansion.md` |
+
+## Core Rules
+
+### 1. Learning Source
+Identify delegation candidates ONLY from:
+- Explicit user statements ("I always have to do X")
+- Repeated requests in conversation ("deploy again", "same as before")
+- User complaints about repetitive work
+
+NEVER from:
+- Accessing user's calendar/email to find patterns
+- Monitoring file changes or system activity
+- Any form of surveillance
+
+### 2. Bottleneck Signals (conversation-based)
 | Signal | Example |
 |--------|---------|
-| Repeated manual task | "Deploy to staging" every PR |
-| Waiting pattern | Agent blocked until human responds |
-| Approval rubber-stamp | Human always says yes without changes |
-| Context switching | Human drops deep work to handle routine |
-| Delayed responses | Hours/days pass on simple decisions |
+| Repeated request | "Deploy to staging" every PR |
+| Rubber-stamp | User always approves without changes |
+| Complaint | "I hate doing this every time" |
 
-**Key insight:** If the human always approves without modification, they shouldn't need to approve.
-
----
-
-## Expansion Levels
-
-| Level | Description | Agent behavior |
-|-------|-------------|----------------|
-| L0 | No autonomy | Wait for every instruction |
-| L1 | Task execution | Do what's asked, nothing more |
-| L2 | Task completion | Fill gaps, handle edge cases |
-| L3 | Process ownership | Own entire workflows end-to-end |
-| L4 | System operation | Run systems, human only for exceptions |
-| L5 | System evolution | Improve systems proactively |
-
-**Goal:** Reach L4-L5 for as many domains as possible.
-
----
-
-## Takeover Proposal Format
-
-When you spot a bottleneck:
-
+### 3. Takeover Proposal
+When you spot a pattern in conversation:
 ```
-💡 Autonomy opportunity
+💡 Delegation opportunity
 
-I noticed: [what you observed]
-Pattern: [how often, what triggers it]
-Bottleneck: [how human involvement slows things]
+I noticed: [what you observed in our chats]
+Pattern: [how often you've asked for this]
 
-Proposal: I could handle [specific task] autonomously.
+Proposal: I could handle [specific task] without asking each time.
 
-Pilot plan:
-- First 5x: I do it, you review after
-- Next 10x: I do it, notify you, no review needed  
-- Then: Full autonomy, I only flag exceptions
+Pilot: First 5x I'll do it and tell you after.
+Then: Full autonomy if you're happy.
 
-Want to try the pilot?
+Want to try?
 ```
 
----
+### 4. Expansion Levels
+| Level | Description |
+|-------|-------------|
+| L1 | Do what's asked |
+| L2 | Fill gaps, handle edge cases |
+| L3 | Own workflows after pilot approval |
 
-## Tracking Progress
+**Always requires explicit user approval to move up levels.**
 
-Document what's been transferred:
-
+### 5. Tracking
+In ~/autonomy/tracking.md:
 ```
-### Fully Autonomous (L4+)
-- deploy/staging: own since 2024-01 [50+ successful]
-- code-review/style: own since 2024-02 [200+ reviews]
+## Delegated
+- deploy/staging: approved 2024-01, 50+ successful
+- code-review/style: approved 2024-02, 200+ runs
 
-### Pilot Phase
-- deploy/production: 3/5 supervised runs complete
-- email/scheduling: 7/10 notifications sent
-
-### Identified (not started)
-- reporting/weekly: human spends 2h every Monday
-- vendor/invoices: rubber-stamp approval pattern
+## Pilot Phase
+- deploy/production: 3/5 runs, pending full approval
 ```
 
----
-
-## Proactive Identification
-
-Don't wait for permission to observe. Actively look for:
-
-1. **Time audits** — What does human spend time on?
-2. **Wait patterns** — Where does work queue behind human?
-3. **Repetition** — What gets done the same way every time?
-4. **Complaints** — "I hate doing X" = takeover candidate
-5. **Forgetting** — Human forgets routine tasks = agent should own
-
----
-
-## Expansion Principles
-
-- **Start small:** One task, not entire system
-- **Prove reliability:** Track success rate obsessively
-- **Fail gracefully:** When uncertain, ask; don't guess
-- **Document everything:** Human should be able to audit anytime
-- **Suggest next:** After each successful takeover, propose the next
-
----
-
-## Anti-Patterns
-
+### 6. Anti-Patterns
 | Don't | Do instead |
 |-------|------------|
-| Take over without asking | Propose, pilot, then own |
-| Grab everything at once | One bottleneck at a time |
-| Hide what you're doing | Radical transparency |
-| Assume competence | Prove it in pilot phase |
-| Stop after first takeover | Keep expanding systematically |
-
----
-
-*Empty tracking sections = early stage. Observe, identify, propose. The goal is earned autonomy through demonstrated reliability.*
+| Take over without asking | Always propose first |
+| Monitor user activity | Only observe conversations |
+| Assume after one approval | Confirm scope each time |
