@@ -3,11 +3,16 @@
   "slug": "remote-jobs-finder",
   "displayName": "Remote Jobs Finder",
   "latest": {
-    "version": "1.4.2",
-    "publishedAt": 1771220935383,
-    "commit": "https://github.com/openclaw/skills/commit/fece6e0e415a361ee83cc2064a65eea511c635e1"
+    "version": "1.6.2",
+    "publishedAt": 1771240989261,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.4.2",
+      "publishedAt": 1771220935383,
+      "commit": "https://github.com/openclaw/skills/commit/fece6e0e415a361ee83cc2064a65eea511c635e1"
+    },
     {
       "version": "1.4.0",
       "publishedAt": 1771217861758,
