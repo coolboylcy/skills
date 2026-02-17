@@ -1,35 +1,55 @@
 ---
 name: Screenshots
+slug: screenshots
+version: 1.0.1
 description: Create professional App Store and Google Play screenshots with automatic sizing, device frames, marketing copy, and iterative visual learning.
+changelog: Preferences now persist across skill updates
+metadata: {"clawdbot":{"emoji":"📱","requires":{"bins":[]},"os":["linux","darwin","win32"]}}
 ---
 
-## Situation Detection
+## Quick Reference
 
-| Context | Load |
+| Context | File |
 |---------|------|
-| Need exact dimensions for stores | `specs.md` |
-| Creating marketing text overlays | `text-style.md` |
-| Choosing visual templates by category | `templates.md` |
+| Store dimensions and specs | `specs.md` |
+| Marketing text overlays | `text-style.md` |
+| Visual templates by category | `templates.md` |
 | Full creation workflow | `workflow.md` |
+| Learning from feedback | `feedback.md` |
 
----
+## Memory Storage
 
-## Workspace
+User preferences stored at `~/screenshots/memory.md`. Read on activation.
 
-Store all screenshot projects in `~/screenshots/`:
+**Format:**
+```markdown
+# Screenshots Memory
+
+## Style Preferences
+- style: dominant-color | gradient | minimal | dark | light
+- fonts: preferred headline fonts
+- frames: with-frame | frameless | floating
+- tone: punchy | descriptive | minimal
+
+## Learned Patterns
+- templates that converted well
+- font/size combinations that worked
+```
+
+Create folder on first use: `mkdir -p ~/screenshots`
+
+## Workspace Structure
+
 ```
 ~/screenshots/
+├── memory.md              # Style preferences (persistent)
 ├── {app-slug}/
 │   ├── config.md          # Brand: colors, fonts, style
 │   ├── raw/               # Raw simulator/device captures
-│   ├── v1/                # Version 1 exports
-│   ├── v2/                # Version 2 (after changes)
+│   ├── v1/, v2/           # Version exports
 │   └── latest -> v2/      # Symlink to current
-├── templates/             # Reusable visual templates
-└── learnings.md           # Visual patterns that work
+└── templates/             # Reusable visual templates
 ```
-
----
 
 ## Core Workflow
 
@@ -40,9 +60,7 @@ Store all screenshot projects in `~/screenshots/`:
 5. **Iterate** — Adjust based on user feedback
 6. **Export** — Organize by store/device/language
 
----
-
-## Quality Checklist (Before Sending)
+## Quality Checklist
 
 Use vision model to verify EVERY screenshot set:
 - [ ] Text readable at thumbnail size?
@@ -53,39 +71,9 @@ Use vision model to verify EVERY screenshot set:
 
 **If ANY check fails** → fix before presenting to user.
 
----
-
-## User Preferences (Auto-Learn)
-
-### Style
-<!-- dominant-color | gradient | minimal | dark | light -->
-
-### Fonts
-<!-- preferred headline fonts -->
-
-### Device Frames
-<!-- with-frame | frameless | floating -->
-
-### Copy Tone
-<!-- punchy | descriptive | minimal -->
-
----
-
 ## Versioning Rules
 
 - **Never overwrite** — each batch goes in `v{n}/`
 - **Symlink `latest`** to current approved version
 - **config.md** stores brand decisions for regeneration
 - **Compare versions** when user says "go back to the old style"
-
----
-
-## Learning Loop
-
-After each project, update the learnings file (`~/screenshots/learnings.md`):
-- Templates that converted well
-- Font/size combinations that worked
-- Background styles by app category
-- Text patterns that got positive feedback
-
-Check the learnings file before starting new projects. See `feedback.md` for detailed learning system.
