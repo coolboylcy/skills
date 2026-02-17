@@ -1,66 +1,39 @@
 ---
 name: sparkbtcbot
-description: Set up Spark Bitcoin L2 wallet capabilities for AI agents. Initialize wallets from mnemonic, transfer sats and tokens, create/pay Lightning invoices, manage deposits and withdrawals. Use when user mentions "Spark wallet," "Spark Bitcoin," "BTKN tokens," "Spark L2," "Spark SDK," "Spark payment," "Spark transfer," "Spark invoice," or wants Bitcoin L2 capabilities for an agent.
-argument-hint: "[Optional: specify what to set up - wallet, payments, tokens, lightning, or full]"
+description: Set up Spark Bitcoin L2 wallet capabilities for AI agents. Initialize wallets from mnemonic, transfer sats and tokens, create/pay Lightning invoices, pay L402 paywalls, manage deposits and withdrawals. Use when user mentions "Spark wallet," "Spark Bitcoin," "BTKN tokens," "Spark L2," "Spark SDK," "Spark payment," "Spark transfer," "Spark invoice," "L402," "Lightning paywall," or wants Bitcoin L2 capabilities for an agent.
+argument-hint: "[Optional: specify what to set up - wallet, payments, tokens, lightning, l402, or full]"
+requires:
+  env:
+    - name: SPARK_MNEMONIC
+      description: 12 or 24 word BIP39 mnemonic for the Spark wallet. This is a secret key that controls all funds — never commit to git or expose in logs.
+      sensitive: true
+    - name: SPARK_NETWORK
+      description: Network to connect to (MAINNET or REGTEST)
+      default: MAINNET
+model-invocation: autonomous
+model-invocation-reason: This skill enables agents to autonomously send and receive Bitcoin payments. Autonomous invocation is intentional — agents need to pay invoices and respond to incoming transfers without human approval for each transaction. Use spending limits and the proxy for production environments where you need guardrails.
 ---
 
-# Spark Bitcoin & Lightning Wallet for AI Agents
+# Spark Bitcoin L2 for AI Agents
 
-Give your AI agent a Bitcoin wallet with a single mnemonic. Send and receive payments instantly — zero fees between agents, full Lightning Network compatibility.
-
-## Why This Skill
-
-| What | How |
-|------|-----|
-| **Install** | `clawhub install sparkbtcbot` or clone from [GitHub](https://github.com/echennells/sparkbtcbot-skill) |
-| **Setup** | One 12-word mnemonic + `npm install @buildonspark/spark-sdk` |
-| **Agent-to-agent transfers** | Free. Instant. No channels, no routing fees. |
-| **Lightning payments** | Create and pay BOLT11 invoices (0.15–0.25% fee) |
-| **Token support** | Send/receive BTKN and LRC20 tokens natively |
-| **Self-custodial** | Agent holds its own keys — no accounts, no KYC, no intermediaries |
-
-### Quick Example
-
-```javascript
-import { SparkWallet } from "@buildonspark/spark-sdk";
-
-// Initialize from mnemonic
-const { wallet } = await SparkWallet.initialize({
-  mnemonicOrSeed: process.env.SPARK_MNEMONIC,
-  options: { network: "MAINNET" }
-});
-
-// Check balance
-const { balance } = await wallet.getBalance();
-console.log("Balance:", balance.toString(), "sats");
-
-// Send sats to another agent (free, instant)
-await wallet.transfer({ receiverSparkAddress: "sp1p...", amountSats: 1000 });
-
-// Create a Lightning invoice anyone can pay
-const inv = await wallet.createLightningInvoice({ amountSats: 500, memo: "Payment for service" });
-console.log("Invoice:", inv.invoice.encodedInvoice);
-```
-
-### Included Examples
-
-| Script | What it does |
-|--------|-------------|
-| `wallet-setup.js` | Generate a new wallet or import from mnemonic |
-| `balance-and-deposits.js` | Check BTC + token balances, get deposit addresses |
-| `payment-flow.js` | Lightning invoices, Spark invoices, fee estimation |
-| `token-operations.js` | BTKN token transfers and batch operations |
-| `spark-agent.js` | Complete SparkAgent class with all capabilities |
-
----
-
-## Detailed Skill Instructions
-
-What follows is the full reference for AI agents. It covers the Spark SDK, trust model, fee structure, all wallet operations, Lightning interop, token operations, security practices, and error handling.
-
----
+You are an expert in setting up Spark Bitcoin L2 wallet capabilities for AI agents using the `@buildonspark/spark-sdk`.
 
 Spark is a Bitcoin Layer 2 that enables instant, zero-fee self-custodial transfers of BTC and tokens, with native Lightning Network interoperability. Spark-to-Spark transfers cost nothing — compared to Lightning routing fees or on-chain transaction fees of 200+ sats. Even cross-network payments (Lightning interop) are cheaper than most alternatives at 0.15-0.25%. A single BIP39 mnemonic gives an agent identity, wallet access, and payment capabilities.
+
+## For Production Use
+
+**This skill gives the agent full custody of the wallet.** The agent holds the mnemonic and can send all funds without restriction. This is appropriate for:
+- Development and testing (use REGTEST with no real funds)
+- Trusted agents you fully control
+- Small operational balances you're willing to lose
+
+**For production with real funds, use [sparkbtcbot-proxy](https://github.com/echennells/sparkbtcbot-proxy) instead.** The proxy keeps the mnemonic on your server and gives agents scoped access via bearer tokens:
+- **Spending limits** — per-transaction and daily caps
+- **Role-based access** — read-only, invoice-only, or full access
+- **Revocable tokens** — cut off a compromised agent without moving funds
+- **Audit logs** — track all wallet activity
+
+The proxy wraps the same Spark SDK behind authenticated REST endpoints. Agents get HTTP access instead of direct SDK access.
 
 ## Why Bitcoin for Agents
 
@@ -74,11 +47,11 @@ AI agents that transact need a monetary network that matches their nature: progr
 
 ## What is Spark
 
-Spark is a recently launched Bitcoin Layer 2 built on threshold cryptography (FROST signatures). Instead of Lightning's payment channels, Spark uses distributed Signing Operators (SOs) that collectively manage transaction signing without any single entity controlling funds. It is fully interoperable with the Lightning Network.
+Spark is a recently launched Bitcoin Layer 2 that lets you send and receive Bitcoin instantly with low fees. Spark-to-Spark transfers are free, and Lightning interop costs 0.15–0.25%. Instead of Lightning's payment channels, Spark uses a network of distributed Signing Operators (SOs) that collectively manage transaction signing without any single entity controlling funds. It is fully self-custodial — you hold your own keys — and fully interoperable with the Lightning Network. However, Spark requires trusting that at least 1-of-n operators behaves honestly during transfers, and it lacks the provable finality of Bitcoin or Lightning. The network currently has only a small number of Signing Operators, so there is some risk of downtime or service disruption. See the Trust Model section below for full details.
 
 ### How It Works
 1. Users hold their own keys (BIP39 mnemonic) — fully self-custodial
-2. Transactions are cooperatively signed by a threshold of Signing Operators using FROST
+2. Transactions are cooperatively signed by a threshold of Signing Operators
 3. Funds live in Bitcoin UTXOs organized in hierarchical trees
 4. Users can always exit to L1 unilaterally if operators go offline
 
@@ -116,7 +89,7 @@ Spark has **different trust assumptions than native Lightning**. Be upfront abou
 | Capacity | No channel limits | Channel-limited | Unlimited |
 | Channels | Not required | Required | N/A |
 | Offline receive | Supported | Requires infra | Yes |
-| Setup | Mnemonic only | Node or NWC + provider | Keys only |
+| Setup | Mnemonic only | Node or hosted provider | Keys only |
 
 ### Fee Structure
 
@@ -172,7 +145,7 @@ A single mnemonic provides identity, wallet, and payment capabilities. No separa
 npm install @buildonspark/spark-sdk@^0.5.8 dotenv
 ```
 
-Requires **v0.5.8 or newer**. One core dependency. The SDK bundles BIP39 mnemonic generation, FROST signing, and gRPC communication internally.
+Requires **v0.5.8 or newer**. One core dependency. The SDK bundles BIP39 mnemonic generation, cooperative signing, and gRPC communication internally.
 
 ## Setup Instructions
 
@@ -185,7 +158,7 @@ import { SparkWallet } from "@buildonspark/spark-sdk";
 const { wallet, mnemonic } = await SparkWallet.initialize({
   options: { network: "MAINNET" }
 });
-console.log("Mnemonic (save securely):", mnemonic);
+// Save mnemonic securely — NEVER log it in production
 
 // Option B: Import existing wallet from mnemonic
 const { wallet } = await SparkWallet.initialize({
@@ -203,6 +176,12 @@ Add to your project's `.env`:
 SPARK_MNEMONIC=word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12
 SPARK_NETWORK=MAINNET
 ```
+
+**Security warnings:**
+- **Never log the mnemonic** — not even during development. If you must display it once for backup, delete that code immediately after.
+- **Never commit `.env`** — add it to `.gitignore` before your first commit.
+- **Use a secrets manager in production** — environment variables in `.env` files are plaintext. For production deployments, use your platform's secrets management (Vercel encrypted env vars, AWS Secrets Manager, etc.).
+- **Test with REGTEST first** — use a throwaway mnemonic on REGTEST before touching real funds.
 
 ### Step 3: Verify Wallet
 
@@ -564,6 +543,79 @@ export class SparkAgent {
     );
   }
 
+  // L402 Methods
+  async fetchL402(url, options = {}) {
+    const { decode } = await import("light-bolt11-decoder");
+    const { method = "GET", headers = {}, body, maxFeeSats = 10 } = options;
+
+    // Make initial request
+    const initialResponse = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json", ...headers },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (initialResponse.status !== 402) {
+      const ct = initialResponse.headers.get("content-type") || "";
+      const data = ct.includes("json") ? await initialResponse.json() : await initialResponse.text();
+      return { paid: false, data };
+    }
+
+    // Parse L402 challenge
+    const challenge = await initialResponse.json();
+    const invoice = challenge.invoice || challenge.payment_request || challenge.pr;
+    const macaroon = challenge.macaroon || challenge.token;
+    if (!invoice || !macaroon) throw new Error("Invalid L402 challenge");
+
+    // Decode and pay
+    const decoded = decode(invoice);
+    const amountSection = decoded.sections.find((s) => s.name === "amount");
+    const amountSats = Math.ceil(Number(amountSection.value) / 1000);
+
+    const payResult = await this.#wallet.payLightningInvoice({ invoice, maxFeeSats });
+    let preimage = payResult.paymentPreimage;
+
+    // Poll if needed
+    if (!preimage && payResult.id) {
+      for (let i = 0; i < 15; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const status = await this.#wallet.getLightningSendRequest(payResult.id);
+        if (status?.paymentPreimage) { preimage = status.paymentPreimage; break; }
+        if (status?.status === "LIGHTNING_PAYMENT_FAILED") throw new Error("Payment failed");
+      }
+    }
+    if (!preimage) throw new Error("No preimage received");
+
+    // Retry with auth
+    const finalResponse = await fetch(url, {
+      method,
+      headers: { "Authorization": `L402 ${macaroon}:${preimage}`, ...headers },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const ct = finalResponse.headers.get("content-type") || "";
+    const data = ct.includes("json") ? await finalResponse.json() : await finalResponse.text();
+    return { paid: true, amountSats, preimage, data };
+  }
+
+  async previewL402(url) {
+    const response = await fetch(url);
+    if (response.status !== 402) return { requiresPayment: false };
+
+    const { decode } = await import("light-bolt11-decoder");
+    const challenge = await response.json();
+    const invoice = challenge.invoice || challenge.payment_request;
+    const decoded = decode(invoice);
+    const amountSection = decoded.sections.find((s) => s.name === "amount");
+
+    return {
+      requiresPayment: true,
+      amountSats: Math.ceil(Number(amountSection.value) / 1000),
+      invoice,
+      macaroon: challenge.macaroon,
+    };
+  }
+
   onTransferReceived(callback) {
     this.#wallet.on("transfer:claimed", callback);
   }
@@ -630,7 +682,7 @@ Error types:
 
 ### The Agent Has Full Wallet Access
 
-Any agent or process with the mnemonic has **unrestricted control** over the wallet — it can check balance, create invoices, and send every sat to any address. There is no permission scoping, no spending limits, no read-only mode. Unlike NWC (Nostr Wallet Connect), you cannot grant partial access.
+Any agent or process with the mnemonic has **unrestricted control** over the wallet — it can check balance, create invoices, and send every sat to any address. There is no permission scoping, no spending limits, no read-only mode.
 
 This means:
 - If the mnemonic leaks, all funds are at risk immediately
@@ -662,9 +714,232 @@ This means:
 5. **Use REGTEST** for development and testing, MAINNET only for production
 6. **Implement application-level spending controls** — cap per-transaction and daily amounts in your agent logic since the SDK won't do it for you
 
+## L402 Protocol (Lightning Paywalls)
+
+L402 (formerly LSAT) is a protocol for monetizing APIs and content using Lightning payments. When a server returns HTTP 402 (Payment Required), it includes a Lightning invoice. Pay the invoice, get a preimage, then retry the request with an authorization header containing the proof of payment.
+
+### How L402 Works
+
+1. **Request** → Client fetches protected URL
+2. **402 Response** → Server returns `{invoice, macaroon}`
+3. **Pay Invoice** → Client pays Lightning invoice, receives preimage
+4. **Retry with Auth** → Client retries with `Authorization: L402 <macaroon>:<preimage>`
+5. **200 Response** → Server returns protected content
+
+### L402 Implementation
+
+```javascript
+import { decode } from "light-bolt11-decoder";
+
+async function fetchWithL402(wallet, url, options = {}) {
+  const { method = "GET", headers = {}, body, maxFeeSats = 10 } = options;
+
+  // Step 1: Make initial request
+  const initialResponse = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json", ...headers },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  // If not 402, return response directly
+  if (initialResponse.status !== 402) {
+    const contentType = initialResponse.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      return { paid: false, data: await initialResponse.json() };
+    }
+    return { paid: false, data: await initialResponse.text() };
+  }
+
+  // Step 2: Parse 402 challenge
+  const challenge = await initialResponse.json();
+  const invoice = challenge.invoice || challenge.payment_request || challenge.pr;
+  const macaroon = challenge.macaroon || challenge.token;
+
+  if (!invoice || !macaroon) {
+    throw new Error("Invalid L402 response: missing invoice or macaroon");
+  }
+
+  // Step 3: Decode invoice to get amount
+  const decoded = decode(invoice);
+  const amountSection = decoded.sections.find((s) => s.name === "amount");
+  if (!amountSection?.value) {
+    throw new Error("L402 invoice has no amount");
+  }
+  const amountSats = Math.ceil(Number(amountSection.value) / 1000);
+
+  // Step 4: Pay the invoice
+  const payResult = await wallet.payLightningInvoice({
+    invoice,
+    maxFeeSats,
+  });
+
+  // Get preimage (may need to poll if payment is async)
+  let preimage = payResult.paymentPreimage;
+  if (!preimage && payResult.status === "LIGHTNING_PAYMENT_INITIATED") {
+    // Poll for completion
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const status = await wallet.getLightningSendRequest(payResult.id);
+      if (status?.paymentPreimage) {
+        preimage = status.paymentPreimage;
+        break;
+      }
+      if (status?.status === "LIGHTNING_PAYMENT_FAILED") {
+        throw new Error("L402 payment failed");
+      }
+    }
+  }
+
+  if (!preimage) {
+    throw new Error("L402 payment succeeded but no preimage available");
+  }
+
+  // Step 5: Retry with L402 authorization
+  const finalResponse = await fetch(url, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `L402 ${macaroon}:${preimage}`,
+      ...headers,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const contentType = finalResponse.headers.get("content-type") || "";
+  let data;
+  if (contentType.includes("application/json")) {
+    data = await finalResponse.json();
+  } else {
+    data = await finalResponse.text();
+  }
+
+  return {
+    paid: true,
+    amountSats,
+    preimage,
+    data,
+  };
+}
+```
+
+### Preview L402 Cost (Without Paying)
+
+```javascript
+async function previewL402(url) {
+  const response = await fetch(url);
+
+  if (response.status !== 402) {
+    return { requiresPayment: false };
+  }
+
+  const challenge = await response.json();
+  const invoice = challenge.invoice || challenge.payment_request;
+
+  const decoded = decode(invoice);
+  const amountSection = decoded.sections.find((s) => s.name === "amount");
+  const amountSats = Math.ceil(Number(amountSection.value) / 1000);
+
+  return {
+    requiresPayment: true,
+    amountSats,
+    invoice,
+    macaroon: challenge.macaroon,
+  };
+}
+```
+
+### Add to SparkAgent Class
+
+```javascript
+// Add to the SparkAgent class
+async fetchL402(url, options = {}) {
+  return await fetchWithL402(this.#wallet, url, options);
+}
+
+async previewL402(url) {
+  return await previewL402(url);
+}
+```
+
+### Usage Example
+
+```javascript
+const { agent } = await SparkAgent.create(process.env.SPARK_MNEMONIC);
+
+// Check cost first
+const preview = await agent.previewL402("https://api.example.com/paid-endpoint");
+console.log("Cost:", preview.amountSats, "sats");
+
+// Pay and fetch
+const result = await agent.fetchL402("https://api.example.com/paid-endpoint", {
+  maxFeeSats: 10,
+});
+console.log("Paid:", result.paid, "Data:", result.data);
+
+agent.cleanup();
+```
+
+### Required Dependency
+
+```bash
+npm install light-bolt11-decoder
+```
+
+### L402 Providers
+
+| Provider | Description | URL |
+|----------|-------------|-----|
+| Lightning Faucet | Test L402 endpoint (21 sat jokes) | https://lightningfaucet.com/api/l402/joke |
+| Sulu | AI image generation | https://rnd.ln.sulu.sh (may require API key) |
+| Various APIs | Growing ecosystem | https://github.com/lnurl/awesome-lnurl#l402 |
+
+### Token Caching
+
+L402 tokens (macaroon + preimage) can often be reused for multiple requests to the same domain. Cache tokens by domain and try the cached token first:
+
+```javascript
+const tokenCache = new Map();
+
+async function fetchWithL402Cached(wallet, url, options = {}) {
+  const domain = new URL(url).host;
+  const cached = tokenCache.get(domain);
+
+  if (cached) {
+    // Try cached token first
+    const response = await fetch(url, {
+      method: options.method || "GET",
+      headers: {
+        "Authorization": `L402 ${cached.macaroon}:${cached.preimage}`,
+        ...options.headers,
+      },
+    });
+
+    if (response.status !== 402 && response.status !== 401) {
+      return { paid: false, cached: true, data: await response.json() };
+    }
+    // Token expired, delete and pay again
+    tokenCache.delete(domain);
+  }
+
+  // Pay for new token
+  const result = await fetchWithL402(wallet, url, options);
+
+  // Cache the token
+  if (result.paid) {
+    tokenCache.set(domain, {
+      macaroon: result.macaroon,
+      preimage: result.preimage,
+    });
+  }
+
+  return result;
+}
+```
+
 ## Resources
 
 - Spark Docs: https://docs.spark.money
 - Spark SDK (npm): https://www.npmjs.com/package/@buildonspark/spark-sdk
 - Sparkscan Explorer: https://sparkscan.io
 - Spark CLI: https://docs.spark.money/tools/cli
+- L402 Spec: https://docs.lightning.engineering/the-lightning-network/l402
