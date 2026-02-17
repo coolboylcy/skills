@@ -1,6 +1,6 @@
 ---
 name: pakat
-description: Interact with Pakat email marketing API (new.pakat.net). Use when the user wants to manage email lists, subscribers, campaigns, templates, transactional emails, segments, or check campaign stats and delivery logs via the Pakat platform. Triggers on mentions of Pakat, email campaigns, mailing lists, subscriber management, or transactional email sending through Pakat.
+description: Interact with Pakat email marketing API (new.pakat.net) - REQUIRES PAKAT_API_KEY environment variable. Use when the user wants to manage email lists, subscribers, campaigns, templates, transactional emails, segments, or check campaign stats and delivery logs via the Pakat platform. Triggers on mentions of Pakat, email campaigns, mailing lists, subscriber management, or transactional email sending through Pakat.
 ---
 
 # Pakat Email Marketing
