@@ -48,7 +48,6 @@ python scripts/router.py spawn --json --multi "fix bug and write poem"
 python scripts/router.py models
 ```
 
-
 ## What this skill does
 
 Agent Swarm is a traffic cop for AI models.
@@ -159,6 +158,7 @@ To change **all** task-specific models: edit each `routing_rules.<TIER>.primary`
 }
 ```
 Only include tiers you want to override; the rest are read from the full `config.json`.
+
 
 
 ## Security

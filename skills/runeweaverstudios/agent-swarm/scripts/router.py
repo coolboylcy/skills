@@ -41,6 +41,19 @@ try:
 except ImportError:
     HAS_OPENCLAW = False
 
+# CLI wizard ASCII header (shown for human-readable output only)
+CLI_HEADER = r"""
+                                            d8b
+                                           88P
+                                          d88
+ .d888b,.d88b,.88P?88   d8P d888b8b   d888888
+ ?8b,   88P  `88P'd88   88 d8P' ?88  d8P' ?88
+   `?8b ?8b  d88  ?8(  d88 88b  ,88b 88b  ,88b
+`?888P' `?888888  `?88P'?8b`?88P'`88b`?88P'`88b
+            `?88
+              88b
+              ?8P
+"""
 
 # Security: Input validation and sanitization
 def validate_task_string(task):
@@ -586,6 +599,10 @@ def main():
     p_spawn.add_argument("--label", type=str, default=None, help="Optional label for the sub-agent session")
     
     args = parser.parse_args()
+
+    # Show ASCII header only for human-readable (non-JSON) output
+    if not getattr(args, "json", False):
+        print(CLI_HEADER)
 
     router = FridayRouter()
 
