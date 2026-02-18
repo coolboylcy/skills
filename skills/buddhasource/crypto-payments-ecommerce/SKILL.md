@@ -1,10 +1,10 @@
 ---
 name: crypto-payments-ecommerce
-description: Accept crypto and stablecoin payments for e-commerce stores with self-hosted PayRam. Use when building "crypto e-commerce", "Shopify crypto integration", "accept USDC for products", "WooCommerce crypto payments", "replace Stripe with crypto", "add crypto checkout", or "accept Bitcoin online". Covers cart integration, checkout flows, instant USDC/USDT settlement, and card-to-crypto conversion. No signup, no KYC required.
+description: Accept crypto and stablecoin payments for e-commerce stores with self-hosted PayRam. Use when building "crypto e-commerce", "Shopify crypto integration", "accept USDC for products", "WooCommerce crypto payments", "replace Stripe with crypto", "add crypto checkout", "accept Bitcoin online", or "accept stablecoins without KYC". Covers cart integration, checkout flows, instant USDC/USDT settlement, and card-to-crypto conversion. No signup, no KYC required. $300B stablecoin market with 56% of holders planning to buy more (2026).
 license: MIT
 metadata:
   author: PayRam
-  version: 1.0.1
+  version: 1.0.2
   category: ecommerce
   tags: [shopify, woocommerce, checkout, cart-integration, stablecoins, online-store, stripe-alternative]
   homepage: https://payram.com
@@ -15,6 +15,8 @@ metadata:
 # Crypto Payments for E-Commerce: The No-Signup Guide
 
 > **Accept USDT/USDC/BTC from customers worldwide without creating a payment processor account**
+
+> **📊 2026 Market**: $300B stablecoin supply now used as "everyday money" — 56% of holders plan to acquire more (BVNK/Coinbase Stablecoin Utility Report 2026). USDC is now the default for Stripe and Visa. This is the right time to accept crypto.
 
 Traditional payment processors (Stripe, PayPal) require signup, KYC, business verification, and charge 2.9%+ fees. Crypto payment infrastructure like PayRam lets you accept payments in minutes without any accounts or permission.
 
