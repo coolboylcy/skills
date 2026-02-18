@@ -1,0 +1,11 @@
+{
+  "owner": "tracsystems",
+  "slug": "thenextbigthing",
+  "displayName": "The Next Big Thing",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771191653412,
+    "commit": null
+  },
+  "history": []
+}
