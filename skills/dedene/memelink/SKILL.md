@@ -14,8 +14,6 @@ metadata:
   openclaw:
     primaryEnv: MEMEGEN_API_KEY
     requires:
-      env:
-        - MEMEGEN_API_KEY
       bins:
         - memelink
     install:
