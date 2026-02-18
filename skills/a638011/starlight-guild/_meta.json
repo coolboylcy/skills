@@ -3,11 +3,16 @@
   "slug": "starlight-guild",
   "displayName": "starlight-guild",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771045438397,
-    "commit": "https://github.com/openclaw/skills/commit/04f50674537e9613b44ea5b9515022c399a58191"
+    "version": "1.0.3",
+    "publishedAt": 1771378845199,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771045438397,
+      "commit": "https://github.com/openclaw/skills/commit/04f50674537e9613b44ea5b9515022c399a58191"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1770570304714,
