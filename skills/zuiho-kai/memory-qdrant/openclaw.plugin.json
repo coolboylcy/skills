@@ -2,7 +2,7 @@
   "id": "memory-qdrant",
   "kind": "memory",
   "name": "Memory (Qdrant)",
-  "version": "1.0.4",
+  "version": "1.0.10",
   "description": "本地语义记忆系统（Qdrant + Transformers.js，完全本地运行）",
   "configSchema": {
     "type": "object",
@@ -29,6 +29,13 @@
         "minimum": 100,
         "maximum": 10000,
         "default": 500
+      },
+      "maxMemorySize": {
+        "type": "number",
+        "minimum": 100,
+        "maximum": 1000000,
+        "default": 1000,
+        "description": "Maximum number of memories in in-memory mode. Set to 999999 for unlimited (oldest memories are auto-deleted when limit is reached, except when set to 999999)"
       }
     }
   },
@@ -55,6 +62,11 @@
     "captureMaxChars": {
       "label": "Capture Max Length",
       "help": "Maximum characters per captured memory",
+      "advanced": true
+    },
+    "maxMemorySize": {
+      "label": "Max Memory Size (In-Memory Mode)",
+      "help": "Maximum number of memories stored in in-memory mode. When limit is reached, oldest memories are automatically deleted (LRU eviction). Set to 999999 for unlimited storage. Only applies to in-memory mode, not external Qdrant.",
       "advanced": true
     }
   }

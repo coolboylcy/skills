@@ -14,22 +14,30 @@ import { randomUUID } from 'crypto';
 
 const MEMORY_CATEGORIES = ['fact', 'preference', 'decision', 'entity', 'other'];
 const DEFAULT_CAPTURE_MAX_CHARS = 500;
+const DEFAULT_MAX_MEMORY_SIZE = 1000;
 const VECTOR_DIM = 384; // all-MiniLM-L6-v2
+const SIMILARITY_THRESHOLDS = {
+  DUPLICATE: 0.95,    // 重复检测
+  HIGH: 0.7,          // 高相关性
+  MEDIUM: 0.5,        // 中等相关性
+  LOW: 0.3            // 低相关性（默认搜索）
+};
 
 // ============================================================================
 // Qdrant 客户端（内存模式）
 // ============================================================================
 
 class MemoryDB {
-  constructor(url, collectionName) {
+  constructor(url, collectionName, maxSize = DEFAULT_MAX_MEMORY_SIZE) {
     // 如果没有配置 URL，使用本地 Qdrant（需要手动启动）
     // 或者使用内存存储（简化版）
     this.useMemoryFallback = !url || url === ':memory:';
-    
+
     if (this.useMemoryFallback) {
       // 内存模式：使用简单的数组存储
       this.memoryStore = [];
       this.collectionName = collectionName;
+      this.maxSize = maxSize;
       this.initialized = true;
     } else {
       this.client = new QdrantClient({ url });
@@ -60,8 +68,27 @@ class MemoryDB {
     this.initialized = true;
   }
 
+  async healthCheck() {
+    if (this.useMemoryFallback) {
+      return { healthy: true, mode: 'memory' };
+    }
+
+    try {
+      await this.client.getCollections();
+      return { healthy: true, mode: 'qdrant', url: this.client.url };
+    } catch (err) {
+      return { healthy: false, mode: 'qdrant', error: err.message };
+    }
+  }
+
   async store(entry) {
     if (this.useMemoryFallback) {
+      // LRU 清理：超过最大容量时删除最旧的记忆（除非设置为无限制）
+      if (this.maxSize < 999999 && this.memoryStore.length >= this.maxSize) {
+        this.memoryStore.sort((a, b) => a.createdAt - b.createdAt);
+        this.memoryStore.shift(); // 删除最旧的
+      }
+
       const id = randomUUID();
       const record = { id, ...entry, createdAt: Date.now() };
       this.memoryStore.push(record);
@@ -87,7 +114,7 @@ class MemoryDB {
     return { id, ...entry, createdAt: Date.now() };
   }
 
-  async search(vector, limit = 5, minScore = 0.5) {
+  async search(vector, limit = 5, minScore = SIMILARITY_THRESHOLDS.LOW) {
     if (this.useMemoryFallback) {
       // 简单的余弦相似度计算
       const cosineSimilarity = (a, b) => {
@@ -142,7 +169,7 @@ class MemoryDB {
         score: r.score
       }));
     } catch (err) {
-      console.error('Qdrant search failed:', err.message);
+      api.logger.error(`memory-qdrant: Qdrant search failed: ${err.message}`);
       return [];
     }
   }
@@ -182,12 +209,26 @@ class MemoryDB {
 class Embeddings {
   constructor() {
     this.pipe = null;
+    this.initAttempts = 0;
+    this.maxRetries = 3;
   }
 
   async init() {
-    if (!this.pipe) {
-      // 使用轻量级模型（~25MB，首次下载）
-      this.pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+    if (this.pipe) return;
+
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        // 使用轻量级模型（~25MB，首次下载）
+        this.pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+        this.initAttempts = attempt;
+        return;
+      } catch (err) {
+        if (attempt === this.maxRetries) {
+          throw new Error(`Failed to initialize embeddings after ${this.maxRetries} attempts: ${err.message}`);
+        }
+        // 等待后重试（指数退避）
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
+      }
     }
   }
 
@@ -199,6 +240,25 @@ class Embeddings {
 }
 
 // ============================================================================
+// 输入清理
+// ============================================================================
+
+function sanitizeInput(text) {
+  if (!text || typeof text !== 'string') return '';
+
+  // 移除 HTML 标签
+  let cleaned = text.replace(/<[^>]*>/g, '');
+
+  // 移除控制字符（保留换行和制表符）
+  cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+
+  // 规范化空白字符
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  return cleaned;
+}
+
+// ============================================================================
 // 过滤规则
 // ============================================================================
 
@@ -206,8 +266,8 @@ const MEMORY_TRIGGERS = [
   /remember|记住|保存/i,
   /prefer|喜欢|偏好/i,
   /decided?|决定/i,
-  /\+\d{10,}/,
-  /[\w.-]+@[\w.-]+\.\w+/,
+  /\+\d{10,13}/,  // 限制长度防止 ReDoS
+  /^[\w.+-]+@[\w-]+\.[\w.-]{2,}$/,  // 更严格的邮箱正则
   /my \w+ is|is my|我的.*是/i,
   /i (like|prefer|hate|love|want|need)/i,
   /always|never|important|总是|从不|重要/i,
@@ -235,7 +295,7 @@ function detectCategory(text) {
   const lower = text.toLowerCase();
   if (/\b(prefer|like|love|hate|want)\b|喜欢/i.test(lower)) return 'preference';
   if (/\b(decided|will use|budeme)\b|决定/i.test(lower)) return 'decision';
-  if (/\+\d{10,}|@[\w.-]+\.\w+|\b(is called)\b|叫做/i.test(lower)) return 'entity';
+  if (/\+\d{10,13}\b|^[\w.+-]+@[\w-]+\.[\w.-]{2,}$|\b(is called)\b|叫做/i.test(lower)) return 'entity';
   if (/\b(is|are|has|have)\b|是|有/i.test(lower)) return 'fact';
   return 'other';
 }
@@ -259,13 +319,26 @@ function formatRelevantMemoriesContext(memories) {
 
 export default function register(api) {
   const cfg = api.pluginConfig;
-  const db = new MemoryDB(cfg.qdrantUrl, cfg.collectionName || 'openclaw_memories');
+  const maxSize = cfg.maxMemorySize || DEFAULT_MAX_MEMORY_SIZE;
+  const db = new MemoryDB(cfg.qdrantUrl, cfg.collectionName || 'openclaw_memories', maxSize);
   const embeddings = new Embeddings();
 
   if (db.useMemoryFallback) {
-    api.logger.info('memory-qdrant: using in-memory storage (no persistence)');
+    const sizeInfo = maxSize >= 999999 ? 'unlimited' : `max ${maxSize} memories, LRU eviction`;
+    api.logger.info(`memory-qdrant: using in-memory storage (${sizeInfo})`);
   } else {
     api.logger.info(`memory-qdrant: using Qdrant at ${cfg.qdrantUrl}`);
+
+    // 异步健康检查（不阻塞启动）
+    db.healthCheck().then(health => {
+      if (!health.healthy) {
+        api.logger.warn(`memory-qdrant: Qdrant health check failed: ${health.error}`);
+      } else {
+        api.logger.info('memory-qdrant: Qdrant connection verified');
+      }
+    }).catch(err => {
+      api.logger.error(`memory-qdrant: Health check error: ${err.message}`);
+    });
   }
 
   api.logger.info('memory-qdrant: plugin registered (local embeddings)');
@@ -290,21 +363,24 @@ export default function register(api) {
       },
       execute: async function(_id, params) {
         const { text, importance = 0.7, category = 'other' } = params;
-        
-        if (!text || typeof text !== 'string' || text.length === 0 || text.length > 10000) {
-          return { content: [{ type: "text", text: JSON.stringify({ success: false, message: 'Text must be 1-10000 characters' }) }] };
+
+        // 清理输入
+        const cleanedText = sanitizeInput(text);
+
+        if (!cleanedText || cleanedText.length === 0 || cleanedText.length > 10000) {
+          return { content: [{ type: "text", text: JSON.stringify({ success: false, message: 'Text must be 1-10000 characters after sanitization' }) }] };
         }
-        
-        const vector = await embeddings.embed(text);
-        
-        // 检查重复
-        const existing = await db.search(vector, 1, 0.95);
+
+        const vector = await embeddings.embed(cleanedText);
+
+        // 检查重复（添加简单的互斥锁模拟）
+        const existing = await db.search(vector, 1, SIMILARITY_THRESHOLDS.DUPLICATE);
         if (existing.length > 0) {
           return { content: [{ type: "text", text: JSON.stringify({ success: false, message: `相似记忆已存在: "${existing[0].entry.text}"` }) }] };
         }
 
-        const entry = await db.store({ text, vector, category, importance });
-        return { content: [{ type: "text", text: JSON.stringify({ success: true, message: `已保存: "${text.slice(0, 50)}..."`, id: entry.id }) }] };
+        const entry = await db.store({ text: cleanedText, vector, category, importance });
+        return { content: [{ type: "text", text: JSON.stringify({ success: true, message: `已保存: "${cleanedText.slice(0, 50)}..."`, id: entry.id }) }] };
       }
     };
   }
@@ -323,20 +399,20 @@ export default function register(api) {
       },
       execute: async function(_id, params) {
         const { query, limit = 5 } = params;
-        
+
         const vector = await embeddings.embed(query);
-        const results = await db.search(vector, limit, 0.3);
+        const results = await db.search(vector, limit, SIMILARITY_THRESHOLDS.LOW);
 
         if (results.length === 0) {
           return { content: [{ type: "text", text: JSON.stringify({ success: true, message: '未找到相关记忆', count: 0 }) }] };
         }
 
-        const text = results.map((r, i) => 
+        const text = results.map((r, i) =>
           `${i + 1}. [${r.entry.category}] ${r.entry.text} (${(r.score * 100).toFixed(0)}%)`
         ).join('\n');
 
-        return { content: [{ type: "text", text: JSON.stringify({ 
-          success: true, 
+        return { content: [{ type: "text", text: JSON.stringify({
+          success: true,
           message: `找到 ${results.length} 条记忆:\n\n${text}`,
           count: results.length,
           memories: results.map(r => ({ id: r.entry.id, text: r.entry.text, category: r.entry.category, score: r.score }))
@@ -366,20 +442,20 @@ export default function register(api) {
 
         if (query) {
           const vector = await embeddings.embed(query);
-          const results = await db.search(vector, 5, 0.7);
+          const results = await db.search(vector, 5, SIMILARITY_THRESHOLDS.HIGH);
 
           if (results.length === 0) {
             return { content: [{ type: "text", text: JSON.stringify({ success: false, message: '未找到匹配的记忆' }) }] };
           }
 
-          if (results.length === 1 && results[0].score > 0.9) {
+          if (results.length === 1 && results[0].score > SIMILARITY_THRESHOLDS.DUPLICATE) {
             await db.delete(results[0].entry.id);
             return { content: [{ type: "text", text: JSON.stringify({ success: true, message: `已删除: "${results[0].entry.text}"` }) }] };
           }
 
           const list = results.map(r => `- [${r.entry.id.slice(0, 8)}] ${r.entry.text.slice(0, 60)}...`).join('\n');
-          return { content: [{ type: "text", text: JSON.stringify({ 
-            success: false, 
+          return { content: [{ type: "text", text: JSON.stringify({
+            success: false,
             message: `找到 ${results.length} 个候选，请指定 memoryId:\n${list}`,
             candidates: results.map(r => ({ id: r.entry.id, text: r.entry.text, score: r.score }))
           }) }] };
@@ -432,13 +508,13 @@ export default function register(api) {
       if (!query) return { text: '请提供搜索查询' };
 
       const vector = await embeddings.embed(query);
-      const results = await db.search(vector, 5, 0.3);
+      const results = await db.search(vector, 5, SIMILARITY_THRESHOLDS.LOW);
 
       if (results.length === 0) {
         return { text: '未找到相关记忆' };
       }
 
-      const text = results.map((r, i) => 
+      const text = results.map((r, i) =>
         `${i + 1}. [${r.entry.category}] ${r.entry.text} (${(r.score * 100).toFixed(0)}%)`
       ).join('\n');
 
@@ -456,11 +532,11 @@ export default function register(api) {
 
       try {
         const vector = await embeddings.embed(event.prompt);
-        const results = await db.search(vector, 3, 0.3);
+        const results = await db.search(vector, 3, SIMILARITY_THRESHOLDS.LOW);
 
         if (results.length === 0) return;
 
-        api.logger.info(`memory-qdrant: 注入 ${results.length} 条记忆`);
+        api.logger.debug(`memory-qdrant: 注入 ${results.length} 条记忆`);
 
         return {
           prependContext: formatRelevantMemoriesContext(
@@ -500,12 +576,12 @@ export default function register(api) {
 
         for (const text of toCapture) {
           const vector = await embeddings.embed(text);
-          const existing = await db.search(vector, 1, 0.95);
+          const existing = await db.search(vector, 1, SIMILARITY_THRESHOLDS.DUPLICATE);
           if (existing.length > 0) continue;
 
           const category = detectCategory(text);
           await db.store({ text, vector, category, importance: 0.7 });
-          api.logger.info(`memory-qdrant: 捕获 [${category}] ${text.slice(0, 50)}...`);
+          api.logger.debug(`memory-qdrant: 捕获 [${category}] ${text.slice(0, 50)}...`);
         }
       } catch (err) {
         api.logger.warn(`memory-qdrant: capture 失败: ${err.message}`);
@@ -527,7 +603,7 @@ export default function register(api) {
 
     memory.command('search <query>').description('搜索记忆').action(async (query) => {
       const vector = await embeddings.embed(query);
-      const results = await db.search(vector, 5, 0.3);
+      const results = await db.search(vector, 5, SIMILARITY_THRESHOLDS.LOW);
       console.log(JSON.stringify(results.map(r => ({
         id: r.entry.id,
         text: r.entry.text,
@@ -539,4 +615,4 @@ export default function register(api) {
 };
 
 // 导出内部函数供测试使用
-export { shouldCapture, detectCategory, escapeMemoryForPrompt };
+export { shouldCapture, detectCategory, escapeMemoryForPrompt, sanitizeInput };

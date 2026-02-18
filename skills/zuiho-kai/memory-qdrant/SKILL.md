@@ -1,14 +1,14 @@
 ---
 name: memory-qdrant
-description: Local semantic memory for OpenClaw agents. Store, search, and recall conversation context using Qdrant vector DB and Transformers.js embeddings (fully local, no API keys).
-version: 1.0.4
+description: Local semantic memory with Qdrant and Transformers.js. Store, search, and recall conversation context using vector embeddings (fully local, no API keys).
+version: 1.0.10
 author: zuiho-kai
+homepage: https://github.com/zuiho-kai/openclaw-memory-qdrant
 tags: [memory, semantic-search, qdrant, transformers, embeddings, local-ai, vector-db, context]
 metadata:
   openclaw:
     requires:
       bins: [node, npm]
-    primaryEnv: null
 ---
 
 # memory-qdrant
@@ -31,14 +31,7 @@ Local semantic memory plugin powered by Qdrant vector database and Transformers.
 clawhub install memory-qdrant
 ```
 
-Or manually:
-
-```bash
-cd ~/.openclaw/plugins
-git clone https://github.com/zuiho-kai/openclaw-memory-qdrant.git memory-qdrant
-cd memory-qdrant
-npm install
-```
+**First-time setup:** This plugin downloads a 25MB embedding model from Hugging Face on first run and may require build tools for native dependencies (sharp, onnxruntime). See [README](https://github.com/zuiho-kai/openclaw-memory-qdrant#readme) for detailed installation requirements.
 
 ## Configuration
 

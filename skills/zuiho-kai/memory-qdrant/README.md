@@ -13,12 +13,81 @@ OpenClaw 本地语义记忆插件，基于 Qdrant 和 Transformers.js 实现零�
 
 ## 安装
 
+### 通过 ClawHub（推荐）
+
+```bash
+clawhub install memory-qdrant
+```
+
+### 手动安装
+
 ```bash
 cd ~/.openclaw/plugins
 git clone https://github.com/zuiho/openclaw-memory-qdrant.git memory-qdrant
 cd memory-qdrant
 npm install
 ```
+
+### 安装要求
+
+**首次运行准备：**
+
+1. **Node.js 版本**: 需要 Node.js ≥18.17
+   ```bash
+   node --version  # 检查版本
+   ```
+
+2. **构建工具**（用于编译原生依赖）:
+   - **Windows**: Visual Studio Build Tools
+     ```powershell
+     npm install --global windows-build-tools
+     ```
+   - **macOS**: Xcode Command Line Tools
+     ```bash
+     xcode-select --install
+     ```
+   - **Linux**: build-essential
+     ```bash
+     sudo apt-get install build-essential  # Debian/Ubuntu
+     sudo yum groupinstall "Development Tools"  # RHEL/CentOS
+     ```
+
+3. **网络访问**:
+   - 安装时需要访问 npmjs.com 下载依赖包
+   - 首次运行时会从 huggingface.co 下载 embedding 模型（约 25MB）
+   - 如果配置了外部 Qdrant 服务器，需要能访问该服务器
+
+4. **原生依赖**:
+   - `sharp`: 图像处理库（可能需要编译）
+   - `onnxruntime`: ML 推理引擎（可能需要编译）
+   - `undici`: HTTP 客户端（通过 @qdrant/js-client-rest 引入）
+
+### 推荐安装方式
+
+```bash
+# 使用 npm ci 确保可重现的安装（推荐用于生产环境）
+npm ci
+
+# 或者分步安装（用于调试）
+npm install --ignore-scripts  # 跳过 post-install 脚本
+npm rebuild                    # 然后重新构建原生模块
+```
+
+### 故障排除
+
+**问题: 原生模块编译失败**
+- 确保已安装对应平台的构建工具
+- 尝试清理缓存: `npm cache clean --force`
+- 删除 node_modules 重新安装: `rm -rf node_modules && npm install`
+
+**问题: 模型下载失败**
+- 检查网络连接和防火墙设置
+- 确保能访问 huggingface.co
+- 模型会缓存在 `~/.cache/huggingface/` 目录
+
+**问题: Node 版本不兼容**
+- 升级到 Node.js 18.17 或更高版本
+- 使用 nvm 管理多个 Node 版本: `nvm install 18 && nvm use 18`
 
 ## 配置
 
@@ -43,6 +112,13 @@ npm install
 - **autoCapture** (默认 false): 自动记录对话内容，开启前请注意隐私
 - **autoRecall** (默认 true): 自动注入相关记忆到对话
 - **captureMaxChars** (默认 500): 单条记忆最大字符数
+- **maxMemorySize** (默认 1000): 内存模式下的最大记忆条数
+  - 仅在内存模式下生效（未配置 qdrantUrl 时）
+  - 达到上限时自动删除最旧的记忆（LRU 淘汰策略）
+  - 范围：100-1000000 条
+  - 设置为 999999 表示无限制（不会自动删除旧记忆）
+  - ⚠️ 无限制模式可能导致内存耗尽，请谨慎使用
+  - 外部 Qdrant 模式不受此限制
 
 ## 隐私与安全
 
