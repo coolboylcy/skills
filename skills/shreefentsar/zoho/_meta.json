@@ -3,11 +3,16 @@
   "slug": "zoho",
   "displayName": "Zoho",
   "latest": {
-    "version": "2.0.1",
-    "publishedAt": 1769680346525,
-    "commit": "https://github.com/clawdbot/skills/commit/f171eac8e13667b0d666f432b54d1d8fcfe0a646"
+    "version": "2.0.2",
+    "publishedAt": 1771445206486,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.0.1",
+      "publishedAt": 1769680346525,
+      "commit": "https://github.com/clawdbot/skills/commit/f171eac8e13667b0d666f432b54d1d8fcfe0a646"
+    },
     {
       "version": "1.3.0",
       "publishedAt": 1769587492112,

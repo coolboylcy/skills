@@ -4,8 +4,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-ZOHO_SKILL_DIR="/root/clawd/skills/zoho"
-PROCESSED_FILE="/root/clawd/data/standup-processed.json"
+ZOHO_SKILL_DIR="${ZOHO_SKILL_DIR:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)}"
+PROCESSED_FILE="${ZOHO_DATA_DIR:-${ZOHO_SKILL_DIR}/data}/standup-processed.json"
 TMP_DIR="/tmp/standup-$$"
 
 # ── Load env ──────────────────────────────────────────────────────────
