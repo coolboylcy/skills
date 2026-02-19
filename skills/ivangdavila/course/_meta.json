@@ -3,9 +3,15 @@
   "slug": "course",
   "displayName": "Course",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1771091787844,
-    "commit": "https://github.com/openclaw/skills/commit/7e2ed557f7483f40a9a7403f26860274e537d899"
+    "version": "1.0.1",
+    "publishedAt": 1771413435994,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1771091787844,
+      "commit": "https://github.com/openclaw/skills/commit/7e2ed557f7483f40a9a7403f26860274e537d899"
+    }
+  ]
 }
