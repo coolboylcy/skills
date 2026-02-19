@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { getSafeKimiCliPath } from "../safe-cli-path.js";
 
 function getKimiHome(): string {
   return process.env.KIMI_HOME ?? path.join(os.homedir(), ".kimi");
@@ -69,27 +70,26 @@ export function verifyCredentials(): VerifyResult {
 
 /**
  * Run `kimi --print -p "Reply OK"` and check exit code 0.
+ * Uses spawnSync with an argument array (no shell) so KIMI_CLI_PATH cannot be abused.
  */
 export function verifyKimiRun(): VerifyResult {
   const credsOk = verifyCredentials();
   if (!credsOk.ok) return credsOk;
 
-  try {
-    const kimiCmd = process.env.KIMI_CLI_PATH ?? "kimi";
-    execSync(`${kimiCmd} --print -p "Reply OK"`, {
-      encoding: "utf-8",
-      timeout: 30_000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    return { ok: true };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return {
-      ok: false,
-      reason: "run_failed",
-      detail: `Kimi CLI run failed: ${msg}. Ensure 'kimi' is on PATH and authenticated.`,
-    };
-  }
+  const kimiCmd = getSafeKimiCliPath();
+  const result = spawnSync(kimiCmd, ["--print", "-p", "Reply OK"], {
+    encoding: "utf-8",
+    timeout: 30_000,
+    stdio: ["pipe", "pipe", "pipe"],
+    shell: false,
+  });
+  if (result.status === 0) return { ok: true };
+  const msg = result.error?.message ?? result.stderr?.trim() ?? `exit ${result.status}`;
+  return {
+    ok: false,
+    reason: "run_failed",
+    detail: `Kimi CLI run failed: ${msg}. Ensure 'kimi' is on PATH and authenticated.`,
+  };
 }
 
 export function verifyAll(): VerifyResult {

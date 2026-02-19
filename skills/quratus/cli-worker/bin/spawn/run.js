@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { getSafeKimiCliPath } from "../safe-cli-path.js";
 /**
  * Sanitize prompt before passing to subprocess. Prevents argument injection.
  * - Strips null bytes (can truncate argv).
@@ -21,7 +22,7 @@ export function sanitizePrompt(prompt) {
 export function runKimi(prompt, cwd, options = {}) {
     const safePrompt = sanitizePrompt(prompt);
     return new Promise((resolve, reject) => {
-        const kimiCmd = process.env.KIMI_CLI_PATH ?? "kimi";
+        const kimiCmd = getSafeKimiCliPath();
         const args = ["--print", "-p", safePrompt, "--output-format=stream-json"];
         const child = spawn(kimiCmd, args, {
             cwd,

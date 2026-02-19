@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2026-02-19
+
+### Security
+
+- **Credentials / KIMI_CLI_PATH:** Verify no longer uses `execSync` with a string command. It uses `spawnSync` with an argument array and `shell: false`, so `KIMI_CLI_PATH` cannot be abused for shell injection. `KIMI_CLI_PATH` is validated (no spaces, no shell metacharacters); invalid values fall back to `kimi`. Same helper used in spawn/run.
+- **Env vars documented:** No required env vars; optional vars (`KIMI_CLI_PATH`, `KIMI_HOME`, `OPENCLAW_CONFIG`, `OPENCLAW_LOG_DIR`, `KIMI_NO_BROWSER`) listed in README and SECURITY.md.
+
+### Added
+
+- `src/safe-cli-path.ts`: `getSafeKimiCliPath()` for validated CLI path.
+- Unit tests in `tests/unit/safe-cli-path.test.js`.
+
 ## [0.2.2] - 2026-02-19
 
 ### Security

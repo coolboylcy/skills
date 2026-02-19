@@ -19,6 +19,13 @@ The `taskId` argument for `cli-worker status <taskId>` and `cli-worker worktree 
 
 This prevents arbitrary file read (e.g. `status ../../../../etc/passwd`) and destructive worktree remove in arbitrary directories.
 
+## Credentials and environment variables
+
+- **No required env vars.** The skill works with defaults (e.g. `kimi` on PATH, `~/.kimi` for config, `~/.openclaw` for config/logs/worktrees). All env vars are optional overrides.
+- **Optional env vars:** `KIMI_CLI_PATH`, `KIMI_HOME`, `OPENCLAW_CONFIG`, `OPENCLAW_LOG_DIR`, `KIMI_NO_BROWSER`. Documented in README.
+- **KIMI_CLI_PATH:** If set, it is validated (no spaces, no shell metacharacters, length limit). Verify and spawn use `spawnSync` / `spawn` with an argument array and `shell: false`, so the value is never passed to a shell. Invalid values fall back to `kimi`.
+- **Paths:** The skill reads config/credentials under `~/.kimi` (Kimi’s own dir) and writes logs and task manifests under `~/.openclaw`. No credentials are stored by the skill.
+
 ## RCE / argument injection
 
 The ClawHub finding concerns possible RCE if the Kimi CLI were susceptible to argument or command injection. On the skill side:

@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { getSafeKimiCliPath } from "../safe-cli-path.js";
 
 export interface RunResult {
   exitCode: number | null;
@@ -38,7 +39,7 @@ export function runKimi(
 ): Promise<RunResult> {
   const safePrompt = sanitizePrompt(prompt);
   return new Promise((resolve, reject) => {
-    const kimiCmd = process.env.KIMI_CLI_PATH ?? "kimi";
+    const kimiCmd = getSafeKimiCliPath();
     const args = ["--print", "-p", safePrompt, "--output-format=stream-json"];
     const child = spawn(kimiCmd, args, {
       cwd,
