@@ -8,11 +8,7 @@ set -euo pipefail
 #   image_to_palette.sh <imagePath> [--model ui|default]
 #
 # Output:
-#   JSON:
-#   {
-#     sampled: { colors: [{hex,rgb,count}...], base: {..} },
-#     colormind: { result: [[r,g,b]...]} 
-#   }
+#   JSON with sampled colors and generated Colormind palette
 
 IMG="${1:-}"
 if [[ -z "$IMG" || "$IMG" == "-h" || "$IMG" == "--help" ]]; then
@@ -31,34 +27,31 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Build histogram (count + rgb + hex)
-HIST=$(convert "$IMG" -alpha off -strip -resize 256x256\> -colors 8 -unique-colors -format "%c\n" histogram:info:- \
-  | sed -E 's/^[[:space:]]+//')
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Parse histogram to JSON (sorted by count)
-SAMPLED_JSON=$(python3 -c 'import json,re,sys; text=sys.stdin.read().splitlines(); pat=re.compile(r"^(\d+):\s+\((\d+),(\d+),(\d+)\)\s+(#[0-9A-Fa-f]{6})"); colors=[]
-for ln in text:
-    m=pat.search(ln.strip())
-    if not m: continue
-    count=int(m.group(1)); r,g,b=map(int,[m.group(2),m.group(3),m.group(4)]); hexv=m.group(5).upper();
-    colors.append({"count":count,"rgb":[r,g,b],"hex":hexv})
-colors.sort(key=lambda x:x["count"], reverse=True); print(json.dumps(colors))' <<< "$HIST")
+# Create temp files for intermediate data
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
-BASE_RGB=$(python3 -c 'import json,sys; colors=json.loads(sys.stdin.read() or "[]"); base=(colors[0]["rgb"] if colors else [0,0,0]); print(",".join(map(str,base)))' <<< "$SAMPLED_JSON")
+HIST_FILE="$TEMP_DIR/histogram.txt"
+SAMPLED_FILE="$TEMP_DIR/sampled.json"
+COLORMIND_FILE="$TEMP_DIR/colormind.json"
 
-GEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COLORMIND_JSON=$(node "$GEN_DIR/generate_palette.mjs" --model "$MODEL" --input "$BASE_RGB" N N N N)
+# Build histogram using ImageMagick
+convert "$IMG" -alpha off -strip -resize 256x256\> -colors 8 -unique-colors \
+  -format "%c\n" histogram:info:- \
+  | sed -E 's/^[[:space:]]+//' > "$HIST_FILE"
 
-python3 - <<PY
-import json, sys
-sampled=json.loads('''$SAMPLED_JSON''' or '[]')
-col=json.loads('''$COLORMIND_JSON''')
-out={
-  "sampled": {
-    "colors": sampled,
-    "base": sampled[0] if sampled else None,
-  },
-  "colormind": col,
-}
-print(json.dumps(out, indent=2))
-PY
+# Parse histogram to JSON
+python3 "$SCRIPT_DIR/parse_histogram.py" < "$HIST_FILE" > "$SAMPLED_FILE"
+
+# Extract base RGB color
+BASE_RGB=$(python3 "$SCRIPT_DIR/get_base_rgb.py" "$SAMPLED_FILE")
+
+# Generate Colormind palette
+node "$SCRIPT_DIR/generate_palette.mjs" --model "$MODEL" \
+  --input "$BASE_RGB" N N N N > "$COLORMIND_FILE"
+
+# Combine results
+python3 "$SCRIPT_DIR/combine_results.py" "$SAMPLED_FILE" "$COLORMIND_FILE"
