@@ -1,12 +1,6 @@
 ---
 name: product-photography
-description: |
-  AI product photography with studio lighting, lifestyle shots, and packshot conventions.
-  Covers angles, backgrounds, shadow types, hero shots, and e-commerce image requirements.
-  Use for: product photos, e-commerce images, Amazon listings, packshots, lifestyle photography.
-  Triggers: product photography, product photo, packshot, e-commerce photography,
-  product shot, product image, studio photography, lifestyle product, amazon product photo,
-  product listing image, hero shot, product mockup, commercial photography
+description: "AI product photography with studio lighting, lifestyle shots, and packshot conventions. Covers angles, backgrounds, shadow types, hero shots, and e-commerce image requirements. Use for: product photos, e-commerce images, Amazon listings, packshots, lifestyle photography. Triggers: product photography, product photo, packshot, e-commerce photography, product shot, product image, studio photography, lifestyle product, amazon product photo, product listing image, hero shot, product mockup, commercial photography"
 allowed-tools: Bash(infsh *)
 ---
 
@@ -25,6 +19,8 @@ infsh app run bytedance/seedream-4-5 --input '{
   "size": "2K"
 }'
 ```
+
+> **Install note:** The [install script](https://cli.inference.sh) only detects your OS/architecture, downloads the matching binary from `dist.inference.sh`, and verifies its SHA-256 checksum. No elevated permissions or background processes. [Manual install & verification](https://dist.inference.sh/cli/checksums.txt) available.
 
 ## Shot Types
 
@@ -285,9 +281,9 @@ infsh app run falai/topaz-image-upscaler --input '{
 ## Related Skills
 
 ```bash
-npx skills add inferencesh/skills@ai-image-generation
-npx skills add inferencesh/skills@flux-image
-npx skills add inferencesh/skills@prompt-engineering
+npx skills add inference-sh/skills@ai-image-generation
+npx skills add inference-sh/skills@flux-image
+npx skills add inference-sh/skills@prompt-engineering
 ```
 
 Browse all apps: `infsh app list`
