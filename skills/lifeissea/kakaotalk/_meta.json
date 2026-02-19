@@ -1,13 +1,18 @@
 {
   "owner": "lifeissea",
   "slug": "kakaotalk",
-  "displayName": "Clawhub Kakaotalk",
+  "displayName": "KakaoTalk Agent",
   "latest": {
-    "version": "1.2.3",
-    "publishedAt": 1771499903071,
-    "commit": "https://github.com/openclaw/skills/commit/d0e9d5a3a20f07c1ae6e493599f180c50ce7fbb4"
+    "version": "1.2.4",
+    "publishedAt": 1771501369392,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.2.3",
+      "publishedAt": 1771499903071,
+      "commit": "https://github.com/openclaw/skills/commit/d0e9d5a3a20f07c1ae6e493599f180c50ce7fbb4"
+    },
     {
       "version": "1.2.2",
       "publishedAt": 1771495129137,
