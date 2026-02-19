@@ -1,17 +1,14 @@
 ---
 name: flux-image
-description: |
-  Generate images with FLUX models (Black Forest Labs) via inference.sh CLI.
-  Models: FLUX Dev LoRA, FLUX.2 Klein LoRA with custom style adaptation.
-  Capabilities: text-to-image, image-to-image, LoRA fine-tuning, custom styles.
-  Triggers: flux, flux.2, flux dev, flux schnell, flux pro, black forest labs,
-  flux image, flux ai, flux model, flux lora
+description: "Generate images with FLUX models (Black Forest Labs) via inference.sh CLI. Models: FLUX Dev LoRA, FLUX.2 Klein LoRA with custom style adaptation. Capabilities: text-to-image, image-to-image, LoRA fine-tuning, custom styles. Triggers: flux, flux.2, flux dev, flux schnell, flux pro, black forest labs, flux image, flux ai, flux model, flux lora"
 allowed-tools: Bash(infsh *)
 ---
 
 # FLUX Image Generation
 
 Generate images with FLUX models via [inference.sh](https://inference.sh) CLI.
+
+![FLUX Image Generation](https://cloud.inference.sh/app/files/u/4mg21r6ta37mpaz6ktzwtt8krr/01kg0v0nz7wv0qwqjtq1cam52z.jpeg)
 
 ## Quick Start
 
@@ -20,6 +17,8 @@ curl -fsSL https://cli.inference.sh | sh && infsh login
 
 infsh app run falai/flux-dev-lora --input '{"prompt": "a futuristic city at night"}'
 ```
+
+> **Install note:** The [install script](https://cli.inference.sh) only detects your OS/architecture, downloads the matching binary from `dist.inference.sh`, and verifies its SHA-256 checksum. No elevated permissions or background processes. [Manual install & verification](https://dist.inference.sh/cli/checksums.txt) available.
 
 ## FLUX Models
 
@@ -76,13 +75,13 @@ infsh app run falai/topaz-image-upscaler --input '{"image_url": "https://..."}'
 
 ```bash
 # Full platform skill (all 150+ apps)
-npx skills add inference-sh/agent-skills@inference-sh
+npx skills add inference-sh/skills@inference-sh
 
 # All image generation models
-npx skills add inference-sh/agent-skills@ai-image-generation
+npx skills add inference-sh/skills@ai-image-generation
 
 # Upscaling
-npx skills add inference-sh/agent-skills@image-upscaling
+npx skills add inference-sh/skills@image-upscaling
 ```
 
 Browse all apps: `infsh app list`
