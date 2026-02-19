@@ -1,10 +1,18 @@
 {
     "id": "lily-memory",
     "name": "Lily Memory",
-    "version": "5.0.0",
+    "version": "5.2.3",
     "description": "Persistent memory plugin for OpenClaw agents. SQLite FTS5 keyword search + Ollama vector embeddings with auto-capture, auto-recall, stuck-detection, and memory consolidation.",
     "kind": "memory",
     "main": "index.js",
+    "install": {
+        "type": "npm",
+        "command": "npm install --production"
+    },
+    "requires": {
+        "bins": ["node"],
+        "npm": ["better-sqlite3"]
+    },
     "configSchema": {
         "type": "object",
         "additionalProperties": false,
@@ -75,6 +83,32 @@
                 "items": { "type": "string" },
                 "default": [],
                 "description": "Additional entity names to recognize (merged with built-in defaults and runtime-added entities)."
+            },
+            "maxBootstrapChars": {
+                "type": "number",
+                "default": 6000,
+                "minimum": 1000,
+                "maximum": 20000,
+                "description": "Maximum characters for bootstrap context injection. Prevents context budget bloat."
+            },
+            "sessionOverflowThreshold": {
+                "type": "number",
+                "default": 0.8,
+                "minimum": 0.5,
+                "maximum": 0.95,
+                "description": "Reset session when estimated tokens exceed this fraction of contextTokens. Set to 0.95 for more tolerance."
+            },
+            "capturePolicy": {
+                "type": "string",
+                "enum": ["all", "assistant-only", "tagged-only"],
+                "default": "all",
+                "description": "Which message roles are eligible for auto-capture. 'all' captures from all sources with injection detection. 'assistant-only' only captures from assistant responses (safest). 'tagged-only' requires explicit <trusted-capture> tags."
+            },
+            "protectedEntities": {
+                "type": "array",
+                "items": { "type": "string" },
+                "default": [],
+                "description": "Additional entity names that can only be written from assistant messages or memory_store tool. Built-in protected: config, system, note."
             }
         }
     },
@@ -90,6 +124,8 @@
         "embeddingModel": { "label": "Embedding Model", "help": "Ollama model for embeddings", "advanced": true },
         "consolidation": { "label": "Memory Consolidation", "help": "Deduplicate redundant entries on startup" },
         "vectorSimilarityThreshold": { "label": "Similarity Threshold", "help": "Minimum cosine similarity for vector results", "advanced": true },
-        "entities": { "label": "Additional Entities", "help": "Extra entity names to recognize" }
+        "entities": { "label": "Additional Entities", "help": "Extra entity names to recognize" },
+        "capturePolicy": { "label": "Capture Policy", "help": "Controls which message sources are eligible for auto-capture" },
+        "protectedEntities": { "label": "Protected Entities", "help": "Entities only writable from assistant messages or memory_store tool", "advanced": true }
     }
 }

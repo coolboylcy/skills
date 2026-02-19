@@ -1,11 +1,17 @@
 {
   "owner": "kevinodell",
   "slug": "lily-memory",
-  "displayName": "Lily Memory",
+  "displayName": "Lily Memory Plugin",
   "latest": {
-    "version": "5.0.0",
-    "publishedAt": 1771293150905,
-    "commit": "https://github.com/openclaw/skills/commit/46bfc5ab87df14e72b3b2f0592586474d16b08d5"
+    "version": "5.2.3",
+    "publishedAt": 1771463207541,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "5.0.0",
+      "publishedAt": 1771293150905,
+      "commit": "https://github.com/openclaw/skills/commit/46bfc5ab87df14e72b3b2f0592586474d16b08d5"
+    }
+  ]
 }
