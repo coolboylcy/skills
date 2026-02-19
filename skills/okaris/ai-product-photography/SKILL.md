@@ -1,19 +1,14 @@
 ---
 name: ai-product-photography
-description: |
-  Generate professional AI product photography and commercial images.
-  Models: FLUX, Imagen 3, Grok, Seedream for product shots, lifestyle images, mockups.
-  Capabilities: studio lighting, lifestyle scenes, packaging, e-commerce photos.
-  Use for: e-commerce, Amazon listings, Shopify, marketing, advertising, mockups.
-  Triggers: product photography, product shot, commercial photography, e-commerce images,
-  amazon product photo, shopify images, product mockup, studio product shot,
-  lifestyle product image, advertising photo, packshot, product render, product image ai
+description: "Generate professional AI product photography and commercial images. Models: FLUX, Imagen 3, Grok, Seedream for product shots, lifestyle images, mockups. Capabilities: studio lighting, lifestyle scenes, packaging, e-commerce photos. Use for: e-commerce, Amazon listings, Shopify, marketing, advertising, mockups. Triggers: product photography, product shot, commercial photography, e-commerce images, amazon product photo, shopify images, product mockup, studio product shot, lifestyle product image, advertising photo, packshot, product render, product image ai"
 allowed-tools: Bash(infsh *)
 ---
 
 # AI Product Photography
 
 Generate professional product photography via [inference.sh](https://inference.sh) CLI.
+
+![AI Product Photography](https://cloud.inference.sh/app/files/u/4mg21r6ta37mpaz6ktzwtt8krr/01kg0v0nz7wv0qwqjtq1cam52z.jpeg)
 
 ## Quick Start
 
@@ -25,6 +20,8 @@ infsh app run falai/flux-dev --input '{
   "prompt": "Professional product photo of wireless earbuds on white surface, soft studio lighting, commercial photography, high detail"
 }'
 ```
+
+> **Install note:** The [install script](https://cli.inference.sh) only detects your OS/architecture, downloads the matching binary from `dist.inference.sh`, and verifies its SHA-256 checksum. No elevated permissions or background processes. [Manual install & verification](https://dist.inference.sh/cli/checksums.txt) available.
 
 ## Available Models
 
@@ -251,19 +248,19 @@ infsh app run falai/birefnet --input '{
 
 ```bash
 # Image generation models
-npx skills add inference-sh/agent-skills@ai-image-generation
+npx skills add inference-sh/skills@ai-image-generation
 
 # FLUX specific
-npx skills add inference-sh/agent-skills@flux-image
+npx skills add inference-sh/skills@flux-image
 
 # Image upscaling
-npx skills add inference-sh/agent-skills@image-upscaling
+npx skills add inference-sh/skills@image-upscaling
 
 # Background removal
-npx skills add inference-sh/agent-skills@background-removal
+npx skills add inference-sh/skills@background-removal
 
 # Full platform skill
-npx skills add inference-sh/agent-skills@inference-sh
+npx skills add inference-sh/skills@inference-sh
 ```
 
 Browse all image apps: `infsh app list --category image`
