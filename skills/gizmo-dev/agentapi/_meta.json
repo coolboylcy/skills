@@ -3,9 +3,15 @@
   "slug": "agentapi",
   "displayName": "AgentAPI",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771357479792,
-    "commit": "https://github.com/openclaw/skills/commit/afc9d2073f71789ee5508d10b36541e028578ee2"
+    "version": "1.0.8",
+    "publishedAt": 1771492081585,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771357479792,
+      "commit": "https://github.com/openclaw/skills/commit/afc9d2073f71789ee5508d10b36541e028578ee2"
+    }
+  ]
 }
