@@ -1,12 +1,6 @@
 ---
 name: product-changelog
-description: |
-  Product changelog and release notes that users actually read.
-  Covers categorization, user-facing language, visuals, and distribution.
-  Use for: release notes, changelogs, product updates, feature announcements, versioning.
-  Triggers: changelog, release notes, product update, version notes, what's new,
-  feature announcement, product changelog, update log, release announcement,
-  version release, product release, ship notes
+description: "Product changelog and release notes that users actually read. Covers categorization, user-facing language, visuals, and distribution. Use for: release notes, changelogs, product updates, feature announcements, versioning. Triggers: changelog, release notes, product update, version notes, what's new, feature announcement, product changelog, update log, release announcement, version release, product release, ship notes"
 allowed-tools: Bash(infsh *)
 ---
 
@@ -26,6 +20,8 @@ infsh app run falai/flux-dev-lora --input '{
   "height": 832
 }'
 ```
+
+> **Install note:** The [install script](https://cli.inference.sh) only detects your OS/architecture, downloads the matching binary from `dist.inference.sh`, and verifies its SHA-256 checksum. No elevated permissions or background processes. [Manual install & verification](https://dist.inference.sh/cli/checksums.txt) available.
 
 ## Entry Format
 
@@ -265,8 +261,8 @@ Try it now → [link]
 ## Related Skills
 
 ```bash
-npx skills add inferencesh/skills@ai-image-generation
-npx skills add inferencesh/skills@prompt-engineering
+npx skills add inference-sh/skills@ai-image-generation
+npx skills add inference-sh/skills@prompt-engineering
 ```
 
 Browse all apps: `infsh app list`
