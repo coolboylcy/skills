@@ -2,10 +2,10 @@
 name: navifare-flight-validator
 description: Verify and compare flight prices across multiple booking sites using Navifare. Trigger when users share flight prices from any booking site (Skyscanner, Kayak, etc.) or upload flight screenshots to find better deals. Returns ranked results with booking links from multiple providers.
 license: MIT
-compatibility: Requires Navifare MCP server configured in Claude Code. Access to mcp__navifare-mcp tools required.
+compatibility: Requires Navifare MCP server configured. Access to mcp__navifare-mcp tools required.
 metadata:
   author: navifare
-  version: "1.0.0"
+  version: "1.1.0"
   category: travel
   mcp_required: navifare-mcp
 allowed-tools: mcp__navifare-mcp__flight_pricecheck mcp__navifare-mcp__format_flight_pricecheck_request Read
@@ -48,58 +48,63 @@ Check for these MCP tools:
 - mcp__navifare-mcp__flight_pricecheck (main search tool)
 - mcp__navifare-mcp__format_flight_pricecheck_request (formatting helper)
 
-If not available: Inform user to add this to ~/.claude/mcp.json:
+If not available: Inform user to configure the Navifare MCP server
+in their MCP settings with:
 {
-  "mcpServers": {
-    "navifare-mcp": {
-      "url": "https://mcp.navifare.com/mcp"
-    }
+  "navifare-mcp": {
+    "url": "https://mcp.navifare.com/mcp"
   }
 }
-
-Then restart Claude Code.
 ```
 
 ## Execution Workflow
 
 ⚠️ **IMPORTANT**: Always follow this exact sequence:
-1. Extract flight info from user → format with `format_flight_pricecheck_request` → search with `flight_pricecheck`
+1. Format with `format_flight_pricecheck_request` → resolve any missing info → search with `flight_pricecheck`
 2. **NEVER** call `flight_pricecheck` directly without calling `format_flight_pricecheck_request` first
 
-### Step 1: Extract Flight Information
+### Step 1: Format the Request
 
-**From Text/Conversation**:
-Extract these required fields:
-- **Airlines**: Full airline names or IATA codes (e.g., "British Airways" or "BA")
-- **Flight numbers**: Numeric only, without airline prefix (e.g., "553" not "BA553")
-- **Airports**: 3-letter IATA codes (e.g., "JFK", "LHR", "CDG")
-- **Dates**: YYYY-MM-DD format
-- **Times**: HH:MM in 24-hour format
-- **Travel class**: ECONOMY, BUSINESS, FIRST, or PREMIUM_ECONOMY
-- **Passengers**: Number of adults, children, infants
-- **Price**: Numeric value user saw
-- **Currency**: 3-letter ISO code (EUR, USD, GBP, etc.)
+This is always the first action. Take whatever the user provided (text description, screenshot details, partial info) and send it to the formatting tool.
 
-**From Screenshots**:
-If user uploads an image:
+⚠️ **CRITICAL**: You MUST call this tool before `flight_pricecheck`.
+
 ```
-Call mcp__navifare-mcp__flight_pricecheck with the flight data
-The MCP will use Gemini AI to extract flight details automatically
-Validate the extracted data before proceeding
+Tool: mcp__navifare-mcp__format_flight_pricecheck_request
+Parameters: {
+  "user_request": "[paste the complete flight description from the user, including all details: airlines, flight numbers, dates, times, airports, price, passengers, class]"
+}
+
+Example user_request value:
+"Outbound Feb 19, 2026: QR124 MXP-DOH 08:55-16:40, QR908 DOH-SYD 20:40-18:50 (+1 day).
+Return Mar 1, 2026: QR909 SYD-DOH 21:40-04:30 (+1 day), QR127 DOH-MXP 08:50-13:10.
+Price: 1500 EUR, 1 adult, economy class."
 ```
 
-**Missing Information Handling**:
-If any required field is missing:
+**What this tool does:**
+- Parses natural language into proper JSON structure
+- Validates all required fields are present
+- Returns `flightData` ready for `flight_pricecheck`
+- Tells you if any information is missing via `needsMoreInfo: true`
+
+**Output handling:**
+- If `needsMoreInfo: true` → Ask user for the missing information, then call this tool again with the updated details
+- If `readyForPriceCheck: true` → Proceed to Step 2 with the returned `flightData`
+
+**From Screenshots**: If user uploads an image, extract all visible flight details (airlines, times, airports, dates, price) and pass them as the `user_request` string.
+
+**Resolving missing info**: When the tool reports missing fields:
 - For **airports**: Check `references/AIRPORTS.md` for common codes
 - For **airlines**: Check `references/AIRLINES.md` for codes
-- For **times**: Ask user explicitly: "What time does the flight depart/arrive?"
+- For **times**: Ask user: "What time does the flight depart/arrive?"
 - For **dates**: Validate dates are in future, ask user if unclear
 - For **currency**: Auto-detect from symbols (€→EUR, $→USD, £→GBP, CHF→CHF)
-Remember to pass the previous details in any additional information, as the tool doesn't retain context between calls
 
-### Step 2: Prepare Search Parameters
+**DO NOT skip this step.** It ensures data is properly formatted and validated.
 
-Build the trip object following this structure:
+### Step 2: Execute Price Search
+
+Once `format_flight_pricecheck_request` returns `readyForPriceCheck: true`, it provides a structured `flightData` object like this:
 
 ```json
 {
@@ -129,90 +134,19 @@ Build the trip object following this structure:
   "source": "MCP",
   "price": "450",
   "currency": "USD",
-  "location": "ZZ"
+  "location": "US"
 }
 ```
 
-**Key Parameters**:
-- `plusDays`: Set to 1 if arrival is next day, 2 if two days later, etc.
-- `source`: Set to "ChatGPT" or the platform you're running on
-- `location`: User's 2-letter ISO country code (e.g., "IT", "US", "GB"). Default to "ZZ" if unknown
+**Key fields in the output:**
+- `plusDays`: 1 if arrival is next day, 2 if two days later, etc.
+- `location`: User's 2-letter ISO country code (e.g., "IT", "US", "GB"). Defaults to "ZZ" if unknown
+- Multi-segment flights have multiple segments in the same leg
+- Round-trip flights have two separate legs (outbound and return)
 
-**Multi-segment flights** (connections):
-For flights with connections, add multiple segments in the same leg:
+**IMPORTANT VALIDATIONS before calling the search:**
 
-```json
-{
-  "legs": [
-    {
-      "segments": [
-        {"airline": "BA", "flightNumber": "553", "departureAirport": "JFK", "arrivalAirport": "LHR", ...},
-        {"airline": "BA", "flightNumber": "456", "departureAirport": "LHR", "arrivalAirport": "FCO", ...}
-      ]
-    }
-  ]
-}
-```
-
-**Round-trip flights**:
-For round trips, use TWO separate legs (outbound and return):
-
-```json
-{
-  "legs": [
-    {
-      "segments": [
-        // Outbound flight(s) only
-        {"airline": "BA", "flightNumber": "553", "departureAirport": "JFK", "arrivalAirport": "LHR", ...}
-      ]
-    },
-    {
-      "segments": [
-        // Return flight(s) only
-        {"airline": "BA", "flightNumber": "554", "departureAirport": "LHR", "arrivalAirport": "JFK", ...}
-      ]
-    }
-  ]
-}
-```
-
-### Step 3: Execute Navifare Search
-
-**MANDATORY TWO-STEP PROCESS:**
-
-**Step 3a: Format the Request (ALWAYS DO THIS FIRST)**
-
-⚠️ **CRITICAL**: You MUST call this tool first before flight_pricecheck.
-
-```
-Tool: mcp__navifare-mcp__format_flight_pricecheck_request
-Parameters: {
-  "user_request": "[paste the complete flight description from the user, including all details: airlines, flight numbers, dates, times, airports, price, passengers, class]"
-}
-
-Example user_request value:
-"Outbound Feb 19, 2026: QR124 MXP-DOH 08:55-16:40, QR908 DOH-SYD 20:40-18:50 (+1 day).
-Return Mar 1, 2026: QR909 SYD-DOH 21:40-04:30 (+1 day), QR127 DOH-MXP 08:50-13:10.
-Price: 1500 EUR, 1 adult, economy class."
-```
-
-**What this tool does:**
-- Parses natural language into proper JSON structure
-- Validates all required fields are present
-- Returns `flightData` ready for flight_pricecheck
-- Tells you if any information is missing via `needsMoreInfo: true`
-
-**Output handling:**
-- If `readyForPriceCheck: true` → Proceed to Step 3b with the returned `flightData`
-- If `needsMoreInfo: true` → Ask user for missing information, then call this tool again
-
-**DO NOT skip this step.** It ensures data is properly formatted and validated.
-
-**Step 3b: Execute Price Search (ONLY AFTER Step 3a)**
-
-**IMPORTANT VALIDATIONS:**
-
-1. **Check for one-way flights** - Navifare only supports round-trip flights:
+1. **Check for one-way flights** — Navifare only supports round-trip flights:
    ```
    if trip has only 1 leg:
      ❌ Return error: "Sorry, Navifare currently only supports round-trip flights.
@@ -220,7 +154,7 @@ Price: 1500 EUR, 1 adult, economy class."
      DO NOT proceed with the search.
    ```
 
-2. **Inform user FIRST** - Tell them it will take time:
+2. **Inform user FIRST** — Tell them it will take time:
    ```
    "🔍 Searching for better prices across multiple booking sites...
    This typically takes 30-60 seconds as I check real-time availability."
@@ -231,7 +165,7 @@ Price: 1500 EUR, 1 adult, economy class."
 ```
 Tool: mcp__navifare-mcp__flight_pricecheck
 Parameters: {
-  Use the EXACT flightData object returned from format_flight_pricecheck_request in Step 3a.
+  Use the EXACT flightData object returned from format_flight_pricecheck_request.
   This includes: trip, source, price, currency, location
 }
 
@@ -242,15 +176,15 @@ The MCP server will:
 ```
 
 **CRITICAL**: The tool call will block for 30-60 seconds. This is normal.
-Do NOT abort or assume it failed - wait for the response.
+Do NOT abort or assume it failed — wait for the response.
 
 **IF TOOL RUNS LONGER THAN 90 SECONDS:**
 - The server has a 90-second timeout
 - If still running after 90s, there may be a client-side issue
 - Results are likely already available but not displayed
-- Check server logs or try canceling and re-calling the tool
+- Try canceling and re-calling the tool
 
-### Step 4: Analyze Results
+### Step 3: Analyze Results
 
 **IMPORTANT**: The MCP tool returns a JSON-RPC response following the MCP specification.
 
@@ -319,7 +253,7 @@ If savingsPercent < -5%: "Prices have increased"
 If abs(savingsPercent) <= 5%: "Price is competitive"
 ```
 
-### Step 5: Present Findings to User
+### Step 4: Present Findings to User
 
 Format results as a clear, actionable summary:
 
@@ -390,7 +324,7 @@ Would you like to:
 3. Try different dates
 ```
 
-### Step 6: Provide Booking Guidance
+### Step 5: Provide Booking Guidance
 
 After presenting results:
 
@@ -406,121 +340,127 @@ After presenting results:
    - "Would you like me to check alternative dates?"
    - "Should I search for different flight options?"
 
-4. **NO automatic booking**: Never attempt to book flights - only provide comparison and links
+4. **NO automatic booking**: Never attempt to book flights — only provide comparison and links
 
 ## Data Format Examples
 
-### Example 1: Simple One-Way Flight
-
-User: "I found a flight from New York to London on June 15 for $450, BA553 departing 6pm"
-
-Extracted data:
-```json
-{
-  "trip": {
-    "legs": [{"segments": [
-      {
-        "airline": "BA",
-        "flightNumber": "553",
-        "departureAirport": "JFK",
-        "arrivalAirport": "LHR",
-        "departureDate": "2025-06-15",
-        "departureTime": "18:00",
-        "arrivalTime": "06:30",
-        "plusDays": 1
-      }
-    ]}],
-    "travelClass": "ECONOMY",
-    "adults": 1,
-    "children": 0,
-    "infantsInSeat": 0,
-    "infantsOnLap": 0
-  },
-  "source": "ChatGPT",
-  "price": "450",
-  "currency": "USD"
-}
-```
-
-### Example 2: Round-Trip Flight
+### Example 1: Round-Trip Flight
 
 User: "Kayak shows €599 for Milan to Barcelona and back, June 20-27, ITA Airways"
 
-Extracted data:
+What you send to `format_flight_pricecheck_request`:
+```
+"Kayak shows €599 for Milan to Barcelona and back, June 20-27, ITA Airways AZ78 departing 08:30 arriving 10:15, return AZ79 departing 18:00 arriving 19:45. 1 adult, economy."
+```
+
+What the tool returns as `flightData` (ready for `flight_pricecheck`):
 ```json
 {
   "trip": {
-    "legs": [{"segments": [
-      {
-        "airline": "AZ",
-        "flightNumber": "78",
-        "departureAirport": "MXP",
-        "arrivalAirport": "BCN",
-        "departureDate": "2025-06-20",
-        "departureTime": "08:30",
-        "arrivalTime": "10:15",
-        "plusDays": 0
-      },
-      {
-        "airline": "AZ",
-        "flightNumber": "79",
-        "departureAirport": "BCN",
-        "arrivalAirport": "MXP",
-        "departureDate": "2025-06-27",
-        "departureTime": "18:00",
-        "arrivalTime": "19:45",
-        "plusDays": 0
-      }
-    ]}],
+    "legs": [
+      {"segments": [
+        {
+          "airline": "AZ",
+          "flightNumber": "78",
+          "departureAirport": "MXP",
+          "arrivalAirport": "BCN",
+          "departureDate": "2025-06-20",
+          "departureTime": "08:30",
+          "arrivalTime": "10:15",
+          "plusDays": 0
+        }
+      ]},
+      {"segments": [
+        {
+          "airline": "AZ",
+          "flightNumber": "79",
+          "departureAirport": "BCN",
+          "arrivalAirport": "MXP",
+          "departureDate": "2025-06-27",
+          "departureTime": "18:00",
+          "arrivalTime": "19:45",
+          "plusDays": 0
+        }
+      ]}
+    ],
     "travelClass": "ECONOMY",
     "adults": 1,
     "children": 0,
     "infantsInSeat": 0,
     "infantsOnLap": 0
   },
-  "source": "ChatGPT",
+  "source": "MCP",
   "price": "599",
   "currency": "EUR"
 }
 ```
 
-### Example 3: Multi-Segment Connection
+### Example 2: Multi-Segment Connection (Round-Trip)
 
-User: "Found $890 LAX to Tokyo via Seattle on Alaska/ANA, July 10"
+User: "Found $890 LAX to Tokyo via Seattle on Alaska/ANA, July 10, returning July 20"
 
-Extracted data:
+What you send to `format_flight_pricecheck_request`:
+```
+"LAX to Tokyo via Seattle, July 10. AS338 LAX-SEA 10:00-12:30, NH178 SEA-NRT 14:30-17:00 (+1 day). Return July 20: NH177 NRT-SEA 18:00-11:00, AS339 SEA-LAX 14:00-17:00. Price $890, 1 adult, economy."
+```
+
+What the tool returns as `flightData`:
 ```json
 {
   "trip": {
-    "legs": [{"segments": [
-      {
-        "airline": "AS",
-        "flightNumber": "338",
-        "departureAirport": "LAX",
-        "arrivalAirport": "SEA",
-        "departureDate": "2025-07-10",
-        "departureTime": "10:00",
-        "arrivalTime": "12:30",
-        "plusDays": 0
-      },
-      {
-        "airline": "NH",
-        "flightNumber": "178",
-        "departureAirport": "SEA",
-        "arrivalAirport": "NRT",
-        "departureDate": "2025-07-10",
-        "departureTime": "14:30",
-        "arrivalTime": "17:00",
-        "plusDays": 1
-      }
-    ]}],
+    "legs": [
+      {"segments": [
+        {
+          "airline": "AS",
+          "flightNumber": "338",
+          "departureAirport": "LAX",
+          "arrivalAirport": "SEA",
+          "departureDate": "2025-07-10",
+          "departureTime": "10:00",
+          "arrivalTime": "12:30",
+          "plusDays": 0
+        },
+        {
+          "airline": "NH",
+          "flightNumber": "178",
+          "departureAirport": "SEA",
+          "arrivalAirport": "NRT",
+          "departureDate": "2025-07-10",
+          "departureTime": "14:30",
+          "arrivalTime": "17:00",
+          "plusDays": 1
+        }
+      ]},
+      {"segments": [
+        {
+          "airline": "NH",
+          "flightNumber": "177",
+          "departureAirport": "NRT",
+          "arrivalAirport": "SEA",
+          "departureDate": "2025-07-20",
+          "departureTime": "18:00",
+          "arrivalTime": "11:00",
+          "plusDays": 0
+        },
+        {
+          "airline": "AS",
+          "flightNumber": "339",
+          "departureAirport": "SEA",
+          "arrivalAirport": "LAX",
+          "departureDate": "2025-07-20",
+          "departureTime": "14:00",
+          "arrivalTime": "17:00",
+          "plusDays": 0
+        }
+      ]}
+    ],
     "travelClass": "ECONOMY",
     "adults": 1,
     "children": 0,
     "infantsInSeat": 0,
     "infantsOnLap": 0
   },
-  "source": "ChatGPT",
+  "source": "MCP",
   "price": "890",
   "currency": "USD"
 }
@@ -638,16 +578,14 @@ Please confirm the correct travel date.
 
 ### MCP Tool Integration
 The Navifare MCP provides these tools:
-- `format_flight_pricecheck_request`: Parses natural language into structured format (recommended first step)
+- `format_flight_pricecheck_request`: Parses natural language into structured format (**always call first**)
 - `flight_pricecheck`: Executes price search across booking sites (main search tool)
 
-**Recommended workflow:**
-1. If user provides natural language: Call `format_flight_pricecheck_request` first
-2. Use the formatted output (flightData) to call `flight_pricecheck`
-3. `flight_pricecheck` handles polling automatically and returns complete results
-
-**Alternative workflow:**
-- If you already have structured data: Call `flight_pricecheck` directly
+**Workflow:**
+1. Call `format_flight_pricecheck_request` with the user's natural language description
+2. If `needsMoreInfo: true` → ask user for missing fields, then call again
+3. If `readyForPriceCheck: true` → use the returned `flightData` to call `flight_pricecheck`
+4. `flight_pricecheck` handles polling automatically and returns complete results
 
 ### Data Quality
 - Navifare scrapes real-time prices from booking sites
