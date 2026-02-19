@@ -5,8 +5,59 @@ description: Use when working with Crunch competitions - setting up workspaces, 
 
 # Cruncher Skill
 
-Guides users through Crunch competition lifecycle: setup, quickstarter discovery, solution development, local testing, and submission. It assumes that the local development environment for a ML Engineer is set up. 
+Guides users through Crunch competition lifecycle: setup, quickstarter discovery, solution development, local testing, and submission.
 
+## Prerequisites
+- Python 3.9+ with `venv` module (included in standard Python)
+- `pip` for package installation
+
+## Package Installation
+
+This skill installs Python packages from [PyPI](https://pypi.org) into isolated virtual environments:
+
+| Package | Source | Purpose |
+|---------|--------|---------|
+| `crunch-cli` | [PyPI](https://pypi.org/project/crunch-cli/) | CrunchDAO competition CLI (setup, test, submit) |
+| `jupyter` | [PyPI](https://pypi.org/project/jupyter/) | Notebook support (optional) |
+| `ipykernel` | [PyPI](https://pypi.org/project/ipykernel/) | Jupyter kernel registration (optional) |
+| Competition SDKs (e.g. `crunch-synth`, `birdgame`) | PyPI | Competition-specific libraries (varies) |
+
+**Agent rules for package installation:**
+- **Always use a virtual environment** — never install into system Python
+- **Only install known packages** listed above or referenced in competition docs (PACKAGES.md)
+- **Ask the user before installing** any package not listed here
+- **All packages are from PyPI** — no custom URLs, no `--index-url` overrides, no `.whl` files from unknown sources
+
+
+## Credentials
+
+### Submission Token (required for setup & submit)
+- **How to get:** User logs into [CrunchDAO Hub](https://hub.crunchdao.com), navigates to the competition's submit page (`/competitions/<competition>/submit`), and copies their token
+- **How it's used:** Passed once via `--token <TOKEN>` during `crunch setup`
+- **Persistence:** After setup, the CLI stores the token in the project's `.crunch/` config directory. All subsequent commands (`crunch test`, `crunch push`, `crunch download`) authenticate automatically — no need to pass the token again
+- **If token expires:** Run `crunch update-token` inside the project directory to refresh it
+
+**Agent rules for tokens:**
+- **Always ask the user** to provide the token — never assume, guess, or reuse tokens from other projects
+- **Never write tokens** into source files, scripts, notebooks, or any committed file
+- **Never log or echo tokens** in shell output (use `--token <TOKEN>` placeholder in examples shown to user)
+- Tokens are user-specific and project-scoped — each `crunch setup` call requires the user to supply one
+
+### GitHub API (optional, unauthenticated)
+- Used only for browsing quickstarter listings via `api.github.com` (public repo, no auth needed)
+- Rate-limited to 60 requests/hour per IP; sufficient for normal use
+
+## Network Access
+
+| Operation | Requires network | Endpoint |
+|-----------|-----------------|----------|
+| `crunch setup` | Yes | hub.crunchdao.com |
+| `crunch push` | Yes | hub.crunchdao.com |
+| `crunch download` | Yes | hub.crunchdao.com |
+| `crunch test` | **No** | Local only |
+| `crunch list` | Yes | hub.crunchdao.com |
+| `pip install` | Yes | pypi.org |
+| Quickstarter browsing | Yes | api.github.com |
 
 ## Quick Setup
 
@@ -15,8 +66,8 @@ Guides users through Crunch competition lifecycle: setup, quickstarter discovery
 ```bash
 mkdir -p ~/.crunch/workspace/competitions/<competition>
 cd ~/.crunch/workspace/competitions/<competition>
-uv venv && source .venv/bin/activate
-uv pip install crunch-cli jupyter ipykernel --upgrade --quiet --progress-bar off
+python -m venv .venv && source .venv/bin/activate 
+pip install crunch-cli jupyter ipykernel --upgrade --quiet --progress-bar=off
 python -m ipykernel install --user --name <competition> --display-name "Crunch - <competition>"
 
 # Get token from: https://hub.crunchdao.com/competitions/<competition>/submit
