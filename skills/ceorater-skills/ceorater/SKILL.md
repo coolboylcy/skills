@@ -1,6 +1,6 @@
 ---
 name: ceorater
-description: "Get institutional-grade CEO performance analytics for S&P 500 companies. Proprietary scores: CEORaterScore (composite), AlphaScore (market outperformance), RevenueCAGRScore (revenue growth), CompScore (compensation efficiency). Underlying data includes Total Stock Return (TSR) vs. S&P 500 (SPY), average annual returns, CEO total compensation (most recent fiscal year from proxy filings), and tenure-adjusted Revenue CAGR. Each record includes CEO name, company name, ticker, sector, industry, and tenure dates. Coverage: 517 CEOs as of February 2026, updated daily. Useful for investment research, due diligence, and executive compensation analysis."
+description: "Get institutional-grade CEO performance analytics for S&P 500 companies. Proprietary scores: CEORaterScore (composite), AlphaScore (market outperformance), RevenueCAGRScore (revenue growth), CompScore (compensation efficiency). Underlying data includes Total Stock Return (TSR) vs. S&P 500 (SPY), average annual returns, CEO total compensation (most recent fiscal year from proxy filings), and tenure-adjusted Revenue CAGR. Each record includes CEO name, company name, ticker, sector, industry, and tenure dates. Coverage: 500+ CEOs, updated daily. For live record count and last refresh timestamp, call GET /v1/meta. Useful for investment research, due diligence, and executive compensation analysis."
 homepage: https://www.ceorater.com
 disable-model-invocation: true
 requires:
@@ -52,6 +52,12 @@ curl -H "Authorization: Bearer $CEORATER_API_KEY" \
 ```bash
 curl -H "Authorization: Bearer $CEORATER_API_KEY" \
   "https://api.ceorater.com/v1/ceos?limit=100&format=raw"
+```
+
+### Get Metadata (live record count + last refresh timestamp)
+```bash
+curl -H "Authorization: Bearer $CEORATER_API_KEY" \
+  "https://api.ceorater.com/v1/meta"
 ```
 
 ## Usage Instructions

@@ -92,6 +92,11 @@ case "${1:-help}" in
         api_get "$BASE_URL/v1/ceos?limit=$LIMIT&format=raw"
         ;;
 
+    meta)
+        check_auth
+        api_get "$BASE_URL/v1/meta"
+        ;;
+
     help|--help|-h|*)
         echo "CEORater API Helper"
         echo ""
@@ -101,6 +106,7 @@ case "${1:-help}" in
         echo "  get <ticker>     Get CEO data by ticker (e.g., get AAPL)"
         echo "  search <query>   Search by CEO name, company, ticker, sector, or industry"
         echo "  list [limit]     List CEOs (default: 20)"
+        echo "  meta             Get live record count and last refresh timestamp"
         echo ""
         echo "Environment:"
         echo "  CEORATER_API_KEY  Your API key (required for get/search/list)"
