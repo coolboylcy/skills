@@ -4,18 +4,15 @@
  *
  * FREE OPTIONS:
  *   1. RapidAPI "Zillow-com1" or "Walk Score" - 30 free req/month
- *   2. Apify Zillow actor - $5/mo free tier (~500-1000 listings)
  *   3. Direct scraping with ScraperAPI (1000 free credits)
  *
  * SIGNUP REQUIRED:
  *   - RapidAPI: https://rapidapi.com (free, credit card optional for basic tier)
- *   - Apify: https://apify.com (free $5/mo, no credit card)
  */
 
 const axios = require('axios');
 
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-const APIFY_TOKEN = process.env.APIFY_TOKEN;
 
 // RapidAPI Zillow endpoint - US Property Market (600 free/mo, fastest)
 const RAPIDAPI_ZILLOW_HOST = 'us-property-market1.p.rapidapi.com';
@@ -29,18 +26,13 @@ const RAPIDAPI_ZILLOW_HOST = 'us-property-market1.p.rapidapi.com';
 async function fetchZillowListings(zip, options = {}) {
   const { maxResults = 40, minPrice, maxPrice, beds, propertyType } = options;
 
-  if (!RAPIDAPI_KEY && !APIFY_TOKEN) {
-    throw new Error('No API keys configured. Set RAPIDAPI_KEY or APIFY_TOKEN in .env\n' +
       'Get free key at: https://rapidapi.com');
   }
 
-  // Prefer RapidAPI (free, instant) over Apify (costs credits, slow)
   if (RAPIDAPI_KEY) {
     return fetchViaRapidAPI(zip, options);
   }
 
-  if (APIFY_TOKEN) {
-    return fetchViaApify(zip, options);
   }
 
   throw new Error('No API keys configured. Set RAPIDAPI_KEY in .env\nGet free key at: https://rapidapi.com');
@@ -92,20 +84,15 @@ async function fetchViaRapidAPI(zip, options = {}) {
 }
 
 /**
- * Apify Zillow actor (free $5/mo = ~500-2000 listings depending on pages)
- * Actor: https://apify.com/dtrungtin/zillow-scraper
  */
-async function fetchViaApify(location, options = {}) {
   const { maxResults = 40 } = options;
 
-  process.stderr.write(`  📡 Fetching Zillow listings for ${location} via Apify...\n`);
 
   const ZILLOW_ACTOR_ID = 'maxcopell~zillow-zip-search';
 
   try {
     // Start the actor run
     const runResponse = await axios.post(
-      `https://api.apify.com/v2/acts/${ZILLOW_ACTOR_ID}/runs?token=${APIFY_TOKEN}`,
       {
         zipCodes: [location],
         maxItems: maxResults
@@ -114,9 +101,7 @@ async function fetchViaApify(location, options = {}) {
     );
 
     const runId = runResponse.data?.data?.id;
-    if (!runId) throw new Error('Failed to start Apify run');
 
-    process.stderr.write(`  ⏳ Apify run started (${runId}), waiting for results...`);
 
     // Poll for completion (Zillow scrape takes ~30-90 seconds)
     let attempts = 0;
@@ -127,7 +112,6 @@ async function fetchViaApify(location, options = {}) {
       attempts++;
 
       const statusResponse = await axios.get(
-        `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`,
         { timeout: 10000 }
       );
 
@@ -135,27 +119,21 @@ async function fetchViaApify(location, options = {}) {
       process.stderr.write(`\r  ⏳ Status: ${status} (${attempts * 5}s)...`);
 
       if (status === 'SUCCEEDED') {
-        process.stderr.write(`\n  ✅ Apify run complete!\n`);
         break;
       }
       if (status === 'FAILED' || status === 'ABORTED') {
-        throw new Error(`Apify run failed with status: ${status}`);
       }
     }
 
     // Fetch results from dataset
     const datasetResponse = await axios.get(
-      `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${APIFY_TOKEN}&format=json&clean=true`,
       { timeout: 30000 }
     );
 
     const items = datasetResponse.data || [];
-    process.stderr.write(`  ✅ Retrieved ${items.length} listings from Apify\n`);
 
-    return items.slice(0, maxResults).map(normalizeApifyZillowItem);
 
   } catch (err) {
-    throw new Error(`Apify Zillow fetch failed: ${err.message}`);
   }
 }
 
@@ -201,9 +179,7 @@ function normalizeZillowListing(item) {
 }
 
 /**
- * Normalize an Apify Zillow result to our standard format
  */
-function normalizeApifyZillowItem(item) {
   // Handle maxcopell~zillow-zip-search output format
   // Top-level: beds, baths, area, price (string "$824,000"), addressStreet, detailUrl, zpid
   // hdpData.homeInfo: bedrooms, bathrooms, livingArea, homeType, daysOnZillow, latitude, longitude, streetAddress

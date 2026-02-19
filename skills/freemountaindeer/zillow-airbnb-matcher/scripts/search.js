@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Zillow × Airbnb Matcher — Chat Output Script
- * Designed for Alfred (OpenClaw) → Telegram/chat output
+ * Designed for OpenClaw agents → Telegram/chat output
  *
  * Usage:
  *   node scripts/search.js --demo
@@ -17,11 +17,9 @@
 const path = require('path');
 const fs = require('fs');
 
-// Try to load .env from a few locations
+// Load .env from skill directory only
 const envPaths = [
   path.join(__dirname, '../.env'),
-  path.join(__dirname, '../../.env'),
-  '/home/ubuntu/.clawdbot/.env'
 ];
 for (const envPath of envPaths) {
   if (fs.existsSync(envPath)) {
@@ -301,7 +299,7 @@ function printCommercialReport() {
   console.log('   Multi-family (5+ units): Check unit-level Airbnb activity');
   console.log('   Mixed-use: Great for STR arbitrage (rent unit, sublet as Airbnb)');
   console.log('   Best data source: AirDNA market reports for your target city');
-  console.log('   Commercial Apify actors: crexi-scraper, loopnet-scraper (~$5 free/mo)');
+  console.log('   Commercial property support coming soon');
 }
 
 // ─── Help --------------------------------------------------───────────────────
@@ -320,8 +318,8 @@ function printHelp() {
   console.log('  --min-price 300000   Min purchase price');
   console.log('  --min-beds 2         Minimum bedrooms');
   console.log('');
-  console.log('Live mode requires APIFY_TOKEN in .env');
-  console.log('Get a free token at: https://apify.com');
+  console.log('Live mode requires RAPIDAPI_KEY in .env');
+  console.log('Get a free key at: https://rapidapi.com');
   console.log('');
   console.log('See GUIDE.md for full setup instructions.');
 }

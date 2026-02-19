@@ -14,8 +14,8 @@
  *    - Returns listing details, pricing, reviews
  *    - No subscription needed
  *
- * 3. Apify Airbnb Scraper ($5/mo free tier)
- *    - Actor: apify/airbnb-scraper
+ * 
+ *    - 
  *    - Gets listing details by URL or location search
  *    - Good for small batches
  *
@@ -33,7 +33,6 @@ const axios = require('axios');
 const AIRROI_KEY = process.env.AIRROI_KEY;
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const SEARCHAPI_KEY = process.env.SEARCHAPI_KEY;
-const APIFY_TOKEN = process.env.APIFY_TOKEN;
 const AIRBTICS_KEY = process.env.AIRBTICS_KEY;
 
 /**
@@ -47,7 +46,7 @@ const AIRBTICS_KEY = process.env.AIRBTICS_KEY;
 async function fetchAirbnbListings(location, options = {}) {
   const { maxResults = 50, checkIn, checkOut } = options;
 
-  // Priority order: RapidAPI > AirROI > SearchAPI > Apify > Airbtics
+  // Priority order: RapidAPI (free tier)
   if (RAPIDAPI_KEY) {
     return fetchViaRapidAPI(location, options);
   }
@@ -57,8 +56,6 @@ async function fetchAirbnbListings(location, options = {}) {
   if (SEARCHAPI_KEY) {
     return fetchViaSearchAPI(location, options);
   }
-  if (APIFY_TOKEN) {
-    return fetchViaApifyAirbnb(location, options);
   }
   if (AIRBTICS_KEY) {
     return fetchViaAirbtics(location, options);
@@ -69,7 +66,6 @@ async function fetchAirbnbListings(location, options = {}) {
     'Options (cheapest first):\n' +
     '  1. RapidAPI (FREE 100/mo): https://rapidapi.com/3b-data-3b-data-default/api/airbnb13 → set RAPIDAPI_KEY\n' +
     '  2. AirROI (FREE + pay-as-you-go): https://airroi.com → set AIRROI_KEY\n' +
-    '  3. Apify (free $5/mo tier): https://apify.com → set APIFY_TOKEN\n\n' +
     'Run with --demo to see the tool without API keys'
   );
 }
@@ -217,19 +213,15 @@ async function fetchViaSearchAPI(location, options = {}) {
 }
 
 /**
- * Apify Airbnb scraper - free $5/mo tier
  * Actor: maxcopell/airbnb-scraper
  */
-async function fetchViaApifyAirbnb(location, options = {}) {
   const { maxResults = 50 } = options;
 
-  process.stderr.write(`  📡 Fetching Airbnb listings for ${location} via Apify...\n`);
 
   const AIRBNB_ACTOR_ID = 'tri_angle~airbnb-scraper';
 
   try {
     const runResponse = await axios.post(
-      `https://api.apify.com/v2/acts/${AIRBNB_ACTOR_ID}/runs?token=${APIFY_TOKEN}`,
       {
         locationQueries: [location],
         maxListings: maxResults,
@@ -239,7 +231,6 @@ async function fetchViaApifyAirbnb(location, options = {}) {
     );
 
     const runId = runResponse.data?.data?.id;
-    if (!runId) throw new Error('Failed to start Apify Airbnb run');
 
     // Poll for results
     let attempts = 0;
@@ -248,7 +239,6 @@ async function fetchViaApifyAirbnb(location, options = {}) {
       attempts++;
 
       const statusRes = await axios.get(
-        `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`,
         { timeout: 10000 }
       );
 
@@ -256,26 +246,21 @@ async function fetchViaApifyAirbnb(location, options = {}) {
       process.stderr.write(`\r  ⏳ Airbnb scrape: ${status} (${attempts * 5}s)...`);
 
       if (status === 'SUCCEEDED') {
-        process.stderr.write(`\n  ✅ Apify Airbnb run complete!\n`);
         break;
       }
       if (status === 'FAILED') {
-        throw new Error('Apify Airbnb actor run failed');
       }
     }
 
     const dataRes = await axios.get(
-      `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${APIFY_TOKEN}&format=json&clean=true`,
       { timeout: 30000 }
     );
 
     const items = dataRes.data || [];
     process.stderr.write(`  ✅ Retrieved ${items.length} Airbnb listings\n`);
 
-    return items.slice(0, maxResults).map(normalizeApifyAirbnbItem);
 
   } catch (err) {
-    throw new Error(`Apify Airbnb fetch failed: ${err.message}`);
   }
 }
 
@@ -391,7 +376,6 @@ function normalizeSearchAPIListing(item) {
   };
 }
 
-function normalizeApifyAirbnbItem(item) {
   // tri_angle~airbnb-scraper output format
   const ratingObj = typeof item.rating === 'object' ? item.rating : {};
   const ratingVal = ratingObj.guestSatisfaction || ratingObj.overall || ratingObj.value || (typeof item.rating === 'number' ? item.rating : null);
@@ -423,7 +407,6 @@ function normalizeApifyAirbnbItem(item) {
   if (cleanUrl.includes('?')) cleanUrl = cleanUrl.split('?')[0];
 
   return {
-    id: `apify-${item.id}`,
     address: item.address || item.location?.address || item.locationTitle || item.title,
     city: item.city || item.location?.city || '',
     state: item.state || item.location?.state || '',

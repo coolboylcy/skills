@@ -1,6 +1,6 @@
 ---
 name: zillow-airbnb-matcher
-version: 2.0.1
+version: 2.0.0
 description: Find properties for sale that are already generating Airbnb income. Cross-references Zillow listings with active Airbnb rentals using geo-matching and calculates investment metrics.
 author: em8.io
 requires:
@@ -25,11 +25,11 @@ tags:
 
 # Zillow × Airbnb Matcher Skill
 
-Alfred can find for-sale properties that **already have an active Airbnb listing** nearby — using GPS-based geo-matching to cross-reference Zillow and Airbnb data.
+This skill finds for-sale properties that **already have an active Airbnb listing** nearby — using GPS-based geo-matching to cross-reference Zillow and Airbnb data.
 
 ## How to Use (Chat Commands)
 
-Send Alfred any of these messages:
+Send your agent any of these messages:
 
 | Message | What Happens |
 |---------|-------------|
@@ -62,11 +62,11 @@ Send Alfred any of these messages:
 2. Subscribe to these 2 APIs (both free):
    - Airbnb: https://rapidapi.com/3b-data-3b-data-default/api/airbnb13
    - Zillow: https://rapidapi.com/SwongF/api/us-property-market1
-3. Add to Alfred's .env: `RAPIDAPI_KEY=your_key_here`
+3. Add to your .env: `RAPIDAPI_KEY=your_key_here`
 4. Test: `airbnb demo` (no API needed)
 5. Live test: `search airbnb 78704`
 
-See GUIDE.md for step-by-step setup instructions.
+See GUIDE-FOR-MATTHEW.md for step-by-step setup with screenshots.
 
 ## Investment Metrics
 
