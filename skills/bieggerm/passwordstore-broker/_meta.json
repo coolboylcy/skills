@@ -3,9 +3,15 @@
   "slug": "passwordstore-broker",
   "displayName": "Passwordstore Broker",
   "latest": {
-    "version": "1.0.3",
-    "publishedAt": 1771452741213,
-    "commit": "https://github.com/openclaw/skills/commit/6d2841668c849e6bf69207cbdec2bcb0ed64eae7"
+    "version": "1.1.1",
+    "publishedAt": 1771453850206,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.3",
+      "publishedAt": 1771452741213,
+      "commit": "https://github.com/openclaw/skills/commit/6d2841668c849e6bf69207cbdec2bcb0ed64eae7"
+    }
+  ]
 }

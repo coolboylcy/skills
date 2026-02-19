@@ -19,6 +19,30 @@ require_cmd() {
   fi
 }
 
+validate_secret_name() {
+  local value="$1"
+  if [ -z "$value" ]; then
+    echo "Secret name is required" >&2
+    exit 1
+  fi
+  if [[ "$value" == -* ]]; then
+    echo "Secret name must not start with '-'" >&2
+    exit 1
+  fi
+  if [[ ! "$value" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    echo "Secret name contains invalid characters" >&2
+    exit 1
+  fi
+  if [[ "$value" == *".."* ]] || [[ "$value" == *"//"* ]]; then
+    echo "Secret name contains invalid path traversal pattern" >&2
+    exit 1
+  fi
+  if [[ "$value" == /* ]] || [[ "$value" == */ ]]; then
+    echo "Secret name must not start or end with '/'" >&2
+    exit 1
+  fi
+}
+
 if [ "${1:-}" = "" ]; then
   usage
   exit 1
@@ -39,22 +63,26 @@ if [ "$cmd" != "ls" ] && [ -z "$name" ]; then
   exit 1
 fi
 
+if [ "$cmd" != "ls" ]; then
+  validate_secret_name "$name"
+fi
+
 case "$cmd" in
   put)
     # Read exactly from stdin and write as multiline secret.
-    pass insert -m -f "$name" >/dev/null
+    pass insert -m -f -- "$name" >/dev/null
     ;;
   get)
-    pass show "$name"
+    pass show -- "$name"
     ;;
   ls)
     pass ls
     ;;
   exists)
-    pass show "$name" >/dev/null 2>&1
+    pass show -- "$name" >/dev/null 2>&1
     ;;
   rm)
-    pass rm -f "$name" >/dev/null
+    pass rm -f -- "$name" >/dev/null
     ;;
   *)
     usage

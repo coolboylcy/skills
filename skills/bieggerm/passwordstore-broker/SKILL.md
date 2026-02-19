@@ -1,6 +1,8 @@
 ---
 name: passwordstore-broker
 description: Enforce safe secret handling by collecting secrets through one-time HTTPS forms, storing them in pass via scripts/vault.sh, and executing tools with environment injection via scripts/run_with_secret.sh so raw secrets do not enter chat context or logs.
+metadata:
+  compatibility: Requires pass, gpg, openssl, python3, and qrencode; local HTTPS network access is required, private LAN access is optional for phone flow.
 ---
 
 # Passwordstore Broker Agent Protocol

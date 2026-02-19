@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import html
 import ipaddress
+import json
 import os
 import re
 import secrets
@@ -187,8 +188,8 @@ def _linux_network_for_ip(local_ip: ipaddress.IPv4Address) -> Optional[ipaddress
         raise RuntimeError("Missing required command 'ip' for Linux LAN detection")
 
     try:
-        proc = subprocess.run(
-            [ip_cmd, "-o", "-f", "inet", "addr", "show"],
+        route_proc = subprocess.run(
+            [ip_cmd, "-j", "route", "get", "1.1.1.1"],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -198,14 +199,45 @@ def _linux_network_for_ip(local_ip: ipaddress.IPv4Address) -> Optional[ipaddress
         message = exc.stderr.strip() or "could not inspect interfaces"
         raise RuntimeError(f"Linux LAN detection failed: {message}") from exc
 
-    line_pattern = re.compile(r"^\d+:\s+\S+\s+inet\s+(\d+\.\d+\.\d+\.\d+/\d+)\b")
-    for line in proc.stdout.splitlines():
-        match = line_pattern.search(line)
-        if not match:
-            continue
-        iface = ipaddress.ip_interface(match.group(1))
-        if iface.ip == local_ip:
-            return iface.network
+    try:
+        route_info = json.loads(route_proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Linux LAN detection failed: invalid route JSON output") from exc
+
+    if not route_info or not isinstance(route_info, list):
+        raise RuntimeError("Linux LAN detection failed: empty route output")
+
+    iface_name = route_info[0].get("dev")
+    if not iface_name:
+        raise RuntimeError("Linux LAN detection failed: route output missing interface name")
+
+    try:
+        addr_proc = subprocess.run(
+            [ip_cmd, "-j", "-f", "inet", "addr", "show", "dev", iface_name],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        message = exc.stderr.strip() or "could not read interface addresses"
+        raise RuntimeError(f"Linux LAN detection failed: {message}") from exc
+
+    try:
+        addr_info = json.loads(addr_proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Linux LAN detection failed: invalid interface JSON output") from exc
+
+    for iface in addr_info:
+        for entry in iface.get("addr_info", []):
+            if entry.get("family") != "inet":
+                continue
+            if entry.get("local") != str(local_ip):
+                continue
+            prefix = entry.get("prefixlen")
+            if not isinstance(prefix, int):
+                continue
+            return ipaddress.ip_network(f"{local_ip}/{prefix}", strict=False)
     return None
 
 
@@ -218,9 +250,34 @@ def _prefix_from_netmask(mask: str) -> int:
 
 
 def _macos_network_for_ip(local_ip: ipaddress.IPv4Address) -> Optional[ipaddress.IPv4Network]:
+    route_cmd = shutil.which("route")
+    if route_cmd is None:
+        raise RuntimeError("Missing required command 'route' for macOS LAN detection")
+
+    try:
+        route_proc = subprocess.run(
+            [route_cmd, "-n", "get", "default"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        message = exc.stderr.strip() or "could not inspect default route"
+        raise RuntimeError(f"macOS LAN detection failed: {message}") from exc
+
+    iface_name = None
+    for line in route_proc.stdout.splitlines():
+        if "interface:" in line:
+            iface_name = line.split("interface:", 1)[1].strip()
+            break
+
+    if not iface_name:
+        raise RuntimeError("macOS LAN detection failed: default route missing interface name")
+
     try:
         proc = subprocess.run(
-            ["ifconfig"],
+            ["ifconfig", iface_name],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
