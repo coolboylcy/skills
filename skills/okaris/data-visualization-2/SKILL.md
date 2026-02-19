@@ -1,12 +1,6 @@
 ---
 name: data-visualization
-description: |
-  Data visualization with chart selection, color theory, and annotation best practices.
-  Covers chart types (bar, line, scatter, heatmap), axes rules, and storytelling with data.
-  Use for: charts, graphs, dashboards, reports, presentations, infographics, data stories.
-  Triggers: data visualization, chart, graph, data chart, bar chart, line chart,
-  scatter plot, data viz, visualization, dashboard chart, infographic data,
-  data presentation, chart design, plot, heatmap, pie chart alternative
+description: "Data visualization with chart selection, color theory, and annotation best practices. Covers chart types (bar, line, scatter, heatmap), axes rules, and storytelling with data. Use for: charts, graphs, dashboards, reports, presentations, infographics, data stories. Triggers: data visualization, chart, graph, data chart, bar chart, line chart, scatter plot, data viz, visualization, dashboard chart, infographic data, data presentation, chart design, plot, heatmap, pie chart alternative"
 allowed-tools: Bash(infsh *)
 ---
 
@@ -24,6 +18,8 @@ infsh app run infsh/python-executor --input '{
   "code": "import matplotlib.pyplot as plt\nimport matplotlib\nmatplotlib.use(\"Agg\")\n\nmonths = [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\"]\nrevenue = [42, 48, 55, 61, 72, 89]\n\nfig, ax = plt.subplots(figsize=(10, 6))\nax.bar(months, revenue, color=\"#3b82f6\", width=0.6)\nax.set_ylabel(\"Revenue ($K)\")\nax.set_title(\"Monthly Revenue Growth\", fontweight=\"bold\")\nfor i, v in enumerate(revenue):\n    ax.text(i, v + 1, f\"${v}K\", ha=\"center\", fontweight=\"bold\")\nplt.tight_layout()\nplt.savefig(\"revenue.png\", dpi=150)\nprint(\"Saved\")"
 }'
 ```
+
+> **Install note:** The [install script](https://cli.inference.sh) only detects your OS/architecture, downloads the matching binary from `dist.inference.sh`, and verifies its SHA-256 checksum. No elevated permissions or background processes. [Manual install & verification](https://dist.inference.sh/cli/checksums.txt) available.
 
 ## Chart Selection Guide
 
@@ -206,9 +202,9 @@ infsh app run infsh/python-executor --input '{
 ## Related Skills
 
 ```bash
-npx skills add inferencesh/skills@pitch-deck-visuals
-npx skills add inferencesh/skills@technical-blog-writing
-npx skills add inferencesh/skills@competitor-teardown
+npx skills add inference-sh/skills@pitch-deck-visuals
+npx skills add inference-sh/skills@technical-blog-writing
+npx skills add inference-sh/skills@competitor-teardown
 ```
 
 Browse all apps: `infsh app list`
