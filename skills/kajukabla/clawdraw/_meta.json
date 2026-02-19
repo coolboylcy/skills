@@ -1,13 +1,18 @@
 {
   "owner": "kajukabla",
   "slug": "clawdraw",
-  "displayName": "ClawDraw",
+  "displayName": "Claw Draw",
   "latest": {
-    "version": "0.3.0",
-    "publishedAt": 1771469991291,
-    "commit": "https://github.com/openclaw/skills/commit/d1ef21a61d4d379ffc579a7308451e5a99b8b784"
+    "version": "0.4.0",
+    "publishedAt": 1771545506953,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.3.0",
+      "publishedAt": 1771469991291,
+      "commit": "https://github.com/openclaw/skills/commit/d1ef21a61d4d379ffc579a7308451e5a99b8b784"
+    },
     {
       "version": "0.2.0",
       "publishedAt": 1771448786880,
