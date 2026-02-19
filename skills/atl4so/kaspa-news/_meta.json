@@ -1,0 +1,11 @@
+{
+  "owner": "atl4so",
+  "slug": "kaspa-news",
+  "displayName": "Kaspa News",
+  "latest": {
+    "version": "1.1.0",
+    "publishedAt": 1771449823689,
+    "commit": null
+  },
+  "history": []
+}
