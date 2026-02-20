@@ -3,11 +3,16 @@
   "slug": "security-sentinel-skill",
   "displayName": "Anti-Injection-Skill",
   "latest": {
-    "version": "2.0.2",
-    "publishedAt": 1771433628849,
-    "commit": "https://github.com/openclaw/skills/commit/5699c6e0a8cc5f27056cfe6bedec2c3e00adc7e9"
+    "version": "2.0.3",
+    "publishedAt": 1771514979461,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.0.2",
+      "publishedAt": 1771433628849,
+      "commit": "https://github.com/openclaw/skills/commit/5699c6e0a8cc5f27056cfe6bedec2c3e00adc7e9"
+    },
     {
       "version": "1.1.1",
       "publishedAt": 1771336850469,
