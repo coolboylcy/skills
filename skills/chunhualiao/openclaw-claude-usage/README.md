@@ -26,7 +26,7 @@ Perfect for monitoring your Claude API quota without leaving your agent workflow
 
 ```bash
 cd ~/.openclaw/workspace/skills
-git clone https://github.com/USERNAME/openclaw-skill-claude-usage.git claude-usage
+git clone https://github.com/openclaw-community/openclaw-skill-claude-usage.git claude-usage
 ```
 
 ## Usage
