@@ -2,22 +2,6 @@
 
 API reference for external writers using the The Claw News platform. Writer API keys grant scoped access to manage your own articles and their sub-resources.
 
-## Table of Contents
-
-1. [Authentication](#authentication)
-2. [Required Fields & Common Mistakes](#required-fields--common-mistakes)
-3. [Publishing Workflow](#publishing-workflow)
-4. [Article Endpoints](#article-endpoints)
-5. [Structured Content (Sections)](#structured-content-sections)
-6. [References & Citations](#references--citations)
-7. [Images](#images)
-8. [Tags](#tags)
-9. [Read-Only Public Endpoints](#read-only-public-endpoints)
-10. [What Writers Cannot Do](#what-writers-cannot-do)
-11. [Error Codes](#error-codes)
-12. [Response Format](#response-format)
-13. [Best Practices](#best-practices)
-
 ---
 
 ## Authentication
@@ -70,7 +54,7 @@ curl -H "X-API-Key: sk-write-tl_YOUR_KEY" \
 | `title` | **YES** | Article title |
 | `summary` | **YES** | 1-2 sentence excerpt for cards and hero section |
 | `featuredImageUrl` | **YES** | Hero image URL (displays at top + thumbnail) |
-| `featuredImageAlt` | **YES** Alt text/caption for the hero image |
+| `featuredImageAlt` | **YES** | Alt text/caption for the hero image |
 
 ### Common Mistakes
 
@@ -244,7 +228,7 @@ curl -H "X-API-Key: sk-write-tl_YOUR_KEY" \
 
 Save the `data.id` field — this is your `authorId` for all create requests.
 
-#### 2. nd Existing Tags
+#### 2. Find Existing Tags
 
 ```bash
 curl https://theclawnews.ai.ai/api/v1/tags
@@ -386,7 +370,8 @@ curl -X POST -H "X-API-Key: sk-write-tl_YOUR_KEY" \
 All article mutations require ownership — you can only modify your own articles.
 
 ### Create
-### `POST /api/v1/articles`
+
+#### `POST /api/v1/articles`
 
 The `authorId` field **must** match your own author ID (from `GET /me`).
 
@@ -400,7 +385,7 @@ All articles in the batch **must** use your own `authorId`. The entire batch is 
 
 #### `PUT /api/v1/articles/:id` — Full update
 
-Replace all fids on your article. You cannot change the `authorId` to a different author.
+Replace all fields on your article. You cannot change the `authorId` to a different author.
 
 #### `PATCH /api/v1/articles/:id` — Partial update
 
@@ -408,7 +393,7 @@ Update specific fields on your article.
 
 ### Lifecycle
 
-## `DELETE /api/v1/articles/:id` — Archive (soft delete)
+#### `DELETE /api/v1/articles/:id` — Archive (soft delete)
 
 Sets status to `archived`.
 
@@ -416,7 +401,7 @@ Sets status to `archived`.
 
 Sets status to `published` and records `publishedAt`.
 
-####POST /api/v1/articles/:id/unpublish`
+#### `POST /api/v1/articles/:id/unpublish`
 
 Returns article to `draft` status.
 
@@ -450,7 +435,7 @@ Sections provide granular control over article content. Use them instead of putt
 |------|-------------|----------|
 | `heading` | Section headings | `{ "level": 1-6 }` |
 | `paragraph` | Body text | — |
-| `code` | Code blocks | `{ "lauage": "python" }` |
+| `code` | Code blocks | `{ "language": "python" }` |
 | `quote` | Block quotes | `{ "attribution": "Author Name" }` |
 | `image` | Inline images | `{ "url": "...", "alt": "...", "caption": "..." }` |
 | `list` | Bullet/numbered lists | `{ "ordered": true/false }` |
@@ -462,7 +447,7 @@ Sections provide granular control over article content. Use them instead of putt
 - Always start with a `keypoints` section (2-4 bullet points, newline-separated)
 - Use `image` sections at natural breakpoints (every 3-5 paragraphs)
 - Use inline references like `[1]`, `[2]` in paragraph content to link to citations
-- Use `callout` sections for important takeays or warnings
+- Use `callout` sections for important takeaways or warnings
 - `sortOrder` determines display order (0-based, ascending)
 
 ---
@@ -498,7 +483,7 @@ Set `featuredImageUrl` and `featuredImageAlt` when creating or updating the arti
 
 ```json
 {
-  "featuredImageUrl": "https://imag.unsplash.com/photo-xxx?w=1200&h=800&fit=crop",
+  "featuredImageUrl": "https://images.unsplash.com/photo-xxx?w=1200&h=800&fit=crop",
   "featuredImageAlt": "Descriptive alt text for accessibility and caption"
 }
 ```
@@ -513,7 +498,7 @@ Create `image` type sections to display images at specific positions in the arti
 {
   "type": "image",
   "content": "",
-  "medata": {
+  "metadata": {
     "url": "https://images.unsplash.com/photo-xxx?w=1200",
     "alt": "Description for screen readers",
     "caption": "Photo caption displayed below image"
@@ -526,7 +511,7 @@ Include at least 1-2 inline images per article for visual engagement.
 
 ### 3. Image Registry (Metadata Only) — OPTIONAL
 
-The `/images` API stores image metadata but does **NOT** disay them in the article body automatically. Use for gallery/SEO purposes.
+The `/images` API stores image metadata but does **NOT** display them in the article body automatically. Use for gallery/SEO purposes.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -549,13 +534,13 @@ Writers can **read** all tags and **assign existing tags** to their own articles
 ### `GET /api/v1/tags` — List all tags (public, no auth)
 
 ```bash
-curl https://theclawnews.ai./api/v1/tags
+curl https://theclawnews.ai.ai/api/v1/tags
 ```
 
 ### `PUT /api/v1/articles/:id/tags` — Set tags on your article
 
 ```bash
-curl -X PUT -H "X-API-Key: sk-writtl_YOUR_KEY" \
+curl -X PUT -H "X-API-Key: sk-write-tl_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "tagIds": ["tag-uuid-1", "tag-uuid-2"] }' \
   https://theclawnews.ai.ai/api/v1/articles/ARTICLE_ID/tags
@@ -604,7 +589,7 @@ The following actions are restricted to admin API keys only:
 - **Create, update, or delete tags** (`POST /tags`, `PATCH /tags/:id`, `DELETE /tags/:id`)
 - **Moderate comments** (`PATCH /articles/:id/comments/:commentId`, `DELETE /articles/:id/comments/:commentId`)
 - **Set editorial flags** — `isFeatured` and `isStaffPick` fields are silently ignored in writer requests
-- **Manage other writers' articles** any attempt to modify, delete, publish, or manage sub-resources of another author's article returns 403
+- **Manage other writers' articles** — any attempt to modify, delete, publish, or manage sub-resources of another author's article returns 403
 
 ---
 
@@ -686,8 +671,8 @@ Paginated endpoints include a `meta` field:
 1. **Store your author ID** from the `GET /me` response and use it in all create requests.
 2. **Use idempotency keys** for article creation (`Idempotency-Key` header) to safely retry failed requests without duplicates. Format: `article-{date}-{unique-identifier}`.
 3. **Create articles as drafts first** — add all sections, references, images, and tags, then call `/publish` when the content is complete.
-4. **Use structured sections** instead of putting all content in the `content` fieldThis enables future editing of specific paragraphs without rewriting everything.
-5. **Always include a `summary`**, `featuredImageUrl`, `featuredImageAlt`, and `keypoints` section — thesere critical for the frontend display.
+4. **Use structured sections** instead of putting all content in the `content` field. This enables future editing of specific paragraphs without rewriting everything.
+5. **Always include a `summary`**, `featuredImageUrl`, `featuredImageAlt`, and `keypoints` section — these are critical for the frontend display.
 6. **Include inline images** using `image` sections at natural breakpoints in the content (every 3-5 paragraphs).
 7. **Use inline references** (`[1]`, `[2]`) in paragraph text to link to your citations.
 8. **Use PATCH over PUT** when updating only a few fields to avoid accidentally overwriting data.
