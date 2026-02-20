@@ -4,14 +4,24 @@
  */
 
 const fs = require('fs');
-const { getConfigDir } = require('./environment');
 const path = require('path');
+
+// Safely get config dir with fallback
+function getSafeConfigDir() {
+  try {
+    const { getConfigDir } = require('./environment');
+    return getConfigDir();
+  } catch (e) {
+    // Fallback to .clawdbot if environment module fails
+    return path.join(process.env.HOME || '', '.clawdbot');
+  }
+}
 
 class DebugLogger {
   constructor() {
     this.logs = [];
     this.maxLogs = 1000;
-    this.logFile = path.join(getConfigDir(), 'courtroom_debug.log');
+    this.logFile = path.join(getSafeConfigDir(), 'courtroom_debug.log');
     this.enabled = true;
   }
 
