@@ -60,12 +60,16 @@ def save_progress(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def check_reset():
-    """检查是否需要自动重置"""
-    today = datetime.now()
-    weekday = today.weekday() + 1
+    """检查是否需要自动重置（刷新日早上6点后重置）"""
+    now = datetime.now()
+    today = now.date()
+    weekday = now.weekday() + 1  # 周1-7
     
     data = load_progress()
     events = get_events()
+    
+    # 刷新时间：早上6点
+    refresh_hour = 6
     
     for name, config in events.items():
         if not config.get("enabled", True):
@@ -74,20 +78,20 @@ def check_reset():
         key = config["key"]
         refresh_day = config["refresh_day"]
         
-        if weekday == refresh_day:
-            last_reset = data.get("last_reset", {}).get(key, "")
-            today_str = today.strftime("%Y-%m-%d")
-            if last_reset != today_str:
-                data["progress"][key] = {"done": 0, "total": config["total"]}
-                data["last_reset"] = data.get("last_reset", {})
-                data["last_reset"][key] = today_str
-                save_progress(data)
+        # 判断今天是否是刷新日，且当前时间超过6点
+        if weekday == refresh_day and now.hour >= refresh_hour:
+            # 重置进度
+            data["progress"][key] = {"done": 0, "total": config["total"]}
+            data["last_reset"] = data.get("last_reset", {})
+            data["last_reset"][key] = now.strftime("%Y-%m-%d")
+            save_progress(data)
     
     return data
 
 def status():
     """显示当前进度"""
-    data = check_reset()
+    check_reset()  # 每次调用都自动检查重置
+    data = load_progress()
     events = get_events()
     progress = data.get("progress", {})
     
@@ -204,6 +208,9 @@ def show_events():
     return "\n".join(lines)
 
 if __name__ == "__main__":
+    # 任何调用都先检查重置
+    check_reset()
+    
     if len(sys.argv) < 2:
         print(status())
     elif sys.argv[1] == "--status":
