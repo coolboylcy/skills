@@ -1,12 +1,6 @@
 ---
 name: product-hunt-launch
-description: |
-  Product Hunt launch optimization with specific specs, timing, and gallery strategy.
-  Covers taglines, gallery images, maker comments, and launch day tactics.
-  Use for: product launches, startup launches, side project launches, Product Hunt optimization.
-  Triggers: product hunt, ph launch, product hunt launch, launch strategy,
-  product launch, startup launch, product hunt tips, product hunt gallery,
-  ph optimization, launch day, product hunt maker
+description: "Product Hunt launch optimization with specific specs, timing, and gallery strategy. Covers taglines, gallery images, maker comments, and launch day tactics. Use for: product launches, startup launches, side project launches, Product Hunt optimization. Triggers: product hunt, ph launch, product hunt launch, launch strategy, product launch, startup launch, product hunt tips, product hunt gallery, ph optimization, launch day, product hunt maker"
 allowed-tools: Bash(infsh *)
 ---
 
@@ -31,6 +25,8 @@ infsh app run tavily/search-assistant --input '{
   "query": "Product Hunt top launches this week SaaS tools"
 }'
 ```
+
+> **Install note:** The [install script](https://cli.inference.sh) only detects your OS/architecture, downloads the matching binary from `dist.inference.sh`, and verifies its SHA-256 checksum. No elevated permissions or background processes. [Manual install & verification](https://dist.inference.sh/cli/checksums.txt) available.
 
 ## Listing Specifications
 
@@ -254,9 +250,9 @@ infsh app run tavily/search-assistant --input '{
 ## Related Skills
 
 ```bash
-npx skills add inferencesh/skills@ai-image-generation
-npx skills add inferencesh/skills@web-search
-npx skills add inferencesh/skills@prompt-engineering
+npx skills add inference-sh/skills@ai-image-generation
+npx skills add inference-sh/skills@web-search
+npx skills add inference-sh/skills@prompt-engineering
 ```
 
 Browse all apps: `infsh app list`
