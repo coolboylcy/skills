@@ -11,6 +11,21 @@ PROJECTS_DIR="$CKPT_DIR/projects"
 # Ensure directories exist
 mkdir -p "$CHECKPOINTS_DIR" "$PROJECTS_DIR"
 
+# JSON escape function - handles all JSON special characters
+json_escape() {
+    local str="$1"
+    # Escape backslashes first (order matters)
+    str="${str//\\/\\\\}"           # \
+    str="${str//\"/\\\"}"           # \"
+    str="${str//$'\t'/\\t}"          # tab
+    str="${str//$'\b'/\\b}"          # backspace
+    str="${str//$'\f'/\\f}"          # formfeed
+    # Replace newlines/carriage returns with spaces (JSON doesn't allow raw newlines in strings)
+    str="${str//$'\n'/ }"
+    str="${str//$'\r'/ }"
+    printf '%s' "$str"
+}
+
 # Auto-detect project from git
 auto_detect_project() {
     local git_dir=""
@@ -94,16 +109,22 @@ else
   FILES_JSON=$(echo "$RECENT_FILES" | awk '{gsub(/, */, "\",\""); print "\"" $0 "\""}')
 fi
 
+# Escape values for JSON
+SAFE_MESSAGE=$(json_escape "$MESSAGE")
+SAFE_PROJECT_NAME=$(json_escape "$PROJECT_NAME")
+SAFE_BRANCH=$(json_escape "$BRANCH")
+SAFE_RECENT_COMMITS=$(json_escape "$RECENT_COMMITS")
+
 cat > "$CHECKPOINTS_DIR/$TIMESTAMP.json" << JSON
 {
   "id": "$TIMESTAMP",
   "timestamp": "$ISO_TIMESTAMP",
   "project_id": "$PROJECT_ID",
-  "project_name": "$PROJECT_NAME",
+  "project_name": "$SAFE_PROJECT_NAME",
   "session_type": "active_development",
-  "summary": "$MESSAGE",
-  "git_branch": "$BRANCH",
-  "recent_commits": "$RECENT_COMMITS",
+  "summary": "$SAFE_MESSAGE",
+  "git_branch": "$SAFE_BRANCH",
+  "recent_commits": "$SAFE_RECENT_COMMITS",
   "files_touched": [$FILES_JSON],
   "urls": [],
   "commands": [],
