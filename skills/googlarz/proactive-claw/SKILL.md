@@ -1,46 +1,25 @@
 ---
 name: proactive-claw
-version: 1.1.7
+version: 1.1.9
 description: >
-  NOTE ON REGISTRY METADATA: The clawhub registry API does not expose skill frontmatter fields
-  (primaryEnv, requires.env, install) in its public metadata panel — those fields exist in
-  SKILL.md and are listed fully below, but the registry stores only slug/displayName/summary/tags.
-  This is a known clawhub platform limitation, not a mismatch or omission by the skill author.
-  REQUIRED ENV VAR: GOOGLE_OAUTH_CREDENTIALS_PATH (path to credentials.json from Google Cloud).
-  REQUIRED BINARY: python3. INSTALL: uv/pip installs google-api-python-client (see install block).
-  OPTIONAL CREDENTIALS (each independently gated, all off by default): NOTION_API_KEY +
-  NOTION_OUTCOMES_DB_ID (Notion outcome logging), Telegram bot token (push notifications),
-  LLM_RATER_API_KEY (cloud LLM rating only — local Ollama/LM Studio need no key),
-  Nextcloud URL+app-password (alternative calendar backend).
-  CROSS-SKILL FILE NOTE: cross_skill.py fetches GitHub PRs (via gh CLI) and Notion pages
-  (via NOTION_API_KEY env var) for event prep context. It does NOT read any other skill's
-  credentials, config files, tokens, or stored data. It only checks if a SKILL.md file exists
-  (presence check) to decide whether to attempt the integration. feature_cross_skill=false by default.
-  Proactive life assistant that acts even when you are not in a conversation. Background daemon
-  scans your calendar every 15 minutes and sends push notifications (system, Telegram). SQLite
-  memory with TF-IDF semantic search. Detects conflicts, back-to-back runs, overloaded days.
-  Natural language rules engine. Open action items auto-schedule follow-ups. Policy engine
-  auto-blocks prep/focus/buffer time. Predictive scheduling with energy pattern detection.
-  Natural language calendar editing: move, find free time, clear, read. Lightweight CRM from
-  attendees. Voice-first via Whisper. Self-tuning notifications. Opt-in team coordination.
-  Configurable LLM interaction rater (local Ollama/LM Studio or any OpenAI-compatible API).
-  One-command setup with clawhub OAuth (downloads only OAuth client config, never your token).
-  REQUIRES RUNNING SETUP SCRIPT: bash scripts/setup.sh (Google Calendar OAuth) or configure
-  Nextcloud backend. Contains 21 Python scripts, setup.sh, install_daemon.sh — inspect before
-  running. Installs a user-level background daemon (launchd/systemd, NOT root).
-  All credentials stored locally under ~/.openclaw/workspace/skills/proactive-agent/ — never uploaded.
-  SIDE EFFECTS: installs user-level background daemon; writes files only under skill directory;
-  creates OpenClaw calendar (never modifies existing calendars); outbound HTTPS only to Google
-  Calendar API by default — Notion, Telegram, GitHub, clawhub.ai, LLM backend each gated by
-  feature_* flag or explicit config.
-
-primaryEnv: GOOGLE_OAUTH_CREDENTIALS_PATH
+  Proactive calendar assistant that acts autonomously between conversations. A background daemon
+  scans your calendar every 15 minutes, sends push notifications (system, Telegram), detects
+  scheduling conflicts, and queues nudges for when you next open a chat. Stores outcome history
+  in a local SQLite database with TF-IDF semantic search. Natural language rules engine and
+  autonomous policy engine auto-block prep, focus, and buffer time. Predictive scheduling warns
+  when high-stakes events fall at historically low-energy times. Move, find free time, and edit
+  your calendar in plain English. Lightweight CRM built automatically from calendar attendees.
+  Voice-first via Whisper. Self-tuning notifications learn your best channel and time. Opt-in
+  team cross-calendar coordination. Local LLM interaction rater (Ollama/LM Studio — no cloud key
+  needed). One-command setup; installs a user-level daemon (NOT root). All credentials stay local.
+  Requires: python3, Google OAuth credentials (or Nextcloud). Optional: gh CLI for GitHub context
+  (feature_cross_skill, off by default), NOTION_API_KEY, Telegram token, LLM_RATER_API_KEY.
+  Outcome notes saved locally by default; optionally to Apple Notes via osascript (macOS only,
+  notes_destination=apple-notes, off by default) or Notion (notes_destination=notion, off by default).
 
 requires:
   bins:
     - python3
-  env:
-    - GOOGLE_OAUTH_CREDENTIALS_PATH
 
 install:
   - kind: uv
@@ -55,7 +34,7 @@ side_effects:
   - pip installs google-api-python-client, google-auth-oauthlib, google-auth-httplib2 (Google backend) or caldav, icalendar (Nextcloud backend) during setup.sh.
 ---
 
-# Proactive Claw v1.1
+# Proactive Claw v1.1.9
 
 > The lobster that acts before you even open a conversation — and learns your rhythms.
 
@@ -190,6 +169,7 @@ Edit this file directly to change settings. Only modify values in the right-hand
 | `llm_rater.model` | `qwen2.5:3b` | Model name (see Feature 16 for options) |
 | `llm_rater.api_key_env` | `""` | Env var name holding API key (empty = no key, for local) |
 | `llm_rater.timeout` | `30` | Request timeout in seconds |
+| `notes_destination` | `local` | Where to save outcome notes: `local` (JSON file only), `apple-notes` (also write to Apple Notes via osascript — macOS only), `notion` (also POST to Notion DB — requires NOTION_API_KEY + NOTION_OUTCOMES_DB_ID env vars) |
 
 ---
 
