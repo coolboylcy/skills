@@ -147,6 +147,42 @@ grep -c "Status\*\*: pending" agents/[name]/.learnings/*.md
 grep -B5 "Priority\*\*: high" agents/[name]/.learnings/*.md | grep "^## \["
 ```
 
+## Weekly Metrics Layer
+
+In addition to `.learnings/`, every council should include:
+
+`memory/learning-metrics.json`
+
+Recommended schema:
+```json
+{
+  "lastWeeklyReview": null,
+  "windowDays": 7,
+  "counts": {
+    "errors": 0,
+    "learnings": 0,
+    "featureRequests": 0,
+    "repeatedMistakes": 0,
+    "promotions": 0
+  },
+  "routing": {
+    "fast": 0,
+    "think": 0,
+    "deep": 0,
+    "strategic": 0
+  },
+  "nextWeekFocus": ""
+}
+```
+
+Weekly review checklist:
+1. Count new entries in ERRORS, LEARNINGS, FEATURE_REQUESTS
+2. Count repeated mistakes (same issue appears 2+ times)
+3. Count promotions to permanent files
+4. Track route distribution (Fast/Think/Deep/Strategic)
+5. Set one concrete next-week focus
+
 ## Initialization
 
 When creating a new agent, initialize .learnings/ with empty files using the templates from `assets/LEARNINGS-TEMPLATE.md`. The files should have headers and status definitions but no entries yet.
+Also initialize `memory/learning-metrics.json` using `assets/LEARNING-METRICS-TEMPLATE.json`.

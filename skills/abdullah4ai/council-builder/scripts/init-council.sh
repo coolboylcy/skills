@@ -20,10 +20,61 @@ NC='\033[0m'
 
 log() { echo -e "${GREEN}[+]${NC} $1"; }
 
-# Create shared directories
+# Create shared and support directories
 mkdir -p "$WORKSPACE/shared/reports"
 mkdir -p "$WORKSPACE/shared/learnings"
-log "Created shared directories"
+mkdir -p "$WORKSPACE/memory"
+mkdir -p "$WORKSPACE/docs/architecture"
+log "Created shared and support directories"
+
+# Initialize weekly learning metrics file
+if [ ! -f "$WORKSPACE/memory/learning-metrics.json" ]; then
+    cat > "$WORKSPACE/memory/learning-metrics.json" << 'EOF'
+{
+  "lastWeeklyReview": null,
+  "windowDays": 7,
+  "counts": {
+    "errors": 0,
+    "learnings": 0,
+    "featureRequests": 0,
+    "repeatedMistakes": 0,
+    "promotions": 0
+  },
+  "routing": {
+    "fast": 0,
+    "think": 0,
+    "deep": 0,
+    "strategic": 0
+  },
+  "nextWeekFocus": ""
+}
+EOF
+    log "Created memory/learning-metrics.json"
+fi
+
+# Initialize visual architecture doc
+if [ ! -f "$WORKSPACE/docs/architecture/ADAPTIVE-ROUTING-LEARNING.md" ]; then
+    cat > "$WORKSPACE/docs/architecture/ADAPTIVE-ROUTING-LEARNING.md" << 'EOF'
+# Adaptive Routing and Learning
+
+Purpose
+- Route tasks to the right model depth
+- Improve quality weekly through measured feedback
+
+## Routing Matrix
+
+| Route | Use When | Preferred Model | Reasoning |
+|------|----------|-----------------|-----------|
+| Fast | direct answer and routine operation | default model | off |
+| Think | analysis and structured planning | analysis-tier model | on |
+| Deep | long-context synthesis and publication-grade output | long-context model | off |
+| Strategic | architecture and high-impact tradeoff decisions | strategic-tier model | on |
+
+## Weekly Metrics Source
+`memory/learning-metrics.json`
+EOF
+    log "Created docs/architecture/ADAPTIVE-ROUTING-LEARNING.md"
+fi
 
 # Initialize cross-agent learnings file
 if [ ! -f "$WORKSPACE/shared/learnings/CROSS-AGENT.md" ]; then

@@ -1,6 +1,6 @@
 ---
 name: council-builder
-description: "Build a personalized team of AI agent personas for OpenClaw. Interviews the user, analyzes their workflow, then creates specialized agents with distinct personalities, self-improvement systems, and inter-agent coordination. USE WHEN: user wants to create an agent team/council, build specialized AI personas, set up multi-agent workflows, 'build me a team of agents', 'create agents for my workflow', 'set up an agent council', 'I want specialized AI assistants', 'build me a crew'. DON'T USE WHEN: user wants a single skill (use skill-creator), wants to install existing skills (use clawhub), or wants to chat with existing agents (just route to them)."
+description: "Build a personalized team of AI agent personas for OpenClaw. Interviews the user, analyzes their workflow, then creates specialized agents with distinct personalities, adaptive model routing (Fast/Think/Deep/Strategic), weekly learning metrics, visual architecture docs, and inter-agent coordination. USE WHEN: user wants to create an agent team/council, build specialized AI personas, set up multi-agent workflows, 'build me a team of agents', 'create agents for my workflow', 'set up an agent council', 'I want specialized AI assistants', 'build me a crew'. DON'T USE WHEN: user wants a single skill (use skill-creator), wants to install existing skills (use clawhub), or wants to chat with existing agents (just route to them)."
 ---
 
 # Council Builder
@@ -98,8 +98,22 @@ agents/[agent-name]/
 2. Create the routing table for all agents
 3. Define file coordination map
 4. Set up enforcement rules
+5. Add adaptive model routing thresholds (Fast, Think, Deep, Strategic)
 
-### Phase 4: Self-Improvement Setup
+### Phase 4: Adaptive Routing Setup
+
+Read `references/adaptive-routing.md`.
+
+Set up an adaptive routing section in root AGENTS.md:
+- Default to Fast
+- Escalation thresholds for Think, Deep, Strategic
+- De-escalation rule back to Fast after heavy reasoning
+- High-tier model rate-limit fallback behavior
+
+Also create visual architecture doc:
+- `docs/architecture/ADAPTIVE-ROUTING-LEARNING.md` using `assets/ADAPTIVE-ROUTING-LEARNING-TEMPLATE.md`
+
+### Phase 5: Self-Improvement Setup
 
 Read `references/self-improvement.md` for the complete system.
 
@@ -109,8 +123,9 @@ Each agent gets built-in self-improvement:
 - Promotion rules (learning → SOUL.md / AGENTS.md / TOOLS.md)
 - Cross-agent learning sharing via `shared/learnings/CROSS-AGENT.md`
 - Periodic review instructions
+- Weekly learning metrics file at `memory/learning-metrics.json` (use `assets/LEARNING-METRICS-TEMPLATE.json`)
 
-### Phase 5: Verification
+### Phase 6: Verification
 
 After building everything:
 1. List all created files for the user
@@ -118,7 +133,7 @@ After building everything:
 3. Show the coordination map
 4. Confirm everything is in place
 
-### Phase 6: Expansion (On-Demand)
+### Phase 7: Expansion (On-Demand)
 
 When the user asks to add, modify, or remove agents:
 
@@ -154,3 +169,9 @@ When the user asks to add, modify, or remove agents:
 6. **The user's main assistant is the coordinator.** It routes tasks, not the agents themselves.
 
 7. **Language-adaptive.** Write SOULs in whatever language the user works in. Arabic, English, bilingual, whatever fits their world.
+
+8. **Adaptive routing by default.** Every generated council should include Fast/Think/Deep/Strategic model routing thresholds.
+
+9. **Metrics over vibes.** Weekly learning review must be measured in `memory/learning-metrics.json`.
+
+10. **Architecture must be visual.** Generate a concise architecture doc at `docs/architecture/ADAPTIVE-ROUTING-LEARNING.md` for training and onboarding.
