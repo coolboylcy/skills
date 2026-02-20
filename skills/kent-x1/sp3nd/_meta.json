@@ -1,0 +1,11 @@
+{
+  "owner": "kent-x1",
+  "slug": "sp3nd",
+  "displayName": "SP3ND — Buy from Amazon with USDC",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771552590361,
+    "commit": null
+  },
+  "history": []
+}
