@@ -3,11 +3,16 @@
   "slug": "youdotcom",
   "displayName": "You.com  CLI",
   "latest": {
-    "version": "2.0.6",
-    "publishedAt": 1771486185122,
-    "commit": "https://github.com/openclaw/skills/commit/595d7ea92e9923df9294a46853031013e3633879"
+    "version": "2.0.7",
+    "publishedAt": 1771534942916,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.0.6",
+      "publishedAt": 1771486185122,
+      "commit": "https://github.com/openclaw/skills/commit/595d7ea92e9923df9294a46853031013e3633879"
+    },
     {
       "version": "2.0.5",
       "publishedAt": 1770928283538,
