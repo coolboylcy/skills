@@ -1,0 +1,11 @@
+{
+  "owner": "aaronllee",
+  "slug": "dex-quote",
+  "displayName": "DEX Aggregator Quote",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771566319068,
+    "commit": null
+  },
+  "history": []
+}
