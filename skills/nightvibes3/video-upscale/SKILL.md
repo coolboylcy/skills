@@ -10,8 +10,9 @@ AI-powered video upscaling with progress tracking and job isolation.
 
 ## Quick Usage
 
+Set environment variables (see INSTALL.md), then:
 ```bash
-/home/bobby/video-tools/real-video-enhancer/upscale_video.sh "{{filepath}}" "{{output_path}}" "{{mode}}" "{{preset}}" "{{engine}}" "{{job_id}}"
+./upscale_video.sh "{{filepath}}" "{{output_path}}" "{{mode}}" "{{preset}}" "{{engine}}" "{{job_id}}"
 ```
 
 ## Parameters
