@@ -1,13 +1,18 @@
 {
   "owner": "rdsthomas",
   "slug": "mission-control",
-  "displayName": "Jeannie Control",
+  "displayName": "Mission Control",
   "latest": {
-    "version": "2.3.0",
-    "publishedAt": 1771434742738,
-    "commit": "https://github.com/openclaw/skills/commit/0814b51ca9a6fc9d3125bb0e9c244d03773538e9"
+    "version": "2.3.1",
+    "publishedAt": 1771603328123,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.3.0",
+      "publishedAt": 1771434742738,
+      "commit": "https://github.com/openclaw/skills/commit/0814b51ca9a6fc9d3125bb0e9c244d03773538e9"
+    },
     {
       "version": "2.2.2",
       "publishedAt": 1770739336241,
