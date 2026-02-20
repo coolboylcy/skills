@@ -1,6 +1,6 @@
 ---
 name: photo-captions
-description: Generate platform-tuned social media captions for photography. Use when a user shares a photo and wants captions for posting. Triggers on sharing photos with context like location, camera, lens, film stock, subject, or asking for captions/posts. Supports Instagram, Flickr, X/Twitter, Glass, Tumblr, Threads, Bluesky, 500px, Reddit, and Facebook.
+description: Generate platform-tuned social media captions for photography. Use when a user shares a photo and wants captions for posting. Triggers on sharing photos with context like location, camera, lens, film stock, subject, or asking for captions/posts. Supports Instagram, Flickr, X/Twitter, Glass, Tumblr, Threads, Bluesky, 500px, Reddit, Facebook, VSCO, and Pinterest.
 ---
 
 # Photo Captions
@@ -60,6 +60,19 @@ If the user specifies gear (camera body, lens, film stock, digital settings), in
 - **Tone**: Personal, conversational, like sharing with friends and family. Most accessible voice.
 - **Format**: 2-3 casual sentences. Story-driven — where you were, what you were doing, why it caught your eye. Gear mention only if it adds to the story.
 - **No hashtags** (or 1-2 at most). Facebook audiences care about the story, not the craft.
+
+### 🎞️ VSCO
+- **Tone**: Minimal, poetic, understated. VSCO is the quiet gallery — let the image breathe.
+- **Format**: 1 line max. Sometimes just a single word or short phrase. No hashtags.
+- **Vibe**: Think whispered, not announced. VSCO captions are closer to titles than descriptions. The less you say, the better.
+- **No gear talk** unless it's film stock and even then, keep it subtle.
+
+### 📌 Pinterest
+- **Tone**: Descriptive and searchable. Pinterest is a discovery engine — think SEO meets aesthetics.
+- **Format**: Clear, keyword-rich title (what it is + where) followed by 2-3 sentences that describe the scene, mood, and style. Include relevant keywords naturally.
+- **Include**: Location, style (film photography, black and white, landscape), mood, and any relevant themes (road trip, desert, americana, etc.).
+- **Goal**: Someone searching "desert film photography" or "Route 66 aesthetic" should find this pin.
+- **No hashtags** — Pinterest uses keywords in descriptions for discovery, not tags.
 
 ## Guidelines
 
