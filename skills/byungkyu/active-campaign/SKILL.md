@@ -10,7 +10,7 @@ metadata:
   version: "1.0"
   clawdbot:
     emoji: 🧠
-    homepage: "https://maton.ai" 
+    homepage: "https://maton.ai"
     requires:
       env:
         - MATON_API_KEY
@@ -38,7 +38,7 @@ EOF
 https://gateway.maton.ai/active-campaign/{native-api-path}
 ```
 
-Replace `{native-api-path}` with the actual Airtable API endpoint path. The gateway proxies requests to `{account}.api-us1.com` and automatically injects your OAuth token.
+Replace `{native-api-path}` with the actual ActiveCampaign API endpoint path. The gateway proxies requests to `{account}.api-us1.com` and automatically injects your OAuth token.
 
 
 ## Authentication
