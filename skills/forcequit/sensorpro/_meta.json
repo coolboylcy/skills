@@ -1,13 +1,18 @@
 {
   "owner": "forcequit",
   "slug": "sensorpro",
-  "displayName": "Sensorpro Email Marketing",
+  "displayName": "sensorpro.app",
   "latest": {
-    "version": "0.2.2",
-    "publishedAt": 1771332194518,
-    "commit": "https://github.com/openclaw/skills/commit/f5027bf8ff6b97dda9352cae3e671bd36515b983"
+    "version": "0.2.3",
+    "publishedAt": 1771332640223,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.2.2",
+      "publishedAt": 1771332194518,
+      "commit": "https://github.com/openclaw/skills/commit/f5027bf8ff6b97dda9352cae3e671bd36515b983"
+    },
     {
       "version": "0.2.0",
       "publishedAt": 1771283496303,
