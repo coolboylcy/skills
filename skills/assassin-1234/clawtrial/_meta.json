@@ -3,11 +3,16 @@
   "slug": "clawtrial",
   "displayName": "Clawtrial Courtroom",
   "latest": {
-    "version": "1.0.8",
-    "publishedAt": 1771522880785,
-    "commit": "https://github.com/openclaw/skills/commit/bfa897508a7ec60ec092ede528407c60a5e4e8dc"
+    "version": "1.0.9",
+    "publishedAt": 1771603100027,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.8",
+      "publishedAt": 1771522880785,
+      "commit": "https://github.com/openclaw/skills/commit/bfa897508a7ec60ec092ede528407c60a5e4e8dc"
+    },
     {
       "version": "1.0.5",
       "publishedAt": 1771520124951,
