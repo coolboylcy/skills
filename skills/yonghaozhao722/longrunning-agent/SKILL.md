@@ -1,6 +1,6 @@
 ---
 name: longrunning-agent
-description: "Enables AI agents to work on long-running projects across multiple sessions. Track progress, manage task lists with priorities and dependencies, and make incremental progress on complex projects."
+description: "Enables AI agents to work on long-running projects across multiple sessions. Use when starting complex projects, resuming work on existing projects, managing task lists with priorities and dependencies, or tracking progress incrementally."
 ---
 
 # OpenClaw Long-Running Agent Skill
