@@ -1,0 +1,11 @@
+{
+  "owner": "robert-janssen",
+  "slug": "wolfram-alpha",
+  "displayName": "Wolfram Alpha",
+  "latest": {
+    "version": "1.0.2",
+    "publishedAt": 1771541872420,
+    "commit": null
+  },
+  "history": []
+}
