@@ -1,6 +1,6 @@
 ---
 name: leetify
-description: Get CS2/CS:GO player statistics, match analysis, and gameplay insights from Leetify API. Uses Telegram username to Steam ID mapping for easy access. Use when asked for "анализ демки", "разбор демки", "разбор матча", "что я сделал не так", "demo analysis".
+description: Get CS2 player statistics, match analysis, and gameplay insights from Leetify API. Supports player comparison and season stats. Use for stat queries and demo analysis.
 metadata:
   {
     "openclaw":
@@ -17,134 +17,72 @@ metadata:
 
 # Leetify API Skill
 
-Get CS2/CS:GO statistics from Leetify platform.
+Access CS2 statistics and match data from the Leetify platform.
 
-## start Quick Stats (Default)
+## Quick Stats
 
-Avoid downloading or analyzing a demo unless explicitly requested (e.g. "demo analysis", "разбор демки"). For general stat queries, use the commands below to save time and resources.
+Use these commands for general statistics, ranks, and recent performance.
 
 ### Show Statistics
 ```bash
 bash scripts/get_stats_by_username.sh USERNAME
 ```
-*Shows: Averages (100 games), last 5 matches (K/D/A, ADR, HS, MVPs), ranks, general stats.*
+Displays averages, recent match performance, and ranks.
 
-### Get Match Data (JSON for Analysis)
+### Get Match Data
 ```bash
 bash scripts/get_match_details.sh USERNAME [INDEX]
 ```
-*Outputs: Full raw JSON statistics for a specific match.* 
-**Model Instruction:** When presenting this data, ALWAYS format the JSON into a readable report with emojis. Separate logical blocks (e.g., stats General, shooting Shooting, recommendations Utility, mistakes Mistakes).
+Fetches raw JSON statistics for a specific match. When presenting this data, provide a structured report covering shooting, utility usage, and performance metrics.
 
 ### Compare Players
 ```bash
 bash scripts/compare_by_username.sh USERNAME1 USERNAME2
 ```
+Compares two players based on their Leetify profiles.
 
-### Clan Season Stats
+### Season Stats
 ```bash
 python3 scripts/season_stats.py
 ```
-*Shows: Summary table for all clan members for the current season.*
+Provides a summary table for players tracked in the local database.
 
-## demo Demo Analysis (for "разбор демки", "анализ демки", "demo analysis")
+## Demo Analysis
 
-**When the user asks for demo analysis, match breakdown, or tactical review — ALWAYS use this workflow:**
+Use this workflow for detailed tactical reviews and round-by-round breakdowns.
 
-### Step 1: Identify the Player and current In-Game Name (IGN)
-- Get Steam ID: `python3 scripts/steam_ids.py get --username USERNAME`
-- The scoreboard includes Steam IDs in `[steamid]` format next to each player name. Always match the target player by their Steam ID to ensure accuracy.
-- Workflow: get Steam ID -> find the line in SCOREBOARD with that exact Steam ID -> that's your player.
+### 1. Identify the Player
+- Resolve Steam ID: `python3 scripts/steam_ids.py get --username USERNAME`
+- Match the player in the match log using the resolved Steam ID.
 
-### Step 2: Generate the match log
+### 2. Generate Match Log
 ```bash
 python3 scripts/analyze_last_demo.py --username USERNAME [--match-index N] [--no-cache]
 ```
-- Downloads the demo (50-300MB), parses it with demoparser2
-- Outputs a compact text log: scoreboard + round-by-round timeline
-- Caches result in `matches/{match_id}.txt` (use `--no-cache` to re-parse)
+- Downloads and parses the demo file (requires significant memory).
+- Generates a text log containing scoreboard and round timeline.
 
-### Step 3: Analyze the log
+### 3. Analyze Performance
+Review the generated log to assess:
+- Shooting accuracy and trade efficiency.
+- Utility effectiveness (flash duration, grenade damage).
+- Role performance (entry, anchor, support).
+- Tactical highlights and mistakes.
 
-Read the full output and produce a structured analysis for the requested player.
-**Use emojis and beautiful formatting throughout the analysis.**
+Actionable recommendations can be provided based on the observed patterns. Guides or tutorials for specific map positions may be referenced if performance in those areas was suboptimal.
 
-**Analysis Guidelines (Structure, Tone & Positions):**
-- **Structure:** 
-  1. **stats General Stats** — K/D/A, ADR, HS%, KAST%, multikills, clutches.
-  2. **role Role Assessment** — Identify role (Entry, Anchor, Support, Lurker, Sniper, Rifler, Rotator) and evaluate effectiveness.
-  3. **side T-Side** — Utility usage, positioning, key mistakes, entry success/failure.
-  4. **side CT-Side** — Site anchor position, rotations, utility usage.
-  5. **mistakes Mistakes & Failures** — Specific moments of poor play, baiting teammates, or giving away free kills (with timestamps).
-  6. **highlights Highlights** — Key plays, clutches, multikills (with timestamps).
-  7. **positioning Positioning** — Analyze frequently played positions. **MANDATORY if the player failed their role/position:** Search the web for guides/videos (YouTube/Steam Guides/CS2 sites) for these specific positions on the current map and include links. If they played perfectly, guides are optional.
-  8. **recommendations Recommendations** — Concrete, actionable advice.
-  9. **rating Overall Rating** — X/10 score.
-- **Tone & Objectivity:** Be neutral and objective. Do not sugarcoat bad performance. Context is key: do not praise high stats (e.g. HS%) if they had no impact on the round win. Call out bad play explicitly (baiting, hunting for eco frags, playing for stats).
-- **Position Naming:** Translate raw positions. Do not use internal names (e.g. "SideAlley", "BombsiteA"). Use common community callouts: Mid, Connector, Jungle, Short, Long, Tunnel, etc.
-
-**What to look for in the log:**
-- `KILL` lines: who killed whom, with what weapon, HS/wallbang/smoke/blind tags, <-opening/<-trade annotations
-- `DMG` lines: damage exchanges, health tracking
-- `FLASH` lines: team flashes (marked `TEAM!`), effective enemy flashes (duration)
-- `POS` lines: player positions every ~5s — where the player is relative to teammates and action
-- `NADE` lines: utility usage and timing
-- Economy block: buy type, equipment value, item purchases
-- `RESULT` line: round winner, clutch attempts with ok/fail
-- `HALVES` line: half scores for macro analysis
-
-### Options
-```bash
-# Specific round deep-dive
-python3 scripts/analyze_last_demo.py --username USERNAME --round N
-
-# Older match (0=last, 1=previous, etc.)
-python3 scripts/analyze_last_demo.py --username USERNAME --match-index 1
-
-# Force re-parse (skip cache)
-python3 scripts/analyze_last_demo.py --username USERNAME --no-cache
-```
-
-### warning Memory constraints
-- Server has 2GB RAM — the parser is optimized but large demos may be tight
-- Economy is parsed in chunks of 4 rounds, positions per-round with gc.collect()
-- If OOM occurs, try running without other heavy processes
-
-## tools Management
+## Data Management
 
 ### Manage Steam IDs
 ```bash
-# Save
-python3 scripts/steam_ids.py save --username "jeminay" --steam-id "76561198185608989" --name "Дамир"
+# Save a player profile
+python3 scripts/steam_ids.py save --username "username" --steam-id "7656119..." --name "Name"
 
-# Get
-python3 scripts/steam_ids.py get --username "jeminay"
-
-# List all
+# List all tracked players
 python3 scripts/steam_ids.py list
 ```
 
-## recommendations Analysis Workflow
-
-1. **Check Steam ID:** `python3 scripts/steam_ids.py get --username USERNAME`
-2. **Run demo parser:** `python3 scripts/analyze_last_demo.py --username USERNAME`
-3. **Read the full log** — identify the target player's team, side, position patterns
-4. **Match teammates:** Cross-reference with `scripts/steam_ids.py list` to identify known players
-5. **Analyze round-by-round:** Track the player's kills, deaths, utility, positions, economy
-6. **Write structured analysis** in Russian (unless specified otherwise). Apply Analysis Guidelines strictly.
-
-**Key rules:**
-- Show script output AS IS when asked for raw data.
-- For analysis: read the log thoroughly and write a precise breakdown.
-- Always mention specific rounds and timestamps (e.g., "R5 [45s]").
-- **Web Search Condition:** If the player failed their role or specific positions, use `web_search` to find tutorials or position guides for these primary positions and attach them to the Positioning section.
-- Highlight patterns, trends, and tactical errors, not just isolated events.
-
 ## Configuration
 
-Set the `LEETIFY_API_KEY` environment variable with your Leetify API key.
-You can get it from: https://api-public-docs.cs-prod.leetify.com/
-
-## API Docs
-
-Docs: https://api-public-docs.cs-prod.leetify.com/
+The skill requires the `LEETIFY_API_KEY` environment variable.
+API documentation is available at: https://api-public-docs.cs-prod.leetify.com/
