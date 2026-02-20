@@ -1,5 +1,5 @@
 ---
-name: korean-gov-programs
+name: Korean Gov Programs
 description: Collect Korean government support programs (TIPS, Small Business, R&D grants) into structured JSONL files. Supports incremental collection with checkpoints.
 version: 1.0.1
 author: raon
