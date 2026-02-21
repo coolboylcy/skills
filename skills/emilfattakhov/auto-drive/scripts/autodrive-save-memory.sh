@@ -3,6 +3,9 @@
 # Usage: autodrive-save-memory.sh <data_file_or_string> [--agent-name NAME] [--state-file PATH]
 # Env: AUTO_DRIVE_API_KEY (required)
 # Output: JSON with cid, previousCid, chainLength (stdout)
+#
+# If the first argument is a file path, its contents are used as the data payload.
+# If the first argument is a plain string, it is wrapped as {"type":"memory","content":"..."}.
 
 set -euo pipefail
 
@@ -32,12 +35,14 @@ fi
 
 # Determine if input is a file or a string
 if [[ -f "$INPUT" ]]; then
+  # Validate it's JSON
   if ! jq empty "$INPUT" 2>/dev/null; then
     echo "Error: Data file is not valid JSON: $INPUT" >&2
     exit 1
   fi
   DATA_JSON=$(cat "$INPUT")
 else
+  # Wrap the plain string as a simple memory object
   DATA_JSON=$(jq -n --arg content "$INPUT" '{type: "memory", content: $content}')
 fi
 
@@ -52,7 +57,7 @@ fi
 
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
 
-# Build the experience JSON
+# Build the experience JSON with header/data structure
 EXPERIENCE=$(jq -n \
   --arg name "$AGENT_NAME" \
   --arg ts "$TIMESTAMP" \
@@ -68,7 +73,7 @@ EXPERIENCE=$(jq -n \
     data: $data
   }')
 
-# Write to temp file and upload
+# Write to temp file and upload via the upload script
 TMPFILE=$(mktemp /tmp/autodrive-memory-XXXXXX.json)
 trap 'rm -f "$TMPFILE"' EXIT
 echo "$EXPERIENCE" > "$TMPFILE"
@@ -79,6 +84,7 @@ if [[ -z "$CID" ]]; then
   exit 1
 fi
 
+# Validate CID format (Autonomys CIDs are base32-encoded, starting with "bafy" or "bafk")
 if [[ ! "$CID" =~ ^baf[a-z2-7]+$ ]]; then
   echo "Error: Invalid CID format returned: $CID" >&2
   exit 1
@@ -93,11 +99,12 @@ jq -n \
   --argjson len "$NEW_LENGTH" \
   '{lastCid: $cid, lastUploadTimestamp: $ts, chainLength: $len}' > "$STATE_FILE"
 
-# Pin latest CID to MEMORY.md if it exists
+# Pin latest CID to MEMORY.md for session continuity (if it exists)
 MEMORY_FILE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}/MEMORY.md"
 if [[ -f "$MEMORY_FILE" ]]; then
   if grep -q "^## Auto-Drive Chain" "$MEMORY_FILE"; then
     if grep -q "^\- \*\*Latest CID:\*\*" "$MEMORY_FILE"; then
+      # Portable sed -i (works on both macOS and Linux)
       SEDTMP=$(mktemp "${MEMORY_FILE}.XXXXXX")
       sed "s|^- \*\*Latest CID:\*\*.*|- **Latest CID:** \`$CID\` (chain length: $NEW_LENGTH, updated: $TIMESTAMP)|" "$MEMORY_FILE" > "$SEDTMP" && mv "$SEDTMP" "$MEMORY_FILE"
     else
@@ -108,7 +115,7 @@ if [[ -f "$MEMORY_FILE" ]]; then
   fi
 fi
 
-# Output result
+# Output structured result
 jq -n \
   --arg cid "$CID" \
   --arg prev "$PREVIOUS_CID" \

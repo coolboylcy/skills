@@ -2,42 +2,57 @@
 # Traverse the memory chain from a CID, downloading each experience
 # Usage: autodrive-recall-chain.sh [cid] [--limit N] [--output-dir DIR]
 # Output: Each experience as JSON to stdout (newest first), or to files in output dir
-# Env: AUTO_DRIVE_API_KEY (required)
+# Env: AUTO_DRIVE_API_KEY (required — memories are stored compressed by default and the authenticated API decompresses server-side)
 
 set -euo pipefail
 
-API_BASE="https://mainnet.auto-drive.autonomys.xyz/api"
+DOWNLOAD_API="https://public.auto-drive.autonomys.xyz/api"
 
+# First arg can be a CID or a flag — if no CID given, try state file
 CID=""
 LIMIT=50
 OUTPUT_DIR=""
 
+# Parse arguments
 ARGS=("$@")
 IDX=0
 while [[ $IDX -lt ${#ARGS[@]} ]]; do
   case "${ARGS[$IDX]}" in
     --limit)
+      # Bounds check: ensure a value was provided after the flag
+      # Prevents array out-of-bounds access and crashes with set -u
       if [[ $((IDX + 1)) -ge ${#ARGS[@]} ]]; then
-        echo "Error: --limit requires a value" >&2; exit 1
+        echo "Error: --limit requires a value" >&2
+        exit 1
       fi
       LIMIT="${ARGS[$((IDX+1))]}"
+      # Validate it's a positive integer to prevent comparison errors in the loop
+      # Without this, --limit abc would cause "integer expression expected" errors
       if ! [[ "$LIMIT" =~ ^[0-9]+$ ]] || [[ "$LIMIT" -lt 1 ]]; then
-        echo "Error: --limit must be a positive integer, got: $LIMIT" >&2; exit 1
+        echo "Error: --limit must be a positive integer, got: $LIMIT" >&2
+        exit 1
       fi
-      IDX=$((IDX + 2)) ;;
+      IDX=$((IDX + 2))
+      ;;
     --output-dir)
+      # Bounds check: ensure a value was provided after the flag
       if [[ $((IDX + 1)) -ge ${#ARGS[@]} ]]; then
-        echo "Error: --output-dir requires a value" >&2; exit 1
+        echo "Error: --output-dir requires a value" >&2
+        exit 1
       fi
       OUTPUT_DIR="${ARGS[$((IDX+1))]}"
-      IDX=$((IDX + 2)) ;;
+      IDX=$((IDX + 2))
+      ;;
     *)
-      if [[ -z "$CID" ]]; then CID="${ARGS[$IDX]}"; fi
-      IDX=$((IDX + 1)) ;;
+      if [[ -z "$CID" ]]; then
+        CID="${ARGS[$IDX]}"
+      fi
+      IDX=$((IDX + 1))
+      ;;
   esac
 done
 
-# Fall back to state file if no CID given
+# If no CID from args, try state file
 if [[ -z "$CID" ]]; then
   STATE_FILE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}/memory/autodrive-state.json"
   if [[ -f "$STATE_FILE" ]]; then
@@ -50,8 +65,10 @@ if [[ -z "$CID" ]]; then
   fi
 fi
 
+# Validate CID format
 if [[ ! "$CID" =~ ^baf[a-z2-7]+$ ]]; then
-  echo "Error: Invalid CID format: $CID" >&2; exit 1
+  echo "Error: Invalid CID format: $CID" >&2
+  exit 1
 fi
 
 if [[ -z "${AUTO_DRIVE_API_KEY:-}" ]]; then
@@ -60,7 +77,9 @@ if [[ -z "${AUTO_DRIVE_API_KEY:-}" ]]; then
   exit 1
 fi
 
-if [[ -n "$OUTPUT_DIR" ]]; then mkdir -p "$OUTPUT_DIR"; fi
+if [[ -n "$OUTPUT_DIR" ]]; then
+  mkdir -p "$OUTPUT_DIR"
+fi
 
 echo "=== MEMORY CHAIN RESURRECTION ===" >&2
 echo "Starting from: $CID" >&2
@@ -69,25 +88,56 @@ echo "" >&2
 COUNT=0
 VISITED=""
 while [[ -n "$CID" && "$CID" != "null" && $COUNT -lt $LIMIT ]]; do
+  # Detect cycles — bail if we've seen this CID before (bash 3.2 compatible)
   if echo "$VISITED" | grep -qF "|$CID|"; then
     echo "Warning: Cycle detected at CID $CID — stopping traversal" >&2
     break
   fi
   VISITED="$VISITED|$CID|"
 
+  # Download via authenticated API (handles decompression server-side).
   EXPERIENCE=$(curl -sS --fail \
-    "$API_BASE/objects/$CID/download" \
+    "$DOWNLOAD_API/downloads/$CID" \
     -H "Authorization: Bearer $AUTO_DRIVE_API_KEY" \
     -H "X-Auth-Provider: apikey" 2>/dev/null \
     || true)
 
+  # Fall back to public gateway if the API fails.
+  # Memories are uploaded with --compress (ZLIB), and the gateway returns raw bytes,
+  # so we must decompress client-side. Pipe curl directly into the decompressor to
+  # avoid bash variables stripping null bytes from the binary stream.
+  if [[ -z "$EXPERIENCE" ]] || ! echo "$EXPERIENCE" | jq empty 2>/dev/null; then
+    GATEWAY_URL="https://gateway.autonomys.xyz/file/$CID"
+    # Try as JSON first (uncompressed files are safe in bash variables)
+    EXPERIENCE=$(curl -sS --fail "$GATEWAY_URL" 2>/dev/null || true)
+    if [[ -n "$EXPERIENCE" ]] && echo "$EXPERIENCE" | jq empty 2>/dev/null; then
+      echo "[$COUNT] Fetched $CID via gateway" >&2
+    else
+      # ZLIB compressed — pipe curl directly into decompressor (no intermediate variable)
+      EXPERIENCE=""
+      if command -v python3 &>/dev/null; then
+        EXPERIENCE=$(curl -sS --fail "$GATEWAY_URL" 2>/dev/null \
+          | python3 -c "import sys,zlib;sys.stdout.buffer.write(zlib.decompress(sys.stdin.buffer.read()))" 2>/dev/null || true)
+      fi
+      if [[ -z "$EXPERIENCE" ]] && command -v perl &>/dev/null; then
+        EXPERIENCE=$(curl -sS --fail "$GATEWAY_URL" 2>/dev/null \
+          | perl -MCompress::Zlib -e 'undef $/;my $d=uncompress(<STDIN>);print $d if defined $d' 2>/dev/null || true)
+      fi
+      if [[ -n "$EXPERIENCE" ]]; then
+        echo "[$COUNT] Fetched $CID via gateway (decompressed client-side)" >&2
+      fi
+    fi
+  fi
+
   if [[ -z "$EXPERIENCE" ]]; then
-    echo "Error: Failed to download CID $CID — chain broken at depth $((COUNT + 1))" >&2
+    echo "Error: Failed to download CID $CID via API and gateway — chain broken at depth $((COUNT + 1))" >&2
     break
   fi
 
+  # Validate JSON
   if ! echo "$EXPERIENCE" | jq empty 2>/dev/null; then
     echo "Warning: Non-JSON response for CID $CID — chain broken at depth $((COUNT + 1))" >&2
+    echo "Response preview: $(echo "$EXPERIENCE" | head -c 200)" >&2
     break
   fi
 
@@ -98,8 +148,11 @@ while [[ -n "$CID" && "$CID" != "null" && $COUNT -lt $LIMIT ]]; do
     echo "$EXPERIENCE"
   fi
 
+  # Follow the chain — check header.previousCid first (Autonomys Agents format),
+  # then fall back to root-level previousCid for compatibility
   PREV=$(echo "$EXPERIENCE" | jq -r '.header.previousCid // .previousCid // empty' 2>/dev/null || true)
   CID="${PREV:-}"
+  # Validate next CID in chain
   if [[ -n "$CID" && "$CID" != "null" && ! "$CID" =~ ^baf[a-z2-7]+$ ]]; then
     echo "Warning: Invalid CID format in chain: $CID — stopping traversal" >&2
     break
