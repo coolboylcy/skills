@@ -1,0 +1,11 @@
+{
+  "owner": "porteden",
+  "slug": "porteden-email",
+  "displayName": "PortEden - secured email (Gmail, Outlook, Exchange) access for OpenClaw",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1771606512751,
+    "commit": null
+  },
+  "history": []
+}
