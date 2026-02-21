@@ -32,17 +32,43 @@ class RealtimeGuard:
         self.config = load_config(config_path)
         self._patterns = self._load_high_severity_patterns()
 
+    @staticmethod
+    def _read_def_file(defs_dir, filename: str):
+        """Read definition file — encoded first, then plaintext."""
+        import base64
+        enc_path = defs_dir / "encoded" / filename.replace(".json", ".enc")
+        if enc_path.exists():
+            try:
+                raw = base64.b64decode(enc_path.read_text(encoding="utf-8").strip()).decode("utf-8")
+                return json.loads(raw)
+            except Exception:
+                pass
+        plain = defs_dir / filename
+        if plain.exists():
+            try:
+                return json.loads(plain.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                pass
+        return None
+
     def _load_high_severity_patterns(self) -> List[Dict[str, Any]]:
         """Load and compile high/critical patterns from local definitions."""
         defs_dir = definitions_dir(self.config)
         patterns: List[Dict[str, Any]] = []
 
-        for file_path in defs_dir.glob("*.json"):
-            if file_path.name == "manifest.json":
-                continue
-            try:
-                payload = json.loads(file_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+        # Collect all definition filenames
+        filenames = set()
+        for p in defs_dir.glob("*.json"):
+            if p.name != "manifest.json":
+                filenames.add(p.name)
+        enc_dir = defs_dir / "encoded"
+        if enc_dir.exists():
+            for p in enc_dir.glob("*.enc"):
+                filenames.add(p.name.replace(".enc", ".json"))
+
+        for fname in sorted(filenames):
+            payload = self._read_def_file(defs_dir, fname)
+            if payload is None:
                 continue
 
             signatures = payload.get("signatures", payload.get("checks", []))

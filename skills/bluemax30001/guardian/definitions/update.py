@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import sqlite3
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,11 +41,11 @@ def resolve_workspace() -> Path:
 
 
 def load_config() -> Dict[str, Any]:
-    """Load Guardian config from skill root."""
-    cfg_path = skill_root() / "config.json"
-    if not cfg_path.exists():
-        return {}
-    return json.loads(cfg_path.read_text(encoding="utf-8"))
+    """Load Guardian config, preferring OpenClaw Control UI config when available."""
+    sys.path.insert(0, str(skill_root() / "core"))
+    from settings import load_config as shared_load_config  # type: ignore  # noqa: E402
+
+    return shared_load_config()
 
 
 def resolve_db_path(config: Dict[str, Any]) -> Path:

@@ -28,7 +28,7 @@ class GuardianDB:
         for candidate in candidates:
             try:
                 candidate.parent.mkdir(parents=True, exist_ok=True)
-                conn = sqlite3.connect(candidate)
+                conn = sqlite3.connect(candidate, check_same_thread=False)
                 conn.row_factory = sqlite3.Row
                 conn.execute("PRAGMA journal_mode=WAL")
                 self.db_path = candidate
@@ -65,7 +65,8 @@ class GuardianDB:
                 channel TEXT,
                 source_file TEXT,
                 message_hash TEXT UNIQUE,
-                dismissed INTEGER DEFAULT 0
+                dismissed INTEGER DEFAULT 0,
+                context TEXT
             );
             CREATE TABLE IF NOT EXISTS metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,16 +112,63 @@ class GuardianDB:
                 warnings TEXT,
                 passed TEXT
             );
+            CREATE TABLE IF NOT EXISTS allowlist (
+                id INTEGER PRIMARY KEY,
+                signature_id TEXT NOT NULL,
+                scope TEXT NOT NULL,
+                scope_value TEXT,
+                created_at TEXT NOT NULL,
+                created_by TEXT,
+                reason TEXT,
+                active INTEGER DEFAULT 1
+            );
+            CREATE TABLE IF NOT EXISTS blocklist (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL,
+                channel TEXT,
+                blocked_at TEXT NOT NULL,
+                blocked_by TEXT,
+                reason TEXT,
+                active INTEGER DEFAULT 1,
+                UNIQUE(source, channel)
+            );
+            CREATE TABLE IF NOT EXISTS false_positive_reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                threat_id INTEGER NOT NULL,
+                reported_at TEXT NOT NULL,
+                reported_by TEXT,
+                comment TEXT,
+                sig_id TEXT,
+                evidence TEXT,
+                FOREIGN KEY(threat_id) REFERENCES threats(id)
+            );
             CREATE INDEX IF NOT EXISTS idx_threats_detected ON threats(detected_at);
             CREATE INDEX IF NOT EXISTS idx_threats_category ON threats(category);
             CREATE INDEX IF NOT EXISTS idx_metrics_period ON metrics(period, period_start);
+            CREATE INDEX IF NOT EXISTS idx_allowlist_sig ON allowlist(signature_id, active);
+            CREATE INDEX IF NOT EXISTS idx_blocklist_source ON blocklist(source, active);
+            CREATE INDEX IF NOT EXISTS idx_fp_reports_threat ON false_positive_reports(threat_id);
             """
         )
+
+        # Backfill new columns on existing installs
+        self._ensure_column("threats", "context", "TEXT")
+        self._ensure_column("threats", "context_before", "TEXT")
+        self._ensure_column("threats", "context_after", "TEXT")
+        self._ensure_column("threats", "context_match", "TEXT")
+        self._ensure_column("threats", "escalated", "INTEGER DEFAULT 0")
+        self._ensure_column("threats", "escalated_at", "TEXT")
         c.commit()
 
     def _now(self) -> str:
         """Return current UTC timestamp in ISO-8601 format."""
         return datetime.now(timezone.utc).isoformat()
+
+    def _ensure_column(self, table: str, column: str, coltype: str) -> None:
+        """Add a column to a table if it does not already exist."""
+        cols = [row[1] for row in self.conn.execute(f"PRAGMA table_info({table})").fetchall()]
+        if column not in cols:
+            self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
 
     def get_bookmark(self, file_path: str) -> Tuple[int, float]:
         """Return last scanned offset and mtime for a file bookmark."""
@@ -150,13 +198,18 @@ class GuardianDB:
         channel: str,
         source_file: str,
         message_hash: str,
+        context: Optional[str] = None,
+        detected_at: Optional[str] = None,
+        context_before: Optional[str] = None,
+        context_after: Optional[str] = None,
+        context_match: Optional[str] = None,
     ) -> Optional[int]:
         """Insert a detected threat row, deduplicated by message hash."""
         try:
             cur = self.conn.execute(
-                "INSERT INTO threats (detected_at, sig_id, category, severity, score, evidence, description, blocked, channel, source_file, message_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO threats (detected_at, sig_id, category, severity, score, evidence, description, blocked, channel, source_file, message_hash, context, context_before, context_after, context_match) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
-                    self._now(),
+                    detected_at or self._now(),
                     sig_id,
                     category,
                     severity,
@@ -167,6 +220,10 @@ class GuardianDB:
                     channel,
                     source_file,
                     message_hash,
+                    context,
+                    context_before,
+                    context_after,
+                    context_match,
                 ),
             )
             self.conn.commit()
@@ -175,10 +232,10 @@ class GuardianDB:
             return None
 
     def get_threats(self, hours: int = 24, limit: int = 50) -> List[Dict[str, Any]]:
-        """Return recent non-dismissed threats."""
+        """Return recent non-dismissed threats, ordered by time (most recent first)."""
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
         rows = self.conn.execute(
-            "SELECT * FROM threats WHERE detected_at >= ? AND dismissed=0 ORDER BY score DESC, detected_at DESC LIMIT ?",
+            "SELECT * FROM threats WHERE detected_at >= ? AND dismissed=0 ORDER BY detected_at DESC LIMIT ?",
             (cutoff, limit),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -207,6 +264,115 @@ class GuardianDB:
         """Mark a threat as dismissed."""
         self.conn.execute("UPDATE threats SET dismissed=1 WHERE id=?", (threat_id,))
         self.conn.commit()
+
+    def escalate_threat(self, threat_id: int) -> None:
+        """Mark a threat as escalated for review."""
+        self.conn.execute(
+            "UPDATE threats SET escalated=1, escalated_at=? WHERE id=?",
+            (self._now(), threat_id)
+        )
+        self.conn.commit()
+
+    def add_blocklist_entry(
+        self,
+        source: str,
+        channel: Optional[str] = None,
+        blocked_by: Optional[str] = None,
+        reason: Optional[str] = None
+    ) -> int:
+        """Add a source to the blocklist. Returns entry ID."""
+        try:
+            cur = self.conn.execute(
+                "INSERT INTO blocklist (source, channel, blocked_at, blocked_by, reason) VALUES (?,?,?,?,?)",
+                (source, channel, self._now(), blocked_by, reason)
+            )
+            self.conn.commit()
+            return int(cur.lastrowid)
+        except sqlite3.IntegrityError:
+            # Already blocked
+            row = self.conn.execute(
+                "SELECT id FROM blocklist WHERE source=? AND channel" + ("=?" if channel else " IS NULL"),
+                (source, channel) if channel else (source,)
+            ).fetchone()
+            return int(row["id"]) if row else 0
+
+    def is_blocked(self, source: str, channel: Optional[str] = None) -> bool:
+        """Check if a source is blocked."""
+        if channel:
+            row = self.conn.execute(
+                "SELECT id FROM blocklist WHERE source=? AND (channel=? OR channel IS NULL) AND active=1 LIMIT 1",
+                (source, channel)
+            ).fetchone()
+        else:
+            row = self.conn.execute(
+                "SELECT id FROM blocklist WHERE source=? AND active=1 LIMIT 1",
+                (source,)
+            ).fetchone()
+        return row is not None
+
+    def get_blocklist(self, active_only: bool = True) -> List[Dict[str, Any]]:
+        """Return all blocklist entries."""
+        query = "SELECT * FROM blocklist WHERE active=1 ORDER BY blocked_at DESC" if active_only else "SELECT * FROM blocklist ORDER BY blocked_at DESC"
+        rows = self.conn.execute(query).fetchall()
+        return [dict(r) for r in rows]
+
+    def remove_blocklist_entry(self, entry_id: int) -> None:
+        """Deactivate a blocklist entry."""
+        self.conn.execute("UPDATE blocklist SET active=0 WHERE id=?", (entry_id,))
+        self.conn.commit()
+
+    def report_false_positive(
+        self,
+        threat_id: int,
+        reported_by: Optional[str] = None,
+        comment: Optional[str] = None
+    ) -> int:
+        """Log a false positive report. Returns report ID."""
+        # Get threat details for the report
+        row = self.conn.execute(
+            "SELECT sig_id, evidence FROM threats WHERE id=?",
+            (threat_id,)
+        ).fetchone()
+        sig_id = row["sig_id"] if row else None
+        evidence = row["evidence"] if row else None
+        
+        cur = self.conn.execute(
+            "INSERT INTO false_positive_reports (threat_id, reported_at, reported_by, comment, sig_id, evidence) VALUES (?,?,?,?,?,?)",
+            (threat_id, self._now(), reported_by, comment, sig_id, evidence)
+        )
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def get_false_positive_reports(self, days: int = 30) -> List[Dict[str, Any]]:
+        """Return recent false positive reports."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        rows = self.conn.execute(
+            "SELECT * FROM false_positive_reports WHERE reported_at >= ? ORDER BY reported_at DESC",
+            (cutoff,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_similar_threats(self, threat_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+        """Find threats similar to the given threat (same sig_id or category)."""
+        # Get the reference threat
+        ref = self.conn.execute(
+            "SELECT sig_id, category, channel FROM threats WHERE id=?",
+            (threat_id,)
+        ).fetchone()
+        if not ref:
+            return []
+        
+        # Find similar threats (same sig or category, excluding the reference)
+        rows = self.conn.execute(
+            """SELECT * FROM threats 
+               WHERE id != ? 
+               AND dismissed=0 
+               AND (sig_id=? OR category=?)
+               ORDER BY detected_at DESC 
+               LIMIT ?""",
+            (threat_id, ref["sig_id"], ref["category"], limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def record_scan(
         self,
@@ -346,6 +512,60 @@ class GuardianDB:
             (now, now),
         )
         self.conn.commit()
+
+    # ── Allowlist ────────────────────────────────────────────────────────────
+
+    def add_allowlist_rule(
+        self,
+        signature_id: str,
+        scope: str,
+        scope_value: Optional[str] = None,
+        created_by: str = "user",
+        reason: str = "",
+    ) -> int:
+        """Insert an allowlist rule and return its row ID."""
+        cur = self.conn.execute(
+            "INSERT INTO allowlist (signature_id, scope, scope_value, created_at, created_by, reason, active) VALUES (?,?,?,?,?,?,1)",
+            (signature_id, scope, scope_value or "", self._now(), created_by, reason or ""),
+        )
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def get_allowlist_rules(self, active_only: bool = True) -> List[Dict[str, Any]]:
+        """Return allowlist rules, optionally filtering to active-only."""
+        query = "SELECT * FROM allowlist"
+        if active_only:
+            query += " WHERE active=1"
+        query += " ORDER BY created_at DESC"
+        rows = self.conn.execute(query).fetchall()
+        return [dict(r) for r in rows]
+
+    def remove_allowlist_rule(self, rule_id: int) -> None:
+        """Deactivate (soft-delete) an allowlist rule."""
+        self.conn.execute("UPDATE allowlist SET active=0 WHERE id=?", (rule_id,))
+        self.conn.commit()
+
+    def is_allowlisted(self, signature_id: str, source_channel: str, message_text: str) -> bool:
+        """Return True if this signature+channel+text combination is covered by an active allowlist rule."""
+        try:
+            rules = self.conn.execute(
+                "SELECT scope, scope_value FROM allowlist WHERE signature_id=? AND active=1",
+                (signature_id,),
+            ).fetchall()
+        except Exception:
+            return False
+        for row in rules:
+            scope = row["scope"]
+            scope_value = row["scope_value"] or ""
+            if scope == "all":
+                return True
+            # scope='channel' with scope_value=channel_name  OR  legacy scope='channel:name'
+            if (scope == "channel" and source_channel == scope_value) or \
+               (scope.startswith("channel:") and source_channel == scope_value):
+                return True
+            if scope == "exact" and scope_value and scope_value in message_text:
+                return True
+        return False
 
     def close(self) -> None:
         """Close underlying SQLite connection."""

@@ -1,7 +1,7 @@
 ---
 name: guardian
-description: OpenClaw security shield for prompt-injection, exfiltration, tool-abuse, and social-engineering defense.
-version: 1.1.0
+description: '"I heard OpenClaw has security risks. How do I lock it down?" Install Guardian. That''s it.'
+version: 2.0.3
 ---
 
 # Guardian
@@ -67,6 +67,58 @@ rm -f .guardian-activate-pending
 ```
 
 > If onboard.py doesn't exist yet, run `./install.sh` first.
+
+---
+
+## 🎯 AGENT — Skill Invoked With No Specific Request
+
+When the user says "use the guardian skill" or similar without specifying what they want, provide a **concise status card + menu** instead of asking "what do you need?":
+
+**Step 1 — Get current status:**
+
+```bash
+python3 skills/guardian/scripts/admin.py status --json 2>/dev/null
+```
+
+**Step 2 — Format the response like this:**
+
+```
+🛡️ **Guardian Security Status**
+
+**Current State:**
+• Status: [enabled/disabled]
+• Mode: [realtime/bypass if admin_override is true]
+• Severity threshold: [low/medium/high/critical]
+• Recent threats: [count from last 24h]
+• Background scanning: [active/inactive based on cron status]
+
+**Quick Actions:**
+1️⃣ **Scan now** — `python3 skills/guardian/scripts/guardian.py --report --hours 24`
+2️⃣ **View dashboard** — [dashboard URL from config]
+3️⃣ **Show recent threats** — `python3 skills/guardian/scripts/admin.py threats`
+4️⃣ **Update definitions** — `python3 skills/guardian/scripts/admin.py update-defs`
+5️⃣ **Full security report** — `python3 skills/guardian/scripts/admin.py report`
+6️⃣ **Modify config** — Edit `skills/guardian/config.json`
+
+What would you like to do?
+```
+
+**Step 3 — If status command fails:**
+Fall back to a simplified response:
+```
+🛡️ **Guardian Security**
+
+Guardian provides real-time threat detection and workspace scanning.
+
+**Available actions:**
+• Run a security scan
+• View the dashboard
+• Check recent threats
+• Update threat definitions
+• Review/modify configuration
+
+What would you like me to help with?
+```
 
 ---
 
@@ -167,6 +219,113 @@ Behavior:
 - `false_positive_suppression.suppress_assistant_number_matches`: Avoid noisy number matches.
 - `false_positive_suppression.allowlist_patterns`: Pattern list to suppress known false positives.
 - `definitions.update_url`: Optional manifest URL for definition updates (default upstream URL used when absent).
+
+### Control UI integration
+
+Guardian config now renders in the OpenClaw Control UI **Config** panel (http://localhost:18789) under `skills.guardian.config`. The UI exposes:
+- `enabled`
+- `severity_threshold`
+- `scan_interval_minutes`
+- `trusted_sources`
+- `alerts.notify_on_critical`
+- `alerts.notify_on_high`
+- `alerts.daily_digest`
+- `alerts.daily_digest_time`
+
+Guardian reads these values from `openclaw.json` first and falls back to `skills/guardian/config.json` if they are missing.
+
+---
+
+## Allowlist Feature (False Positive Suppression)
+
+The allowlist completely bypasses threat scanning for messages matching specific patterns. This is useful for known-safe system messages that might otherwise trigger false positives.
+
+### Current Allowlist Patterns
+
+The default configuration includes patterns for OpenClaw internal system messages:
+
+```json
+"allowlist_patterns": [
+  "WORKFLOW_AUTO\\.md",
+  "(?i)openclaw\\s+(internal|system|post-compaction|audit)",
+  "(?i)post-compaction\\s+(audit|restore|protocol)",
+  "(?i)system\\s+(reminder|protocol|message).*(?:read|follow|check).*(?:SOUL\\.md|USER\\.md|MEMORY\\.md|WORKFLOW_AUTO\\.md)"
+]
+```
+
+These patterns protect:
+- **WORKFLOW_AUTO.md references** - System workflow restoration after context compaction
+- **OpenClaw internal messages** - System audit and status messages
+- **Post-compaction protocols** - Context restore and agent startup procedures
+- **System file reminders** - Instructions to read SOUL.md, USER.md, MEMORY.md
+
+### Adding Allowlist Patterns
+
+**Via CLI (recommended):**
+```bash
+python3 scripts/admin.py allowlist add "PATTERN"
+python3 scripts/admin.py allowlist remove "PATTERN"
+```
+
+**Manual (edit config.json):**
+```json
+{
+  "false_positive_suppression": {
+    "allowlist_patterns": [
+      "your-safe-pattern-here"
+    ]
+  }
+}
+```
+
+### Security Best Practices
+
+**✅ DO:**
+- Use specific patterns that identify internal system processes
+- Include unique markers (file names, system identifiers)
+- Test patterns thoroughly before deployment
+- Document why each pattern is safe
+
+**❌ DON'T:**
+- Add broad patterns that could match user input
+- Allowlist based solely on message content without context
+- Use as a workaround for signature tuning
+- Add patterns containing `.*` or other broad wildcards
+
+### Testing Allowlist Patterns
+
+```bash
+cd skills/guardian
+
+# Test a specific message
+python3 -c "from core.scanner import quick_scan; import json; \
+  result = quick_scan('YOUR MESSAGE HERE'); \
+  print('Allowlisted:', result.get('allowlisted', False)); \
+  print('Clean:', result['clean'])"
+
+# Run allowlist test suite
+python3 test_allowlist.py
+```
+
+### Examples
+
+**Safe Pattern (✅):**
+```json
+"WORKFLOW_AUTO\\.md"
+```
+Matches only messages containing "WORKFLOW_AUTO.md" - a specific system file.
+
+**Unsafe Pattern (❌):**
+```json
+".*system.*"
+```
+Too broad - would match any user message containing "system".
+
+**Balanced Pattern (✅):**
+```json
+"(?i)openclaw\\s+internal:\\s+"
+```
+Specific enough - requires "OpenClaw internal:" prefix which is only used by system messages.
 
 ---
 

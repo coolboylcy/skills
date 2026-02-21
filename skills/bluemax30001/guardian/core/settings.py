@@ -9,12 +9,34 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 DEFAULT_CONFIG: Dict[str, Any] = {
+    "enabled": True,
+    "admin_override": False,
     "scan_paths": ["auto"],
     "db_path": "auto",
     "scan_interval_minutes": 2,
     "severity_threshold": "medium",
     "dismissed_signatures": [],
     "custom_definitions_dir": None,
+    "channels": {
+        "monitor_all": True,
+        "exclude_channels": [],
+    },
+    "alerts": {
+        "notify_on_critical": True,
+        "notify_on_high": False,
+        "daily_digest": True,
+        "daily_digest_time": "09:00",
+    },
+    "admin": {
+        "bypass_token": None,
+        "disable_until": None,
+        "trusted_sources": [],
+    },
+    "false_positive_suppression": {
+        "min_context_words": 3,
+        "suppress_assistant_number_matches": True,
+        "allowlist_patterns": [],
+    },
 }
 
 
@@ -64,18 +86,89 @@ def _config_path(config_path: Optional[str] = None) -> Path:
     return skill_root() / "config.json"
 
 
-def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
-    """Load config.json and merge with defaults."""
-    merged = dict(DEFAULT_CONFIG)
-    cfg_path = _config_path(config_path)
+def _openclaw_config_path(workspace: Optional[Path] = None) -> Optional[Path]:
+    env_cfg = os.environ.get("OPENCLAW_CONFIG_PATH")
+    if env_cfg:
+        return Path(env_cfg).expanduser().resolve()
 
-    if cfg_path.exists():
-        try:
-            loaded = json.loads(cfg_path.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                merged.update(loaded)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid Guardian config JSON: {cfg_path}") from exc
+    ws = workspace or resolve_workspace()
+    candidates = [
+        ws.parent / "openclaw.json",
+        Path.home() / ".openclaw" / "openclaw.json",
+        Path.cwd() / "openclaw.json",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return None
+
+
+def _deep_update(base: Dict[str, Any], updates: Dict[str, Any]) -> None:
+    for key, value in updates.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _deep_update(base[key], value)
+        else:
+            base[key] = value
+
+
+def _extract_guardian_config(raw: Dict[str, Any]) -> Dict[str, Any]:
+    skills = raw.get("skills") if isinstance(raw, dict) else None
+    cfg: Dict[str, Any] = {}
+    if isinstance(skills, dict):
+        guardian = skills.get("guardian", {})
+        if isinstance(guardian, dict):
+            candidate = guardian.get("config") or guardian.get("settings")
+            if isinstance(candidate, dict):
+                cfg = candidate
+    elif isinstance(raw, dict):
+        cfg = raw
+
+    if not isinstance(cfg, dict):
+        return {}
+
+    # Normalize trusted_sources to admin.trusted_sources when provided at top level
+    if "trusted_sources" in cfg:
+        admin_cfg = cfg.get("admin") if isinstance(cfg.get("admin"), dict) else {}
+        if "trusted_sources" not in admin_cfg:
+            admin_cfg["trusted_sources"] = cfg.get("trusted_sources")
+        cfg["admin"] = admin_cfg
+
+    return cfg
+
+
+def _load_json(path: Path) -> Dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid Guardian config JSON: {path}") from exc
+    except OSError:
+        return {}
+
+
+def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
+    """Load Guardian config, preferring OpenClaw config then falling back to skill config."""
+    merged: Dict[str, Any] = json.loads(json.dumps(DEFAULT_CONFIG))
+
+    # 1) Explicit config path (can be openclaw.json or guardian config)
+    if config_path:
+        cfg = _extract_guardian_config(_load_json(_config_path(config_path)))
+        _deep_update(merged, cfg)
+        return merged
+
+    # 2) OpenClaw config (Control UI) if present
+    oc_path = _openclaw_config_path()
+    if oc_path and oc_path.exists():
+        cfg = _extract_guardian_config(_load_json(oc_path))
+        if cfg:
+            _deep_update(merged, cfg)
+            return merged
+
+    # 3) Fallback to skill config.json
+    skill_cfg_path = _config_path()
+    if skill_cfg_path.exists():
+        cfg = _load_json(skill_cfg_path)
+        _deep_update(merged, cfg)
 
     return merged
 

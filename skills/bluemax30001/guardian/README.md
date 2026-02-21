@@ -141,3 +141,8 @@ Models are good at their job. Security isn't their job. They're designed to be h
 MIT — free to use, modify, and distribute.
 
 *Questions? Bugs? [clawhub.ai/skills/guardian](https://clawhub.ai/skills/guardian)*
+
+## Security & Packaging Notes
+- Guardian is a defensive scanner. Signature definitions ship encoded (`definitions/encoded/*.enc`) to avoid misuse; runtime decodes before loading.
+- No external download/shell execution in runtime code. `subprocess` usage is limited to optional cron setup in `scripts/onboard.py` when you explicitly run it.
+- Packaging excludes tests, assets, plaintext definition files, and release notes via `.clawhubignore` to reduce false-positive security scans.

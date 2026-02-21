@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -14,10 +15,12 @@ from urllib.parse import parse_qs, urlparse
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_ROOT = SCRIPT_DIR.parent
+DEFAULT_CONFIG_PATH = Path(os.environ.get("GUARDIAN_CONFIG") or (SKILL_ROOT / "config.json"))
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 from core.api import GuardianScanner
+from core.settings import load_config as load_guardian_config
 
 
 def build_status_payload(scanner: GuardianScanner) -> Dict[str, Any]:
@@ -32,6 +35,11 @@ def build_status_payload(scanner: GuardianScanner) -> Dict[str, Any]:
         "blocked_24h": summary.get("blocked", 0),
         "categories": summary.get("categories", {}),
     }
+
+
+def _save_guardian_config(cfg: Dict[str, Any], path: Path | None = None) -> None:
+    target = Path(path) if path else DEFAULT_CONFIG_PATH
+    target.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
 
 
 def handle_scan_payload(scanner: GuardianScanner, data: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
@@ -63,6 +71,263 @@ def handle_dismiss_payload(scanner: GuardianScanner, data: Dict[str, Any]) -> Tu
 
     db.dismiss_threat(threat_id)
     return HTTPStatus.OK, {"ok": True, "dismissed": threat_id}
+
+
+def handle_ignore_signature_payload(
+    scanner: GuardianScanner, data: Dict[str, Any], config_path: Path | None = None
+) -> Tuple[int, Dict[str, Any]]:
+    """Add a signature to dismissed_signatures and dismiss existing matches."""
+    raw_sig = str(data.get("sig_id") or data.get("signature") or "").strip()
+    if not raw_sig:
+        return HTTPStatus.BAD_REQUEST, {"error": "sig_id is required"}
+
+    cfg = load_guardian_config(config_path=str(config_path or DEFAULT_CONFIG_PATH))
+    dismissed = cfg.setdefault("dismissed_signatures", [])
+    updated = False
+    if raw_sig not in dismissed:
+        dismissed.append(raw_sig)
+        updated = True
+    _save_guardian_config(cfg, path=config_path)
+
+    db = scanner._scanner.db
+    dismissed_count = 0
+    if db:
+        cur = db.conn.execute("UPDATE threats SET dismissed=1 WHERE sig_id=?", (raw_sig,))
+        db.conn.commit()
+        dismissed_count = int(cur.rowcount)
+
+    # Refresh in-memory patterns so the ignore takes effect immediately
+    try:
+        scanner._scanner.config = cfg
+        scanner._scanner.patterns = scanner._scanner._load_patterns()
+    except Exception:
+        pass
+
+    return HTTPStatus.OK, {
+        "ok": True,
+        "sig_id": raw_sig,
+        "updated_config": updated,
+        "dismissed": dismissed_count,
+    }
+
+
+def extract_allowlist_pattern(evidence: str) -> str:
+    """Extract a reasonable allowlist pattern from threat evidence.
+    
+    Strategy:
+    - Escape special regex chars
+    - Keep key identifying words intact
+    - Use word boundaries for safety
+    - Prefer exact match over wildcards
+    """
+    import re
+    
+    # Clean and normalize
+    clean = evidence.strip()
+    
+    # Escape special regex characters
+    escaped = re.escape(clean)
+    
+    # For short messages (< 30 chars), use exact match
+    if len(clean) < 30:
+        return escaped
+    
+    # For longer messages, extract key phrases (first ~40 chars of unique content)
+    # This creates a narrow pattern that's unlikely to match other content
+    if len(clean) > 40:
+        # Take first significant chunk
+        key_part = clean[:40]
+        escaped = re.escape(key_part)
+        return escaped + ".*"  # Allow continuation but anchor start
+    
+    return escaped
+
+
+def handle_approve_payload(
+    scanner: GuardianScanner, data: Dict[str, Any], config_path: Path | None = None
+) -> Tuple[int, Dict[str, Any]]:
+    """Approve a threat as safe: extract pattern, add to allowlist, dismiss threat."""
+    raw_id = data.get("id")
+    if raw_id is None:
+        return HTTPStatus.BAD_REQUEST, {"error": "id is required"}
+    
+    try:
+        threat_id = int(raw_id)
+    except (TypeError, ValueError):
+        return HTTPStatus.BAD_REQUEST, {"error": "id must be an integer"}
+    
+    db = scanner._scanner.db
+    if not db:
+        return HTTPStatus.BAD_REQUEST, {"error": "DB persistence disabled"}
+    
+    # Get the threat details
+    cursor = db.conn.execute(
+        "SELECT evidence, description, sig_id FROM threats WHERE id=?",
+        (threat_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        return HTTPStatus.NOT_FOUND, {"error": f"Threat {threat_id} not found"}
+    
+    evidence, description, sig_id = row
+    
+    # Extract pattern from evidence (the actual matched text)
+    if not evidence or not evidence.strip():
+        return HTTPStatus.BAD_REQUEST, {"error": "Cannot extract pattern: no evidence text"}
+    
+    pattern = extract_allowlist_pattern(evidence)
+    
+    # Load config and add pattern to allowlist
+    cfg = load_guardian_config(config_path=str(config_path or DEFAULT_CONFIG_PATH))
+    
+    # Ensure false_positive_suppression section exists
+    if "false_positive_suppression" not in cfg:
+        cfg["false_positive_suppression"] = {}
+    
+    fps = cfg["false_positive_suppression"]
+    if "allowlist_patterns" not in fps:
+        fps["allowlist_patterns"] = []
+    
+    allowlist = fps["allowlist_patterns"]
+    
+    # Check if pattern already exists
+    if pattern in allowlist:
+        # Still dismiss the threat even if pattern exists
+        db.dismiss_threat(threat_id)
+        return HTTPStatus.OK, {
+            "ok": True,
+            "pattern": pattern,
+            "already_exists": True,
+            "dismissed": threat_id,
+        }
+    
+    # Add pattern to allowlist
+    allowlist.append(pattern)
+    _save_guardian_config(cfg, path=config_path)
+    
+    # Dismiss this threat
+    db.dismiss_threat(threat_id)
+    
+    # Refresh in-memory patterns so the allowlist takes effect immediately
+    try:
+        scanner._scanner.config = cfg
+        scanner._scanner.patterns = scanner._scanner._load_patterns()
+    except Exception:
+        pass
+    
+    return HTTPStatus.OK, {
+        "ok": True,
+        "pattern": pattern,
+        "dismissed": threat_id,
+        "evidence": evidence,
+    }
+
+
+def handle_block_sender_payload(
+    scanner: GuardianScanner, data: Dict[str, Any]
+) -> Tuple[int, Dict[str, Any]]:
+    """Block a sender/source from generating future threats."""
+    raw_id = data.get("id")
+    if raw_id is None:
+        return HTTPStatus.BAD_REQUEST, {"error": "id is required"}
+    
+    try:
+        threat_id = int(raw_id)
+    except (TypeError, ValueError):
+        return HTTPStatus.BAD_REQUEST, {"error": "id must be an integer"}
+    
+    db = scanner._scanner.db
+    if not db:
+        return HTTPStatus.BAD_REQUEST, {"error": "DB persistence disabled"}
+    
+    # Get the threat to extract source
+    cursor = db.conn.execute(
+        "SELECT source_file, channel FROM threats WHERE id=?",
+        (threat_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        return HTTPStatus.NOT_FOUND, {"error": f"Threat {threat_id} not found"}
+    
+    source = row["source_file"] or row["channel"] or "unknown"
+    channel = row["channel"]
+    
+    # Add to blocklist
+    reason = data.get("reason", "Blocked via dashboard action")
+    entry_id = db.add_blocklist_entry(source, channel, "dashboard", reason)
+    
+    # Dismiss the threat
+    db.dismiss_threat(threat_id)
+    
+    return HTTPStatus.OK, {
+        "ok": True,
+        "blocked": source,
+        "channel": channel,
+        "entry_id": entry_id,
+        "dismissed": threat_id,
+    }
+
+
+def handle_escalate_payload(
+    scanner: GuardianScanner, data: Dict[str, Any]
+) -> Tuple[int, Dict[str, Any]]:
+    """Escalate a threat for human review."""
+    raw_id = data.get("id")
+    if raw_id is None:
+        return HTTPStatus.BAD_REQUEST, {"error": "id is required"}
+    
+    try:
+        threat_id = int(raw_id)
+    except (TypeError, ValueError):
+        return HTTPStatus.BAD_REQUEST, {"error": "id must be an integer"}
+    
+    db = scanner._scanner.db
+    if not db:
+        return HTTPStatus.BAD_REQUEST, {"error": "DB persistence disabled"}
+    
+    # Escalate the threat
+    db.escalate_threat(threat_id)
+    
+    return HTTPStatus.OK, {
+        "ok": True,
+        "escalated": threat_id,
+        "note": "Flagged for human review",
+    }
+
+
+def handle_report_false_positive_payload(
+    scanner: GuardianScanner, data: Dict[str, Any]
+) -> Tuple[int, Dict[str, Any]]:
+    """Report a threat as a false positive."""
+    raw_id = data.get("id")
+    if raw_id is None:
+        return HTTPStatus.BAD_REQUEST, {"error": "id is required"}
+    
+    try:
+        threat_id = int(raw_id)
+    except (TypeError, ValueError):
+        return HTTPStatus.BAD_REQUEST, {"error": "id must be an integer"}
+    
+    db = scanner._scanner.db
+    if not db:
+        return HTTPStatus.BAD_REQUEST, {"error": "DB persistence disabled"}
+    
+    comment = data.get("comment", "Reported via dashboard")
+    reported_by = data.get("reported_by", "dashboard")
+    
+    # Create the report
+    report_id = db.report_false_positive(threat_id, reported_by, comment)
+    
+    # Dismiss the threat
+    db.dismiss_threat(threat_id)
+    
+    return HTTPStatus.OK, {
+        "ok": True,
+        "report_id": report_id,
+        "threat_id": threat_id,
+        "dismissed": threat_id,
+        "note": "Thank you for the feedback. This helps improve Guardian.",
+    }
 
 
 def list_threats_payload(scanner: GuardianScanner, query: str) -> Dict[str, Any]:
@@ -127,6 +392,52 @@ class GuardianHTTPHandler(BaseHTTPRequestHandler):
             self._json_response(HTTPStatus.OK, list_threats_payload(self.scanner, parsed.query))
             return
 
+        if parsed.path == "/allowlist":
+            db = self.scanner._scanner.db
+            if not db:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": "DB persistence disabled"})
+                return
+            rules = db.get_allowlist_rules(active_only=True)
+            self._json_response(HTTPStatus.OK, {"rules": rules})
+            return
+
+        if parsed.path == "/blocklist":
+            db = self.scanner._scanner.db
+            if not db:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": "DB persistence disabled"})
+                return
+            entries = db.get_blocklist(active_only=True)
+            self._json_response(HTTPStatus.OK, {"entries": entries})
+            return
+
+        if parsed.path.startswith("/similar"):
+            qs = parse_qs(parsed.query)
+            raw_id = (qs.get("id", [None]) or [None])[0]
+            if not raw_id:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": "id parameter is required"})
+                return
+            try:
+                threat_id = int(raw_id)
+            except (TypeError, ValueError):
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": "id must be an integer"})
+                return
+            db = self.scanner._scanner.db
+            if not db:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": "DB persistence disabled"})
+                return
+            similar = db.get_similar_threats(threat_id, limit=20)
+            self._json_response(HTTPStatus.OK, {"threats": similar, "count": len(similar)})
+            return
+
+        if parsed.path == "/false-positive-reports":
+            db = self.scanner._scanner.db
+            if not db:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": "DB persistence disabled"})
+                return
+            reports = db.get_false_positive_reports(days=30)
+            self._json_response(HTTPStatus.OK, {"reports": reports})
+            return
+
         self._json_response(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
     def do_POST(self) -> None:  # noqa: N802
@@ -149,6 +460,87 @@ class GuardianHTTPHandler(BaseHTTPRequestHandler):
                 return
 
             status, payload = handle_dismiss_payload(self.scanner, data)
+            self._json_response(status, payload)
+            return
+
+        if parsed.path == "/allowlist":
+            data, err = self._read_json_body()
+            if err:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": err})
+                return
+            db = self.scanner._scanner.db
+            if not db:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": "DB persistence disabled"})
+                return
+            action = str(data.get("action", "add")).strip()
+            if action == "add":
+                sig_id = str(data.get("signature_id", "")).strip()
+                scope = str(data.get("scope", "all")).strip()
+                scope_value = str(data.get("scope_value", "") or "").strip()
+                reason = str(data.get("reason", "") or "").strip()
+                if not sig_id:
+                    self._json_response(HTTPStatus.BAD_REQUEST, {"error": "signature_id is required"})
+                    return
+                rule_id = db.add_allowlist_rule(sig_id, scope, scope_value or None, "user", reason)
+                self._json_response(HTTPStatus.OK, {"ok": True, "rule_id": rule_id, "signature_id": sig_id, "scope": scope})
+            elif action == "remove":
+                raw_id = data.get("rule_id")
+                if raw_id is None:
+                    self._json_response(HTTPStatus.BAD_REQUEST, {"error": "rule_id is required"})
+                    return
+                db.remove_allowlist_rule(int(raw_id))
+                self._json_response(HTTPStatus.OK, {"ok": True, "removed": int(raw_id)})
+            else:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": f"Unknown action: {action}"})
+            return
+
+        if parsed.path in {"/ignore", "/ignore-signature"}:
+            data, err = self._read_json_body()
+            if err:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": err})
+                return
+
+            status, payload = handle_ignore_signature_payload(self.scanner, data, config_path=DEFAULT_CONFIG_PATH)
+            self._json_response(status, payload)
+            return
+
+        if parsed.path == "/approve":
+            data, err = self._read_json_body()
+            if err:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": err})
+                return
+
+            status, payload = handle_approve_payload(self.scanner, data, config_path=DEFAULT_CONFIG_PATH)
+            self._json_response(status, payload)
+            return
+
+        if parsed.path == "/block-sender":
+            data, err = self._read_json_body()
+            if err:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": err})
+                return
+
+            status, payload = handle_block_sender_payload(self.scanner, data)
+            self._json_response(status, payload)
+            return
+
+        if parsed.path == "/escalate":
+            data, err = self._read_json_body()
+            if err:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": err})
+                return
+
+            status, payload = handle_escalate_payload(self.scanner, data)
+            self._json_response(status, payload)
+            return
+
+        if parsed.path == "/report-false-positive":
+            data, err = self._read_json_body()
+            if err:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": err})
+                return
+
+            status, payload = handle_report_false_positive_payload(self.scanner, data)
             self._json_response(status, payload)
             return
 

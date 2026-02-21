@@ -25,17 +25,19 @@ def skill_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+CORE_DIR = skill_root() / "core"
+sys.path.insert(0, str(CORE_DIR))
+from settings import load_config as shared_load_config  # type: ignore  # noqa: E402
+
+
 def config_path() -> Path:
     """Return default config file path."""
     return skill_root() / "config.json"
 
 
 def load_config() -> Dict[str, Any]:
-    """Load the Guardian config JSON."""
-    path = config_path()
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+    """Load Guardian config, preferring OpenClaw Control UI config when available."""
+    return shared_load_config()
 
 
 def save_config(cfg: Dict[str, Any]) -> None:
@@ -98,7 +100,25 @@ def connect_db(db_path: Path) -> sqlite3.Connection:
             channel TEXT,
             source_file TEXT,
             message_hash TEXT UNIQUE,
-            dismissed INTEGER DEFAULT 0
+            dismissed INTEGER DEFAULT 0,
+            context TEXT
+        )
+        """
+    )
+    cols = conn.execute("PRAGMA table_info(threats)").fetchall()
+    if not any(col[1] == "context" for col in cols):
+        conn.execute("ALTER TABLE threats ADD COLUMN context TEXT")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS allowlist (
+            id INTEGER PRIMARY KEY,
+            signature_id TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            scope_value TEXT,
+            created_at TEXT NOT NULL,
+            created_by TEXT,
+            reason TEXT,
+            active INTEGER DEFAULT 1
         )
         """
     )
@@ -345,6 +365,51 @@ def cmd_allowlist(cfg: Dict[str, Any], action: str, pattern: str, as_json: bool)
     print(colorize(f"{verb} allowlist pattern: {pattern}", GREEN if changed else YELLOW))
 
 
+def cmd_allowlist_db(conn: sqlite3.Connection, action: str, args: argparse.Namespace, as_json: bool) -> None:
+    """Manage DB-backed allowlist rules (add / remove / list)."""
+    if action == "list":
+        rows = conn.execute(
+            "SELECT * FROM allowlist WHERE active=1 ORDER BY created_at DESC"
+        ).fetchall()
+        payload = {"rules": [dict(r) for r in rows]}
+        if as_json:
+            render_json(payload)
+            return
+        if not rows:
+            print("No active allowlist rules.")
+            return
+        for r in rows:
+            sv = r["scope_value"] or "any"
+            print(f"#{r['id']} {r['signature_id']} scope={r['scope']} value={sv} created={str(r['created_at'])[:10]}")
+
+    elif action == "add":
+        sig_id = args.signature_id
+        scope = args.scope
+        scope_value = args.scope_value or ""
+        reason = args.reason or ""
+        conn.execute(
+            "INSERT INTO allowlist (signature_id, scope, scope_value, created_at, created_by, reason, active) VALUES (?,?,?,?,?,?,1)",
+            (sig_id, scope, scope_value, datetime.utcnow().isoformat() + "Z", "user", reason),
+        )
+        conn.commit()
+        payload = {"ok": True, "action": "allowlist_add", "signature_id": sig_id, "scope": scope}
+        if as_json:
+            render_json(payload)
+            return
+        print(colorize(f"Allowlist rule created for {sig_id} (scope={scope})", GREEN))
+
+    elif action == "remove":
+        rule_id = args.rule_id
+        cur = conn.execute("UPDATE allowlist SET active=0 WHERE id=?", (rule_id,))
+        conn.commit()
+        payload = {"ok": True, "action": "allowlist_remove", "rule_id": rule_id, "updated": cur.rowcount}
+        if as_json:
+            render_json(payload)
+            return
+        verb = "Removed" if cur.rowcount else "Not found"
+        print(colorize(f"{verb}: allowlist rule #{rule_id}", GREEN if cur.rowcount else YELLOW))
+
+
 def cmd_threats(conn: sqlite3.Connection, clear_dismissed: bool, as_json: bool) -> None:
     """List recent threats and optionally clear dismissed entries."""
     cleared = 0
@@ -373,7 +438,7 @@ def cmd_threats(conn: sqlite3.Connection, clear_dismissed: bool, as_json: bool) 
         )
 
 
-def cmd_report(conn: sqlite3.Connection, as_json: bool) -> None:
+def cmd_report(conn: sqlite3.Connection, as_json: bool, deliver: bool = False) -> None:
     """Generate a 7-day security report."""
     cutoff = (now_utc() - timedelta(days=7)).isoformat()
     totals = conn.execute(
@@ -400,16 +465,49 @@ def cmd_report(conn: sqlite3.Connection, as_json: bool) -> None:
         render_json(payload)
         return
 
-    print(colorize("Guardian Report (7d)", CYAN))
-    print(f"Threats: {payload['threats_total']} total, {payload['threats_blocked']} blocked")
+    # Format report message
+    report_lines = [
+        "🛡️ **Guardian Security — Weekly Digest**",
+        "",
+        f"**Period:** Last 7 days",
+        f"**Threats:** {payload['threats_total']} total, {payload['threats_blocked']} blocked",
+        "",
+    ]
+    
     if payload["by_severity"]:
-        print("By severity:")
+        report_lines.append("**By Severity:**")
         for severity, count in payload["by_severity"].items():
-            print(f"  - {severity}: {count}")
+            emoji = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🔵"}.get(severity, "⚪")
+            report_lines.append(f"  {emoji} {severity}: {count}")
+        report_lines.append("")
+    
     if payload["by_category"]:
-        print("By category:")
-        for category, count in payload["by_category"].items():
-            print(f"  - {category}: {count}")
+        report_lines.append("**Top Categories:**")
+        for category, count in list(payload["by_category"].items())[:5]:
+            report_lines.append(f"  • {category}: {count}")
+        report_lines.append("")
+    
+    report_lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+    report_lines.append(f"_Generated: {now_utc().strftime('%Y-%m-%d %H:%M UTC')}_")
+    
+    report_text = "\n".join(report_lines)
+    
+    if deliver:
+        # Deliver via OpenClaw message channel
+        # The report is printed to stdout; the cron wrapper should deliver it
+        print(report_text)
+    else:
+        # Terminal output with color
+        print(colorize("Guardian Report (7d)", CYAN))
+        print(f"Threats: {payload['threats_total']} total, {payload['threats_blocked']} blocked")
+        if payload["by_severity"]:
+            print("By severity:")
+            for severity, count in payload["by_severity"].items():
+                print(f"  - {severity}: {count}")
+        if payload["by_category"]:
+            print("By category:")
+            for category, count in payload["by_category"].items():
+                print(f"  - {category}: {count}")
 
 
 def cmd_update_defs(as_json: bool) -> None:
@@ -469,10 +567,23 @@ def build_parser() -> argparse.ArgumentParser:
     rm_parser = allow_sub.add_parser("remove", help="Remove allowlist pattern")
     rm_parser.add_argument("pattern", help="Regex/text pattern")
 
+    allowlist_db_parser = sub.add_parser("allowlist-db", help="Manage DB-backed allowlist rules")
+    allowlist_db_sub = allowlist_db_parser.add_subparsers(dest="allowlist_db_cmd", required=True)
+    allowlist_db_sub.add_parser("list", help="List active allowlist rules")
+    adb_add = allowlist_db_sub.add_parser("add", help="Add a DB allowlist rule")
+    adb_add.add_argument("signature_id", help="Signature ID to allowlist (e.g. INJ-019)")
+    adb_add.add_argument("--scope", default="all", choices=["all", "channel", "exact"], help="Rule scope")
+    adb_add.add_argument("--scope-value", dest="scope_value", default="", help="Channel name or exact text substring")
+    adb_add.add_argument("--reason", default="", help="Reason for allowlisting")
+    adb_rm = allowlist_db_sub.add_parser("remove", help="Remove a DB allowlist rule")
+    adb_rm.add_argument("rule_id", type=int, help="Rule ID to remove")
+
     threats_parser = sub.add_parser("threats", help="List threats")
     threats_parser.add_argument("--clear", action="store_true", help="Delete dismissed threats")
 
-    sub.add_parser("report", help="Generate 7-day report")
+    report_parser = sub.add_parser("report", help="Generate 7-day report")
+    report_parser.add_argument("--deliver", action="store_true", help="Format for channel delivery (default for cron)")
+    
     sub.add_parser("update-defs", help="Check for definition updates")
 
     return parser
@@ -500,10 +611,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             cmd_dismiss(conn, args.sig_id, args.json)
         elif args.command == "allowlist":
             cmd_allowlist(cfg, args.allow_cmd, args.pattern, args.json)
+        elif args.command == "allowlist-db":
+            cmd_allowlist_db(conn, args.allowlist_db_cmd, args, args.json)
         elif args.command == "threats":
             cmd_threats(conn, args.clear, args.json)
         elif args.command == "report":
-            cmd_report(conn, args.json)
+            cmd_report(conn, args.json, getattr(args, 'deliver', False))
         elif args.command == "update-defs":
             cmd_update_defs(args.json)
         return 0

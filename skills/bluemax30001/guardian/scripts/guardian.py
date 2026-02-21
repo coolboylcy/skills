@@ -39,21 +39,46 @@ def _load_json(path: Path) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _read_def_file(defs_dir, filename: str):
+    """Read a definition file — tries plaintext JSON first, then encoded (.enc)."""
+    import base64
+    plain = defs_dir / filename
+    if plain.exists():
+        try:
+            return _load_json(plain)
+        except (json.JSONDecodeError, OSError):
+            pass
+    enc_path = defs_dir / "encoded" / filename.replace(".json", ".enc")
+    if enc_path.exists():
+        try:
+            raw = base64.b64decode(enc_path.read_text(encoding="utf-8").strip()).decode("utf-8")
+            return json.loads(raw)
+        except Exception:
+            pass
+    return None
+
+
 def load_definitions(config_path: str | None = None) -> Dict[str, List[Dict[str, Any]]]:
     """Load signature definition files configured for this skill."""
     config = load_config(config_path)
     defs = {}
     defs_dir = definitions_dir(config)
 
-    for file_path in defs_dir.glob("*.json"):
-        if file_path.name == "manifest.json":
-            continue
-        try:
-            data = _load_json(file_path)
-        except (json.JSONDecodeError, OSError):
-            continue
+    # Collect all definition filenames from plaintext JSON and encoded .enc files
+    filenames = set()
+    for p in defs_dir.glob("*.json"):
+        if p.name != "manifest.json":
+            filenames.add(p.name)
+    enc_dir = defs_dir / "encoded"
+    if enc_dir.exists():
+        for p in enc_dir.glob("*.enc"):
+            filenames.add(p.name.replace(".enc", ".json"))
 
-        category = data.get("category", file_path.stem)
+    for fname in sorted(filenames):
+        data = _read_def_file(defs_dir, fname)
+        if data is None:
+            continue
+        category = data.get("category", Path(fname).stem)
         sigs = data.get("signatures", data.get("checks", []))
         if isinstance(sigs, list):
             defs[category] = sigs
@@ -61,8 +86,15 @@ def load_definitions(config_path: str | None = None) -> Dict[str, List[Dict[str,
     return defs
 
 
-def scan_text(text: str, definitions: Dict[str, List[Dict[str, Any]]], channel: str = "unknown") -> Dict[str, Any]:
+def scan_text(text: str, definitions: Dict[str, List[Dict[str, Any]]], channel: str = "unknown", role: str = "unknown") -> Dict[str, Any]:
     """Scan text against loaded definitions and return scored threats."""
+    # Load config to check for false positive suppression
+    config = load_config()
+    suppress_config = config.get("false_positive_suppression", {})
+    suppress_assistant_numbers = suppress_config.get("suppress_assistant_number_matches", True)
+    is_assistant = role in ("assistant", "model", "bot")
+    number_sensitive_patterns = {"EXF-008", "EXF-009", "EXF-011"}
+    
     threats: List[Dict[str, Any]] = []
     for category, signatures in definitions.items():
         if category == "openclaw_hardening":
@@ -87,9 +119,30 @@ def scan_text(text: str, definitions: Dict[str, List[Dict[str, Any]]], channel: 
             if not match:
                 continue
 
+            sig_id = sig.get("id", "unknown")
+            
+            # Skip number-sensitive patterns in assistant messages if suppression is enabled
+            if (suppress_assistant_numbers and 
+                is_assistant and 
+                sig_id in number_sensitive_patterns):
+                # Check if the match has financial context keywords nearby
+                match_start = max(0, match.start() - 50)
+                match_end = min(len(text), match.end() + 50)
+                context = text[match_start:match_end].lower()
+                
+                financial_keywords = [
+                    "bsb", "tfn", "tax file", "account", "banking", "transfer",
+                    "payment", "balance", "deposit", "withdrawal", "medicare",
+                    "abn", "financial", "bank"
+                ]
+                
+                has_financial_context = any(keyword in context for keyword in financial_keywords)
+                if not has_financial_context:
+                    continue  # Skip this match - likely a false positive
+
             threats.append(
                 {
-                    "id": sig.get("id", "unknown"),
+                    "id": sig_id,
                     "category": category,
                     "severity": sig.get("severity", "medium"),
                     "description": sig.get("description", ""),
@@ -349,7 +402,8 @@ def scan_sessions_multi(
                         continue
 
                     channel = str(entry.get("channel", "unknown"))
-                    result = scan_text(text, definitions, channel=channel)
+                    role = str(entry.get("role", "unknown"))
+                    result = scan_text(text, definitions, channel=channel, role=role)
                     if not result["threats"]:
                         continue
 

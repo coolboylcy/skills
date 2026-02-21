@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -17,11 +18,11 @@ def skill_root() -> Path:
 
 
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
-    """Load Guardian config from JSON file."""
-    path = Path(config_path).expanduser().resolve() if config_path else skill_root() / "config.json"
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+    """Load Guardian config, preferring OpenClaw Control UI config."""
+    sys.path.insert(0, str(skill_root() / "core"))
+    from settings import load_config as shared_load_config  # type: ignore  # noqa: E402
+
+    return shared_load_config(config_path)
 
 
 def resolve_workspace() -> Path:

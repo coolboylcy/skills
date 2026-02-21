@@ -14,7 +14,9 @@ Usage:
   python3 scripts/onboard.py --refresh                 # re-run, update GUARDIAN.md
   python3 scripts/onboard.py --config-review           # config walkthrough only
   python3 scripts/onboard.py --status                  # operational status only
-  python3 scripts/onboard.py --setup-crons             # auto-install cron jobs
+  python3 scripts/onboard.py --setup-crons             # auto-install cron jobs (includes dedup pre-check)
+  python3 scripts/onboard.py --clean-crons             # remove duplicate/stale Guardian cron entries
+  python3 scripts/onboard.py --clean-crons --dry-run   # preview what --clean-crons would remove
   python3 scripts/onboard.py --workspace /path/to/ws   # override workspace path
   python3 scripts/onboard.py --dashboard-url http://...# override dashboard URL
   python3 scripts/onboard.py --json                    # machine-readable output
@@ -66,6 +68,24 @@ def detect_server_ip() -> str:
         return "localhost"
 
 
+def detect_primary_channel(workspace: Path) -> str:
+    """Detect the user's primary messaging channel from openclaw.json."""
+    try:
+        openclaw_cfg = workspace.parent / "openclaw.json"
+        if not openclaw_cfg.exists():
+            openclaw_cfg = Path.home() / ".openclaw" / "openclaw.json"
+        if openclaw_cfg.exists():
+            data = json.loads(openclaw_cfg.read_text())
+            channels = data.get("channels", {})
+            # Find first enabled channel
+            for ch in ["telegram", "discord", "signal", "slack", "whatsapp"]:
+                if channels.get(ch, {}).get("enabled"):
+                    return ch
+    except Exception:
+        pass
+    return "telegram"  # fallback
+
+
 def detect_dashboard_port(workspace: Path) -> int | None:
     """Check if a static file server is running from the dashboard/ dir."""
     for port in [8089, 8080, 8000, 8888]:
@@ -105,11 +125,10 @@ def build_dashboard_url(workspace: Path, override_url: str | None) -> tuple[str,
 # ─────────────────────────────────────────────────────────
 
 def load_config(skill_dir: Path) -> dict:
-    cfg_path = skill_dir / "config.json"
-    if cfg_path.exists():
-        with open(cfg_path) as f:
-            return json.load(f)
-    return {}
+    sys.path.insert(0, str(skill_dir / "core"))
+    from settings import load_config as shared_load_config  # type: ignore  # noqa: E402
+
+    return shared_load_config()
 
 
 def resolve_db_path(cfg: dict, workspace: Path) -> Path:
@@ -255,7 +274,7 @@ def generate_guardian_md(
         "{{GUARDIAN_MODE}}": mode,
         "{{SEVERITY_THRESHOLD}}": cfg.get("severity_threshold", "medium").upper(),
         "{{DASHBOARD_URL}}": dashboard_url,
-        "{{CONFIG_PATH}}": str(SKILL_DIR / "config.json"),
+        "{{CONFIG_PATH}}": "skills/guardian/config.json",
         "{{DB_PATH}}": str(db_path),
         "{{TRUSTED_CHANNELS}}": ", ".join(trusted) if trusted else "telegram",
         "{{TRUST_TABLE}}": build_trust_table(cfg),
@@ -326,7 +345,7 @@ def build_human_notification(
         f"  • Config file: `skills/guardian/config.json`",
         f"  • DB: `{db_path.name}` (in workspace root)",
         f"  • Block threshold: **{threshold}** and above",
-        f"  • Trusted channels: {', '.join(trusted)}",
+        f"  • Trusted channels: {', '.join(trusted) if trusted else '(none — run --config-review to set this)'}",
         "",
         "🔔 **Alerts configured:**",
     ]
@@ -383,7 +402,8 @@ def cron_line_for(script: str, interval_min: int, skill_dir: Path) -> str:
     return f"*/{interval_min} * * * * cd {skill_dir} && python3 scripts/{script} >> /tmp/guardian-{script}.log 2>&1"
 
 
-CRON_DAILY_DIGEST = "0 9 * * * cd {skill_dir} && python3 scripts/admin.py report >> /tmp/guardian-daily.log 2>&1"
+CRON_DAILY_DIGEST = '0 9 * * * openclaw run "cd {skill_dir} && python3 scripts/daily_digest.py" --deliver-to=agent 2>> /tmp/guardian-daily.log'
+CRON_UPDATE_CHECK = '0 10 * * * openclaw run "cd {skill_dir} && python3 scripts/check_updates.py" --deliver-to=agent 2>> /tmp/guardian-updates.log'
 
 
 def detect_operational_status(skill_dir: Path, workspace: Path, db_path: Path, cfg: dict) -> dict:
@@ -394,7 +414,8 @@ def detect_operational_status(skill_dir: Path, workspace: Path, db_path: Path, c
     # Cron checks — look for key script names in crontab
     scanner_cron = "guardian.py" in crontab and skill_str in crontab
     export_cron = "dashboard_export.py" in crontab and skill_str in crontab
-    daily_cron = "admin.py" in crontab and "report" in crontab and skill_str in crontab
+    daily_cron = "daily_digest.py" in crontab and skill_str in crontab
+    update_check_cron = "check_updates.py" in crontab and skill_str in crontab
 
     # Broader check — maybe using NOC wrapper scripts
     noc_scanner = "noc-guardian-threats.py" in crontab
@@ -424,11 +445,14 @@ def detect_operational_status(skill_dir: Path, workspace: Path, db_path: Path, c
         cron_lines_needed.append(cron_line_for("dashboard_export.py", 5, skill_dir))
     if not daily_cron:
         cron_lines_needed.append(CRON_DAILY_DIGEST.format(skill_dir=skill_dir))
+    if not update_check_cron:
+        cron_lines_needed.append(CRON_UPDATE_CHECK.format(skill_dir=skill_dir))
 
     return {
         "scanner_cron": scanner_ok,
         "export_cron": export_ok,
         "daily_cron": daily_cron,
+        "update_check_cron": update_check_cron,
         "dashboard_running": dashboard_running,
         "dashboard_port": dashboard_port,
         "dashboard_ip": ip,
@@ -451,6 +475,7 @@ def build_status_report(ops: dict, skill_dir: Path, workspace: Path) -> str:
         f"  {check(ops['scanner_cron'])} Background scanner (cron job)",
         f"  {check(ops['export_cron'])} Dashboard data export (cron job)",
         f"  {check(ops['daily_cron'])} Daily digest (cron job)",
+        f"  {check(ops['update_check_cron'])} Update checker (cron job)",
         f"  {check(ops['dashboard_running'])} Dashboard server",
     ]
 
@@ -511,10 +536,17 @@ def setup_crons(ops: dict) -> tuple[bool, str]:
 
     try:
         current = detect_crontab()
+        # Dedup guard: only add lines not already present in the current crontab
+        existing_lines = set(current.splitlines())
+        to_add = [line for line in ops["cron_lines_needed"] if line not in existing_lines]
+
+        if not to_add:
+            return True, "No cron jobs needed — all already configured."
+
         # Remove trailing newline, add new lines
         new_lines = current.rstrip("\n") + "\n"
         new_lines += "\n# Guardian Security\n"
-        new_lines += "\n".join(ops["cron_lines_needed"]) + "\n"
+        new_lines += "\n".join(to_add) + "\n"
 
         proc = subprocess.run(
             ["crontab", "-"],
@@ -525,19 +557,179 @@ def setup_crons(ops: dict) -> tuple[bool, str]:
         if proc.returncode != 0:
             return False, f"crontab install failed: {proc.stderr}"
 
-        added = len(ops["cron_lines_needed"])
+        added = len(to_add)
         return True, f"✅ {added} cron job{'s' if added != 1 else ''} added successfully."
     except Exception as e:
         return False, f"Failed to install crons: {e}"
 
 
 # ─────────────────────────────────────────────────────────
+# Crontab cleanup (BL-030)
+# ─────────────────────────────────────────────────────────
+
+# Script names that identify Guardian-managed cron jobs
+GUARDIAN_SCRIPT_NAMES = [
+    "guardian.py",
+    "daily_digest.py",
+    "check_updates.py",
+    "dashboard_export.py",
+    "noc-guardian-threats.py",
+    "noc-guardian-config.py",
+    "noc-guardian-defs.py",
+]
+
+
+def _is_guardian_cron_line(line: str) -> bool:
+    """Return True if this cron line is Guardian-related."""
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return False
+    return any(script in stripped for script in GUARDIAN_SCRIPT_NAMES)
+
+
+def _guardian_job_key(line: str) -> str | None:
+    """Extract the canonical job identity (script name) from a Guardian cron line.
+
+    Returns the first matching Guardian script name, or None if no match.
+    This is used as the dedup key — multiple lines with the same key are duplicates.
+    """
+    for script in GUARDIAN_SCRIPT_NAMES:
+        if script in line:
+            return script
+    return None
+
+
+def _line_is_tmp_path(line: str) -> bool:
+    """Return True if this cron line uses /tmp/ as a working directory or script path.
+
+    Deliberately ignores /tmp/ in log redirect suffixes (e.g. >> /tmp/guardian-daily.log)
+    because those are acceptable and present in legitimate production cron lines too.
+    Only flags lines where the *command* itself runs from or against a /tmp/ path.
+    """
+    import re as _re
+    # Strip log redirect suffixes (>> /path and 2>> /path) before checking
+    # This removes everything from the first unquoted >> or 2>> onward
+    command_part = _re.split(r"\s+2?>>", line)[0]
+    # Now look for /tmp/ in the working directory (cd /tmp/...) or script invocation path
+    return bool(_re.search(r"(^|[\s\"'])(/tmp/)", command_part))
+
+
+def clean_crons(dry_run: bool = False) -> tuple[bool, str, int]:
+    """Clean Guardian cron entries: remove duplicates and /tmp/ dogfood artifacts.
+
+    Strategy:
+      1. Read current crontab
+      2. Identify all Guardian-related lines
+      3. For each "job key" (script name), keep the best line:
+           - Prefer lines NOT pointing to /tmp/ paths
+           - Among equals, keep the last seen (most recently added)
+      4. Mark all others as stale/duplicate
+      5. Write cleaned crontab back (unless dry_run)
+
+    Returns: (success, message, removed_count)
+    """
+    try:
+        current = detect_crontab()
+    except Exception as e:
+        return False, f"Failed to read crontab: {e}", 0
+
+    if not current.strip():
+        return True, "Crontab is empty — nothing to clean.", 0
+
+    all_lines = current.splitlines(keepends=True)
+
+    # Separate Guardian lines from non-Guardian lines
+    guardian_lines: list[tuple[int, str]] = []  # (original_index, line)
+    for i, line in enumerate(all_lines):
+        if _is_guardian_cron_line(line.rstrip("\n")):
+            guardian_lines.append((i, line))
+
+    if not guardian_lines:
+        return True, "No Guardian cron entries found — nothing to clean.", 0
+
+    # Group by job key; track which line to keep (last non-/tmp/ preferred)
+    best_for_key: dict[str, tuple[int, str]] = {}  # key → (original_index, line)
+    stale_indices: set[int] = set()
+
+    for idx, line in guardian_lines:
+        key = _guardian_job_key(line.rstrip("\n"))
+        if key is None:
+            continue
+
+        is_tmp = _line_is_tmp_path(line)
+
+        if key not in best_for_key:
+            best_for_key[key] = (idx, line)
+        else:
+            prev_idx, prev_line = best_for_key[key]
+            prev_is_tmp = _line_is_tmp_path(prev_line)
+
+            if is_tmp and not prev_is_tmp:
+                # Current is /tmp/ and previous is not — discard current
+                stale_indices.add(idx)
+            elif prev_is_tmp and not is_tmp:
+                # Previous is /tmp/ and current is not — replace previous
+                stale_indices.add(prev_idx)
+                best_for_key[key] = (idx, line)
+            else:
+                # Both /tmp/ or both non-/tmp/ — keep current (more recent), discard previous
+                stale_indices.add(prev_idx)
+                best_for_key[key] = (idx, line)
+
+    # Also mark any remaining /tmp/ Guardian lines that weren't deduped as stale
+    for idx, line in guardian_lines:
+        if _line_is_tmp_path(line) and idx not in stale_indices:
+            # Check if this line is the "best" for its key — if so it must go too
+            key = _guardian_job_key(line.rstrip("\n"))
+            if key and best_for_key.get(key, (None, None))[0] == idx:
+                # It's the only entry for this key but it's a /tmp/ path → remove it
+                stale_indices.add(idx)
+                del best_for_key[key]
+
+    removed_count = len(stale_indices)
+
+    if removed_count == 0:
+        return True, "Crontab is already clean — no duplicates or /tmp/ entries found.", 0
+
+    if dry_run:
+        stale_lines = [all_lines[i].rstrip("\n") for i in sorted(stale_indices)]
+        preview = "\n".join(f"  - {l}" for l in stale_lines)
+        return True, (
+            f"[DRY RUN] Would remove {removed_count} stale/duplicate cron line(s):\n{preview}"
+        ), removed_count
+
+    # Rebuild crontab without stale lines
+    cleaned_lines = [line for i, line in enumerate(all_lines) if i not in stale_indices]
+    new_crontab = "".join(cleaned_lines)
+
+    # Ensure trailing newline
+    if new_crontab and not new_crontab.endswith("\n"):
+        new_crontab += "\n"
+
+    try:
+        proc = subprocess.run(
+            ["crontab", "-"],
+            input=new_crontab,
+            text=True,
+            capture_output=True,
+        )
+        if proc.returncode != 0:
+            return False, f"crontab install failed: {proc.stderr}", 0
+    except Exception as e:
+        return False, f"Failed to write crontab: {e}", 0
+
+    return True, f"✅ Removed {removed_count} stale/duplicate Guardian cron line(s).", removed_count
+
+
+# ─────────────────────────────────────────────────────────
 # Config review (guided setup walkthrough)
 # ─────────────────────────────────────────────────────────
 
-def build_config_review(cfg: dict, db_stats: dict) -> str:
+def build_config_review(cfg: dict, db_stats: dict, workspace: Path | None = None) -> str:
     """Output a human-readable config review with flags for things to consider changing."""
 
+    primary_channel = detect_primary_channel(workspace) if workspace else "telegram"
+    
     lines = [
         "⚙️ **Guardian — Config Review**",
         "",
@@ -577,8 +769,14 @@ def build_config_review(cfg: dict, db_stats: dict) -> str:
     if not trusted:
         lines += [
             "",
-            "⚠️  **No trusted channels set** — add your primary channel (e.g. `telegram`, `discord`)",
-            "   → `admin.trusted_sources: [\"telegram\"]` in config.json",
+            "⚠️  **No trusted channels set** — add your primary channel",
+            "",
+            "**How to fix:**",
+            "1. Edit: `skills/guardian/config.json`",
+            "2. Find the line: `\"trusted_sources\": [],`",
+            f"3. Change it to: `\"trusted_sources\": [\"{primary_channel}\"],`",
+            f"   (Detected your primary channel: **{primary_channel}**)",
+            "4. Save and re-run: `python3 skills/guardian/scripts/onboard.py --refresh`",
         ]
     else:
         lines += [
@@ -677,6 +875,7 @@ def main() -> None:
     parser.add_argument("--config-review", action="store_true", help="Output a guided config review for the user")
     parser.add_argument("--status", action="store_true", help="Show operational status (what's running, what's not)")
     parser.add_argument("--setup-crons", action="store_true", help="Auto-install missing cron jobs")
+    parser.add_argument("--clean-crons", action="store_true", help="Remove duplicate/stale Guardian cron entries and /tmp/ dogfood artifacts")
     args = parser.parse_args()
 
     workspace = resolve_workspace(args.workspace)
@@ -687,7 +886,7 @@ def main() -> None:
     ops = detect_operational_status(SKILL_DIR, workspace, db_path, cfg)
 
     # Check version
-    version = "1.0.0"
+    version = "2.0.0"
     pyproject = SKILL_DIR / "pyproject.toml"
     if pyproject.exists():
         for line in pyproject.read_text().splitlines():
@@ -708,11 +907,36 @@ def main() -> None:
             print(report)
         return
 
+    # --clean-crons: remove duplicate/stale Guardian cron entries
+    if args.clean_crons:
+        ok, msg, removed = clean_crons(dry_run=args.dry_run)
+        if args.json:
+            print(json.dumps({"status": "crons_cleaned", "success": ok, "message": msg, "removed": removed}))
+        else:
+            print(msg)
+            if removed > 0 and not args.dry_run:
+                print("\nVerify with: crontab -l | grep guardian")
+        return
+
     # --setup-crons: auto-install missing cron jobs
     if args.setup_crons:
+        # BL-030: run dedup cleanup automatically before adding new entries
+        clean_ok, clean_msg, clean_removed = clean_crons(dry_run=args.dry_run)
+        if clean_removed > 0 and not args.dry_run:
+            if not args.json:
+                print(f"🧹 Pre-cleanup: {clean_msg}")
+
+        # Re-detect after cleanup (crontab may have changed)
+        ops = detect_operational_status(SKILL_DIR, workspace, db_path, cfg)
+
         ok, msg = setup_crons(ops)
         if args.json:
-            print(json.dumps({"status": "crons_setup", "success": ok, "message": msg}))
+            print(json.dumps({
+                "status": "crons_setup",
+                "success": ok,
+                "message": msg,
+                "pre_cleanup": {"removed": clean_removed, "message": clean_msg},
+            }))
         else:
             print(msg)
             if ok and ops["cron_lines_needed"]:
@@ -724,7 +948,7 @@ def main() -> None:
 
     # --config-review can run independently of onboarding state
     if args.config_review:
-        review = build_config_review(cfg, db_stats)
+        review = build_config_review(cfg, db_stats, workspace)
         if args.json:
             print(json.dumps({"status": "config_review", "review": review}))
         else:
@@ -775,7 +999,8 @@ def main() -> None:
 
     if args.json:
         print(json.dumps({
-            "status": "onboarded",
+            "status": "dry_run" if args.dry_run else "onboarded",
+            "dry_run": args.dry_run,
             "first_run": is_first_run,
             "dashboard_url": dashboard_url,
             "workspace": str(workspace),
@@ -790,8 +1015,12 @@ def main() -> None:
         print("\n" + "="*60)
         print("SECTION 1 — AGENT BRIEFING")
         print("="*60)
-        print(f"✅ GUARDIAN.md written to: {workspace / 'GUARDIAN.md'}")
-        print(f"   The AI agent loads this every session — no further action needed.\n")
+        if args.dry_run:
+            print(f"⚠️  DRY RUN — no changes made")
+            print(f"   GUARDIAN.md was NOT written. Re-run without --dry-run to apply.\n")
+        else:
+            print(f"✅ GUARDIAN.md written to: {workspace / 'GUARDIAN.md'}")
+            print(f"   The AI agent loads this every session — no further action needed.\n")
         print("="*60)
         print("SECTION 2 — ADMIN NOTIFICATION  [send this to the user]")
         print("="*60)

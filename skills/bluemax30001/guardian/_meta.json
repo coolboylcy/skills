@@ -1,13 +1,18 @@
 {
   "owner": "bluemax30001",
   "slug": "guardian",
-  "displayName": "Guardian Security",
+  "displayName": "Guardian",
   "latest": {
-    "version": "1.7.0",
-    "publishedAt": 1771497559380,
-    "commit": "https://github.com/openclaw/skills/commit/5098cc64d4b700f72e3986a66cd2c8acf0877756"
+    "version": "2.0.3",
+    "publishedAt": 1771680790503,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.7.0",
+      "publishedAt": 1771497559380,
+      "commit": "https://github.com/openclaw/skills/commit/5098cc64d4b700f72e3986a66cd2c8acf0877756"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1771494893289,

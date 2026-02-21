@@ -61,10 +61,10 @@ PY
 # The agent reads WORKFLOW_AUTO.md on every startup/compaction — it checks
 # for this file and handles the rest automatically.
 
-WORKSPACE_DIR="$(python3 - <<'PY'
-import sys, os
+WORKSPACE_DIR="$(python3 - "$ROOT_DIR" <<'PY'
+import sys
 from pathlib import Path
-skill = Path("$ROOT_DIR").resolve()
+skill = Path(sys.argv[1]).resolve()  # Read from argv instead of string substitution
 # Walk up to find workspace root (has MEMORY.md / AGENTS.md / SOUL.md)
 candidate = skill.parent.parent
 for marker in ("MEMORY.md", "AGENTS.md", "SOUL.md"):
@@ -81,15 +81,15 @@ MARKER_FILE="$WORKSPACE_DIR/.guardian-activate-pending"
 cat > "$MARKER_FILE" << MARKER
 # Guardian Activation Pending
 # Written by: install.sh at $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-# Skill path: $ROOT_DIR
+# Skill path: skills/guardian
 #
 # AGENT: You must act on this now.
 #
-# 1. Run: python3 $ROOT_DIR/scripts/onboard.py
+# 1. Run: python3 skills/guardian/scripts/onboard.py
 # 2. Send SECTION 2 (ADMIN NOTIFICATION) to the user via their primary channel
 # 3. Send SECTION 3 (SETUP CHECKLIST) to the user
-# 4. Run: python3 $ROOT_DIR/scripts/onboard.py --setup-crons
-# 5. Run: python3 $ROOT_DIR/scripts/onboard.py --config-review
+# 4. Run: python3 skills/guardian/scripts/onboard.py --setup-crons
+# 5. Run: python3 skills/guardian/scripts/onboard.py --config-review
 #    and send that output to the user too
 # 6. Confirm to the user: Guardian is now fully operational
 # 7. Delete this file when done: rm $MARKER_FILE
