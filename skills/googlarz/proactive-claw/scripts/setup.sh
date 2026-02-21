@@ -153,18 +153,18 @@ try:
     calendars = principal.calendars()
     print(f"✅ Connected to Nextcloud. Found {len(calendars)} calendar(s).")
 
-    # Find or create OpenClaw calendar
+    # Find or create Action Calendar (check both old and new name for migration)
     openclaw_url = None
     for cal in calendars:
-        if cal.name == "OpenClaw":
+        if cal.name in ("Proactive Claw \u2014 Actions", "OpenClaw"):
             openclaw_url = str(cal.url)
-            print(f"✅ OpenClaw calendar exists: {openclaw_url}")
+            print(f"\u2705 Action Calendar exists: {openclaw_url}")
             break
 
     if not openclaw_url:
-        new_cal = principal.make_calendar(name="OpenClaw")
+        new_cal = principal.make_calendar(name="Proactive Claw \u2014 Actions")
         openclaw_url = str(new_cal.url)
-        print(f"✅ OpenClaw calendar created: {openclaw_url}")
+        print(f"\u2705 Action Calendar created: {openclaw_url}")
 
     config["openclaw_cal_id"] = openclaw_url
     config["nextcloud"]["openclaw_calendar_url"] = openclaw_url
@@ -234,19 +234,19 @@ if not creds or not creds.valid:
 
 service = build("calendar", "v3", credentials=creds)
 
-# Check if OpenClaw calendar already exists
+# Check if Action Calendar already exists (check both old and new name for migration)
 calendars = service.calendarList().list().execute().get("items", [])
 openclaw_id = None
 for cal in calendars:
-    if cal.get("summary") == "OpenClaw":
+    if cal.get("summary") in ("Proactive Claw \u2014 Actions", "OpenClaw"):
         openclaw_id = cal["id"]
-        print(f"✅ OpenClaw calendar exists (id: {openclaw_id})")
+        print(f"\u2705 Action Calendar exists (id: {openclaw_id})")
         break
 
 if not openclaw_id:
-    cal = service.calendars().insert(body={"summary": "OpenClaw"}).execute()
+    cal = service.calendars().insert(body={"summary": "Proactive Claw \u2014 Actions"}).execute()
     openclaw_id = cal["id"]
-    print(f"✅ OpenClaw calendar created (id: {openclaw_id})")
+    print(f"\u2705 Action Calendar created (id: {openclaw_id})")
 
 # Save to config
 with open(CONFIG_FILE) as f:

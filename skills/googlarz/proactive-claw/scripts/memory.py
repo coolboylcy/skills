@@ -180,9 +180,23 @@ def get_patterns(conn: sqlite3.Connection, recurring_id: str) -> dict:
     if not outcomes:
         return {"recurring_id": recurring_id, "total_outcomes": 0, "outcomes": []}
 
+    # Use decay-weighted averages if available
+    try:
+        from decay import weighted_average
+        config_path = SKILL_DIR / "config.json"
+        half_life = 90
+        if config_path.exists():
+            import json as _json
+            half_life = _json.loads(config_path.read_text()).get("memory_decay_half_life_days", 90)
+        item_pairs = [(len(o["action_items"]), o["event_datetime"]) for o in outcomes]
+        prep_pairs = [(1.0 if o["prep_done"] else 0.0, o["event_datetime"]) for o in outcomes]
+        avg_items = weighted_average(item_pairs, half_life)
+        prep_rate = weighted_average(prep_pairs, half_life)
+    except Exception:
+        avg_items = sum(len(o["action_items"]) for o in outcomes) / len(outcomes)
+        prep_rate = sum(1 for o in outcomes if o["prep_done"]) / len(outcomes)
+
     sentiments = Counter(o["sentiment"] for o in outcomes)
-    avg_items = sum(len(o["action_items"]) for o in outcomes) / len(outcomes)
-    prep_rate = sum(1 for o in outcomes if o["prep_done"]) / len(outcomes)
 
     return {
         "recurring_id": recurring_id,

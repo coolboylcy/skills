@@ -103,6 +103,15 @@ def google_create_event(cal_id: str, title: str, start: datetime, end: datetime,
     return service.events().insert(calendarId=cal_id, body=body).execute()
 
 
+def google_get_event(cal_id: str, event_id: str) -> Optional[dict]:
+    """Fetch a single Google Calendar event by ID. Returns None if not found."""
+    try:
+        service = _get_google_service()
+        return service.events().get(calendarId=cal_id, eventId=event_id).execute()
+    except Exception:
+        return None
+
+
 def google_update_event(cal_id: str, event_id: str, patch: dict) -> dict:
     service = _get_google_service()
     return service.events().patch(
@@ -230,6 +239,23 @@ def nextcloud_create_event(config: dict, cal_url: str, title: str,
     return {"id": event_uid, "summary": title}
 
 
+def nextcloud_get_event(config: dict, cal_url: str, event_id: str) -> Optional[dict]:
+    """Fetch a single CalDAV event by UID. Returns None if not found."""
+    try:
+        import caldav
+        client = _get_caldav_client(config)
+        cal = caldav.Calendar(client=client, url=cal_url)
+        results = cal.search(uid=event_id, event=True)
+        if not results:
+            return None
+        comp = results[0].vobject_instance.vevent
+        summary = str(comp.summary.value) if hasattr(comp, "summary") else "(no title)"
+        description = str(comp.description.value) if hasattr(comp, "description") else ""
+        return {"id": event_id, "summary": summary, "description": description}
+    except Exception:
+        return None
+
+
 def nextcloud_update_event(config: dict, cal_url: str, event_id: str, patch: dict) -> dict:
     """Update a CalDAV event by UID. Patch keys: start/end dicts with dateTime strings."""
     import caldav
@@ -248,6 +274,11 @@ def nextcloud_update_event(config: dict, cal_url: str, event_id: str, patch: dic
         comp.dtend.value = new_end
     if "summary" in patch:
         comp.summary.value = patch["summary"]
+    if "description" in patch:
+        if hasattr(comp, "description"):
+            comp.description.value = patch["description"]
+        else:
+            comp.add("description").value = patch["description"]
     event.save()
     return {"id": event_id, "summary": str(comp.summary.value)}
 
@@ -293,8 +324,17 @@ class CalendarBackend:
             return nextcloud_create_event(self.config, cal_id, title, start, end, description)
         return google_create_event(cal_id, title, start, end, description, tz_str)
 
-    def update_event(self, cal_id: str, event_id: str, patch: dict) -> dict:
-        """Patch an existing event. patch keys: start/end dicts with dateTime strings, summary, etc."""
+    def get_event(self, cal_id: str, event_id: str) -> Optional[dict]:
+        """Fetch a single event by ID. Returns None if not found."""
+        if self.backend == "nextcloud":
+            return nextcloud_get_event(self.config, cal_id, event_id)
+        return google_get_event(cal_id, event_id)
+
+    def update_event(self, cal_id: str, event_id: str, patch: dict = None, **kwargs) -> dict:
+        """Patch an existing event. Accepts a patch dict and/or keyword args (summary=, description=)."""
+        if patch is None:
+            patch = {}
+        patch.update(kwargs)  # merge keyword args like summary=, description= into patch
         if self.backend == "nextcloud":
             return nextcloud_update_event(self.config, cal_id, event_id, patch)
         return google_update_event(cal_id, event_id, patch)

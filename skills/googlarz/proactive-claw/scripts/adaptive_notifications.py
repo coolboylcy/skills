@@ -129,22 +129,34 @@ def record_response(conn: sqlite3.Connection, nudge_id: str, response: str,
 
 
 def _update_preferences(conn: sqlite3.Connection):
-    """Recompute and store learned preferences from response history."""
+    """Recompute and store learned preferences from response history.
+    Uses decay weighting to prioritise recent responses.
+    """
     now = datetime.now(timezone.utc).isoformat()
 
-    # 1. Best channel per event type
+    # Load decay utility
+    try:
+        from decay import decay_weight
+        config = load_config()
+        half_life = config.get("memory_decay_half_life_days", 90)
+    except Exception:
+        decay_weight = None
+        half_life = 90
+
+    # 1. Best channel per event type (with decay weighting)
     rows = conn.execute("""
-        SELECT event_type, channel, response, COUNT(*) as cnt
+        SELECT event_type, channel, response, sent_at
         FROM notification_responses
         WHERE event_type != '' AND channel != ''
-        GROUP BY event_type, channel, response
     """).fetchall()
 
     channel_scores: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     for row in rows:
-        score = RESPONSE_SCORE.get(row["response"], 0.0)
-        for _ in range(row["cnt"]):
-            channel_scores[row["event_type"]][row["channel"]].append(score)
+        base_score = RESPONSE_SCORE.get(row["response"], 0.0)
+        if decay_weight and row["sent_at"]:
+            w = decay_weight(row["sent_at"], half_life)
+            base_score *= w
+        channel_scores[row["event_type"]][row["channel"]].append(base_score)
 
     for event_type, channels in channel_scores.items():
         best_channel = None

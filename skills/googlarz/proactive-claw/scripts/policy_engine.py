@@ -167,10 +167,20 @@ def get_active_policies(conn) -> list:
              "times_fired": r["times_fired"]} for r in rows]
 
 
-def evaluate_policies(policies: list, events: list, dry_run: bool = False) -> list:
-    """Evaluate all autonomous policies against scanned events. Return list of actions taken."""
+def evaluate_policies(policies: list, events: list, dry_run: bool = False,
+                      config: dict = None) -> list:
+    """Evaluate all autonomous policies against scanned events. Return list of actions taken.
+
+    The optional config parameter enables max_autonomy_level enforcement:
+    - advisory: never execute, return suggestion only
+    - confirm: never execute, mark as needs_confirmation
+    - autonomous: execute as before (default)
+    """
     actions = []
     now = datetime.now(timezone.utc)
+    autonomy = "autonomous"
+    if config:
+        autonomy = config.get("max_autonomy_level", "autonomous")
 
     for event in events:
         score = event.get("score", 0)
@@ -210,11 +220,25 @@ def evaluate_policies(policies: list, events: list, dry_run: bool = False) -> li
                 "event_title": event_title,
                 "action_type": action_type,
                 "dry_run": dry_run,
+                "autonomy_level": autonomy,
                 "executed": False,
                 "result": None,
             }
 
-            if not dry_run and event_start:
+            # Enforce max_autonomy_level
+            if autonomy == "advisory":
+                action_record["result"] = {
+                    "advisory": f"Would {action_type} for '{event_title}'",
+                    "params": params,
+                }
+            elif autonomy == "confirm":
+                action_record["result"] = {
+                    "needs_confirmation": True,
+                    "action": action_type,
+                    "event_title": event_title,
+                    "params": params,
+                }
+            elif not dry_run and event_start:
                 try:
                     result = _execute_action(action_type, params, event_title,
                                               event_start, event.get("duration_minutes", 60))

@@ -266,6 +266,60 @@ def is_cache_valid(config: dict) -> bool:
         return False
 
 
+def scan_user_events(config: dict = None, backend=None, now=None, time_max=None) -> list:
+    """Library function: scan user calendars and return raw event dicts.
+
+    Excludes the action calendar (openclaw_cal_id). Respects watched_calendars
+    and ignored_calendars config keys.
+
+    Returns list of dicts, each with original provider fields plus _calendar_name.
+    """
+    if config is None:
+        config = load_config()
+    if now is None:
+        now = datetime.now(timezone.utc)
+    days_ahead = config.get("scan_days_ahead", 7)
+    if time_max is None:
+        time_max = now + timedelta(days=days_ahead)
+
+    sys.path.insert(0, str(SKILL_DIR / "scripts"))
+    if backend is None:
+        from cal_backend import CalendarBackend
+        backend = CalendarBackend()
+
+    openclaw_cal_id = config.get("openclaw_cal_id", "")
+    watched = config.get("watched_calendars", [])
+    ignored = config.get("ignored_calendars", [])
+
+    try:
+        calendars = backend.list_user_calendars()
+    except Exception as e:
+        return []
+
+    all_events = []
+    for cal in calendars:
+        cal_id = cal["id"]
+        # Skip action calendar
+        if cal_id == openclaw_cal_id:
+            continue
+        # Skip ignored
+        if cal_id in ignored:
+            continue
+        # If watched list is non-empty, only include those
+        if watched and cal_id not in watched:
+            continue
+        try:
+            events = backend.list_events(cal_id, now, time_max)
+            for event in events:
+                event["_calendar_name"] = cal.get("summary", "")
+                event["_calendar_id"] = cal_id
+                all_events.append(event)
+        except Exception:
+            pass
+
+    return all_events
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--force", action="store_true", help="Bypass scan cache")

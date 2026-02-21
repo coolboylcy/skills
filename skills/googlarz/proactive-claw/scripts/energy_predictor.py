@@ -71,8 +71,9 @@ def analyse_energy(conn) -> dict:
             "message": f"Need at least {MIN_OUTCOMES} outcomes to detect patterns. Have {len(rows)}.",
         }
 
-    # Accumulate scores per (day, slot)
+    # Accumulate scores per (day, slot) with dates for decay weighting
     scores = defaultdict(list)
+    scores_dates = defaultdict(list)
     for row in rows:
         try:
             dt = datetime.fromisoformat(row["event_datetime"].replace("Z", "+00:00"))
@@ -87,17 +88,30 @@ def analyse_energy(conn) -> dict:
             if not row["follow_up_needed"]:
                 score += 0.2
             scores[(day, slot)].append(score)
+            scores_dates[(day, slot)].append(row["event_datetime"])
         except Exception:
             continue
 
-    # Compute averages
+    # Compute decay-weighted averages
+    try:
+        from decay import weighted_average
+        half_life = load_config().get("memory_decay_half_life_days", 90)
+    except Exception:
+        weighted_average = None
+        half_life = 90
+
     avg_scores = {}
     for (day, slot), vals in scores.items():
         if len(vals) >= 2:  # need at least 2 data points
+            if weighted_average and scores_dates.get((day, slot)):
+                pairs = list(zip(vals, scores_dates[(day, slot)]))
+                avg = round(weighted_average(pairs, half_life), 2)
+            else:
+                avg = round(sum(vals) / len(vals), 2)
             avg_scores[f"{day}_{slot}"] = {
                 "day": day,
                 "slot": slot,
-                "avg_score": round(sum(vals) / len(vals), 2),
+                "avg_score": avg,
                 "sample_size": len(vals),
             }
 
