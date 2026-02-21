@@ -1,6 +1,6 @@
 #!/bin/bash
-# checks.sh - Unified POLICY + HEALTH enforcement
-# Separates Executable (deterministic) vs Interpretive (contextual) rules
+# checks.sh - Unified policies/ + checks/ enforcement
+# Executes checks FIRST, then reads policies
 
 set -e
 
@@ -9,181 +9,226 @@ MODE="${2:-start}" # start or end
 
 cd "$PROJECT_ROOT"
 
-echo "🔍 Running backstage checks (mode: $MODE)..."
+echo "🔍 Running backstage enforcement (mode: $MODE)..."
 echo ""
 
 # ============================================================================
-# STEP 1: Locate POLICY/HEALTH files (global + project)
+# STEP 1: Execute ALL checks (deterministic - bash domain)
 # ============================================================================
 
-GLOBAL_POLICY="$HOME/Documents/backstage/backstage/global/POLICY.md"
-PROJECT_POLICY="backstage/POLICY.md"
-GLOBAL_HEALTH="$HOME/Documents/backstage/backstage/global/HEALTH.md"
-PROJECT_HEALTH="backstage/HEALTH.md"
-
-echo "📋 Locating POLICY + HEALTH files..."
-
-POLICY_FILES=()
-HEALTH_FILES=()
-
-if [ -f "$GLOBAL_POLICY" ]; then
-    echo "  ✅ Global POLICY: $GLOBAL_POLICY"
-    POLICY_FILES+=("$GLOBAL_POLICY")
-fi
-
-if [ -f "$PROJECT_POLICY" ]; then
-    echo "  ✅ Project POLICY: $PROJECT_POLICY (takes precedence)"
-    POLICY_FILES+=("$PROJECT_POLICY")
-fi
-
-if [ -f "$GLOBAL_HEALTH" ]; then
-    echo "  ✅ Global HEALTH: $GLOBAL_HEALTH"
-    HEALTH_FILES+=("$GLOBAL_HEALTH")
-fi
-
-if [ -f "$PROJECT_HEALTH" ]; then
-    echo "  ✅ Project HEALTH: $PROJECT_HEALTH (takes precedence)"
-    HEALTH_FILES+=("$PROJECT_HEALTH")
-fi
-
-# ============================================================================
-# STEP 2: Extract EXECUTABLE rules from POLICY (deterministic)
-# ============================================================================
-
+echo "🔍 Executing checks/ (deterministic)..."
 echo ""
-echo "🔧 Extracting executable rules from POLICY..."
 
-# Extract current backstage version from POLICY
-VERSION=""
-for policy in "${POLICY_FILES[@]}"; do
-    VERSION=$(grep -o 'backstage rules.*v[0-9.]*' "$policy" | sed 's/.*v\([0-9.]*\).*/\1/' | head -1)
-    if [ -n "$VERSION" ]; then
-        echo "  ✅ Found version: v$VERSION"
-        break
-    fi
-done
+GLOBAL_CHECKS_DIR="$HOME/Documents/backstage/backstage/checks/global"
+LOCAL_CHECKS_DIR="backstage/checks/local"
 
-if [ -z "$VERSION" ]; then
-    echo "  ⚠️  No version found in POLICY"
-    VERSION="unknown"
-fi
+CHECKS_PASS=true
+CHECKS_RUN=0
+ROADMAP_STATUS="" # Capture roadmap-tasks output
 
-# Extract navigation block template (between specific markers)
-NAV_TEMPLATE=$(awk '/Navigation block template \(current version\):/,/```markdown/,/```/' "${POLICY_FILES[0]}" 2>/dev/null || echo "")
-
-if [ -n "$NAV_TEMPLATE" ]; then
-    echo "  ✅ Navigation block template extracted"
-else
-    echo "  ⚠️  No navigation block template found"
-fi
-
-# ============================================================================
-# STEP 3: Extract EXECUTABLE rules from HEALTH (code blocks)
-# ============================================================================
-
-echo ""
-echo "🧪 Extracting executable rules from HEALTH..."
-
-HEALTH_CHECKS=()
-
-for health in "${HEALTH_FILES[@]}"; do
-    # Extract bash code blocks
-    while IFS= read -r block; do
-        if [ -n "$block" ]; then
-            HEALTH_CHECKS+=("$block")
+# Collect local check basenames (for override detection)
+LOCAL_CHECKS=""
+if [ -d "$LOCAL_CHECKS_DIR" ]; then
+    for check in "$LOCAL_CHECKS_DIR"/*.sh; do
+        if [ -f "$check" ]; then
+            basename_check=$(basename "$check")
+            LOCAL_CHECKS="$LOCAL_CHECKS $basename_check "
         fi
-    done < <(awk '/```bash/,/```/ {if (!/```/) print}' "$health")
-done
+    done
+fi
 
-echo "  ✅ Found ${#HEALTH_CHECKS[@]} executable checks"
+# Run global checks (skip if local has same name)
+if [ -d "$GLOBAL_CHECKS_DIR" ]; then
+    echo "  📋 Global checks:"
+    for check in "$GLOBAL_CHECKS_DIR"/*.sh; do
+        if [ -f "$check" ]; then
+            basename_check=$(basename "$check")
+            
+            # Skip if local overrides (check if basename is in LOCAL_CHECKS string)
+            if echo "$LOCAL_CHECKS" | grep -q " $basename_check "; then
+                echo "    ⏭️  $basename_check (local override)"
+                continue
+            fi
+            
+            # Run check
+            CHECK_OUTPUT=$(bash "$check" 2>&1)
+            if [ $? -eq 0 ]; then
+                echo "    ✅ $basename_check"
+                # Capture roadmap-tasks output if all tasks done
+                if [ "$basename_check" = "roadmap-tasks.sh" ] && echo "$CHECK_OUTPUT" | grep -q "🚦 Ready for merge-to-main"; then
+                    ROADMAP_STATUS="$CHECK_OUTPUT"
+                fi
+            else
+                echo "    ❌ $basename_check (failed)"
+                CHECKS_PASS=false
+            fi
+            CHECKS_RUN=$((CHECKS_RUN + 1))
+        fi
+    done
+else
+    echo "  ⚠️  No global checks found ($GLOBAL_CHECKS_DIR)"
+fi
+
+echo ""
+
+# Run local checks (always run, overrides global if same name)
+if [ -d "$LOCAL_CHECKS_DIR" ]; then
+    echo "  📋 Local checks:"
+    for check in "$LOCAL_CHECKS_DIR"/*.sh; do
+        if [ -f "$check" ]; then
+            basename_check=$(basename "$check")
+            
+            # Run check
+            if bash "$check" >/dev/null 2>&1; then
+                echo "    ✅ $basename_check"
+            else
+                echo "    ❌ $basename_check (failed)"
+                CHECKS_PASS=false
+            fi
+            CHECKS_RUN=$((CHECKS_RUN + 1))
+        fi
+    done
+else
+    echo "  ℹ️  No local checks found ($LOCAL_CHECKS_DIR)"
+fi
+
+echo ""
+echo "  📊 Checks executed: $CHECKS_RUN"
 
 # ============================================================================
-# STEP 4: Execute DETERMINISTIC rules (SH domain)
+# STEP 2: Read interpretive checks (.md files in checks/)
 # ============================================================================
 
 echo ""
-echo "⚙️  Executing deterministic rules..."
+echo "📋 Reading interpretive checks/ (.md files - AI enforces)..."
+echo ""
 
-EXEC_PASS=true
+INTERPRETIVE_READ=0
 
-# Check: Navigation blocks exist in backstage files
-for file in README.md backstage/ROADMAP.md backstage/CHANGELOG.md backstage/POLICY.md backstage/HEALTH.md; do
-    if [ -f "$file" ]; then
-        if grep -q "> 🤖" "$file"; then
-            echo "  ✅ $file has navigation block"
+# Collect local interpretive basenames (for override detection)
+LOCAL_INTERPRETIVE=""
+if [ -d "$LOCAL_CHECKS_DIR" ]; then
+    for check in "$LOCAL_CHECKS_DIR"/*.md; do
+        if [ -f "$check" ]; then
+            basename_check=$(basename "$check")
+            LOCAL_INTERPRETIVE="$LOCAL_INTERPRETIVE $basename_check "
+        fi
+    done
+fi
+
+# Read global interpretive checks (skip if local has same name)
+if [ -d "$GLOBAL_CHECKS_DIR" ]; then
+    echo "  📋 Global interpretive:"
+    for check in "$GLOBAL_CHECKS_DIR"/*.md; do
+        if [ -f "$check" ]; then
+            basename_check=$(basename "$check")
+            
+            # Skip README.md
+            if [ "$basename_check" = "README.md" ]; then
+                continue
+            fi
+            
+            # Skip if local overrides
+            if echo "$LOCAL_INTERPRETIVE" | grep -q " $basename_check "; then
+                echo "    ⏭️  $basename_check (local override)"
+                continue
+            fi
+            
+            echo "    ✅ $basename_check (read)"
+            INTERPRETIVE_READ=$((INTERPRETIVE_READ + 1))
+        fi
+    done
+fi
+
+echo ""
+
+# Read local interpretive checks (always read, overrides global if same name)
+if [ -d "$LOCAL_CHECKS_DIR" ]; then
+    echo "  📋 Local interpretive:"
+    HAS_LOCAL_INTERPRETIVE=false
+    for check in "$LOCAL_CHECKS_DIR"/*.md; do
+        if [ -f "$check" ] && [ "$(basename "$check")" != "README.md" ]; then
+            basename_check=$(basename "$check")
+            echo "    ✅ $basename_check (read)"
+            INTERPRETIVE_READ=$((INTERPRETIVE_READ + 1))
+            HAS_LOCAL_INTERPRETIVE=true
+        fi
+    done
+    if [ "$HAS_LOCAL_INTERPRETIVE" = false ]; then
+        echo "  ℹ️  No local interpretive checks found"
+    fi
+else
+    echo "  ℹ️  No local interpretive checks found"
+fi
+
+echo ""
+echo "  📊 Interpretive checks read: $INTERPRETIVE_READ"
+
+# ============================================================================
+# STEP 3: Integrated report
+# ============================================================================
+
+echo ""
+echo "📊 Integrated Enforcement Report:"
+echo ""
+
+# Show current branch + epic info
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
+if [[ "$CURRENT_BRANCH" == "main" ]]; then
+    echo "🌿 Branch: main (read-only)"
+elif [[ "$CURRENT_BRANCH" =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+    VERSION="${BASH_REMATCH[1]}"
+    # Extract epic title from ROADMAP
+    if [[ -f backstage/ROADMAP.md ]]; then
+        EPIC_TITLE=$(awk "/^## v$VERSION\$/,/^###/" backstage/ROADMAP.md | grep "^###" | head -1 | sed 's/^### //')
+        if [[ -n "$EPIC_TITLE" ]]; then
+            echo "🌿 Epic: v$VERSION - $EPIC_TITLE"
         else
-            echo "  ⚠️  $file missing navigation block (AI will add)"
-            EXEC_PASS=false
+            echo "🌿 Branch: $CURRENT_BRANCH"
         fi
-    fi
-done
-
-# Check: Versions match
-if [ -f "README.md" ]; then
-    README_VERSION=$(grep -o 'backstage rules.*v[0-9.]*' README.md | sed 's/.*v\([0-9.]*\).*/\1/' | head -1 || echo "")
-    if [ "$README_VERSION" = "$VERSION" ]; then
-        echo "  ✅ README version matches POLICY (v$VERSION)"
     else
-        echo "  ⚠️  README version mismatch (has: $README_VERSION, expected: $VERSION)"
-        EXEC_PASS=false
+        echo "🌿 Branch: $CURRENT_BRANCH"
     fi
-fi
-
-# Execute HEALTH checks
-for check in "${HEALTH_CHECKS[@]}"; do
-    if eval "$check" >/dev/null 2>&1; then
-        echo "  ✅ HEALTH check passed: ${check:0:50}..."
-    else
-        echo "  ❌ HEALTH check failed: ${check:0:50}..."
-        EXEC_PASS=false
-    fi
-done
-
-# ============================================================================
-# STEP 5: Report INTERPRETIVE rules (AI domain)
-# ============================================================================
-
-echo ""
-echo "🤖 Interpretive rules (AI handles):"
-echo "  - README protection (needs confirmation before edits)"
-echo "  - Surgical changes only (quality judgment)"
-echo "  - Context decisions (project wins on conflict)"
-echo "  - Mermaid diagram propagation (ROADMAP → all files)"
-echo ""
-echo "  → AI will enforce these via prompts in backstage-start/end"
-
-# ============================================================================
-# STEP 6: Integrated report
-# ============================================================================
-
-echo ""
-echo "📊 Integrated Compliance Report:"
-echo ""
-
-if [ "$EXEC_PASS" = true ]; then
-    echo "  ✅ All deterministic checks passed"
-    echo "  ✅ Executable enforcement: COMPLETE"
 else
-    echo "  ⚠️  Some deterministic checks failed (see above)"
-    echo "  ⚠️  Executable enforcement: NEEDS FIXES"
+    echo "🌿 Branch: $CURRENT_BRANCH"
 fi
 
-echo "  🤖 Interpretive enforcement: Pending AI action"
+echo ""
+
+echo "🔍 Checks (deterministic):"
+if [ "$CHECKS_PASS" = true ]; then
+    echo "  ✅ All checks passed ($CHECKS_RUN executed)"
+else
+    echo "  ❌ Some checks failed (see above)"
+fi
+
+echo ""
+echo "📋 Interpretive checks:"
+echo "  ✅ All interpretive checks read ($INTERPRETIVE_READ total)"
+echo "  🤖 AI will enforce contextual rules"
+
+# Show roadmap status if epic complete
+if [ -n "$ROADMAP_STATUS" ]; then
+    echo ""
+    echo "$ROADMAP_STATUS"
+fi
+
 echo ""
 
 # ============================================================================
-# STEP 7: Exit code (mode-aware)
+# STEP 4: Exit code (mode-aware)
 # ============================================================================
 
-if [ "$EXEC_PASS" = true ]; then
-    echo "✅ checks.sh complete (all deterministic rules passed)"
+if [ "$CHECKS_PASS" = true ]; then
+    echo "✅ Enforcement complete (all deterministic checks passed)"
     exit 0
 else
     if [ "$MODE" = "start" ]; then
-        echo "🛑 checks.sh failed (blocking commit - fix issues above)"
+        echo "🛑 Enforcement failed (blocking commit - fix issues above)"
         exit 1
     else
-        echo "⚠️  checks.sh soft fail (add issues to ROADMAP)"
+        echo "⚠️  Enforcement soft fail (add issues to ROADMAP)"
         exit 0
     fi
 fi
