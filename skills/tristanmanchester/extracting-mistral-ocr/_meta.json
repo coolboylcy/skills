@@ -1,0 +1,11 @@
+{
+  "owner": "tristanmanchester",
+  "slug": "extracting-mistral-ocr",
+  "displayName": "Mistral PDF OCR",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771675019880,
+    "commit": null
+  },
+  "history": []
+}
