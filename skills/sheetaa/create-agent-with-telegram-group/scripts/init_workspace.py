@@ -3,6 +3,14 @@ import argparse
 from pathlib import Path
 
 
+def validate_path_within(prefix: Path, path: Path, name: str):
+    """Ensure path is within prefix to prevent arbitrary file write."""
+    try:
+        path.resolve().relative_to(prefix.resolve())
+    except ValueError:
+        raise SystemExit(f"Error: {name} must be within {prefix}")
+
+
 def write_if(path: Path, content: str, enabled: bool):
     if not enabled:
         return False
@@ -20,7 +28,11 @@ def main():
     ap.add_argument("--with-soul", action="store_true")
     args = ap.parse_args()
 
-    ws = Path(args.workspace)
+    # Validate workspace is within user's home to prevent arbitrary file write
+    home = Path.home()
+    ws = Path(args.workspace).expanduser().resolve()
+    validate_path_within(home, ws, "workspace")
+
     created = []
 
     if write_if(ws / "USER.md", "# USER.md\n\n- Name: <fill-me>\n- What to call them: <fill-me>\n- Preferred language: <fill-me>\n- Goals: <fill-me>\n", args.with_user):

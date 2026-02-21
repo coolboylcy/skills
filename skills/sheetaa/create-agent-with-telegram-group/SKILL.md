@@ -1,6 +1,6 @@
 ---
 name: create-agent-with-telegram-group
-description: Create a new OpenClaw agent and bind it to a dedicated Telegram group with workspace ~/claw-<agent-name>. Use when the user asks for one-agent-one-group setup, Telegram group binding, or repeatable agent provisioning. Always ask which model to use, ask for essential initialization choices (USER.md/IDENTITY.md/SOUL.md), and set group reply mode to no-mention-required.
+description: Create a new OpenClaw agent and bind it to a dedicated Telegram group with workspace ~/claw-<agent-name>. Use when the user asks for one-agent-one-group setup, Telegram group binding, or repeatable agent provisioning. Always ask which model to use, ask for essential initialization choices (USER.md/IDENTITY.md/SOUL.md), and set group reply mode to no-mention-required. Explicit user confirmation is required before any high-privilege actions: modifying openclaw.json, triggering browser automation, or restarting the gateway.
 ---
 
 # Agent Create + Dedicated Telegram Group
@@ -69,13 +69,16 @@ Telegram group title rule:
    - otherwise PascalCase(agent_name)
 4. Create and bind Telegram group (use resolved group title):
    - use browser automation/user-account flow (Telegram bot API cannot reliably create groups)
+   - **CONFIRM with user before triggering browser automation** (explicit yes/no required)
    - if browser automation is unavailable, request the minimal manual steps and resume
 5. Create/update OpenClaw config via script (preferred):
+   - **CONFIRM with user before modifying openclaw.json** (explicit yes/no required)
    - `python3 scripts/provision_config.py --agent-name <agent_name> --model <model> --chat-id <chat_id>`
    - this sets: agent entry, workspace, binding, and `requireMention=false`
 6. Apply config and activate it:
    - if hot reload is enabled, verify reload logs show applied changes
-   - if reload is off or not applied, restart gateway and verify startup clean
+   - if reload is off or not applied, **CONFIRM with user before restarting gateway** (explicit yes/no required)
+   - restart gateway only after user approval
 7. Bootstrap agent runtime files (required for first-run stability):
    - ensure `~/.openclaw/agents/<agent-id>/agent` exists
    - do NOT copy any auth files from other agents (this prevents credential/API key propagation)

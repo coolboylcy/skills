@@ -6,6 +6,14 @@ from datetime import datetime
 from pathlib import Path
 
 
+def validate_path_within(prefix: Path, path: Path, name: str):
+    """Ensure path is within prefix to prevent arbitrary file write."""
+    try:
+        path.resolve().relative_to(prefix.resolve())
+    except ValueError:
+        raise SystemExit(f"Error: {name} must be within {prefix}")
+
+
 def norm_agent_id(name: str) -> str:
     s = name.strip().lower().replace("_", " ")
     out = []
@@ -68,10 +76,21 @@ def main():
     args = ap.parse_args()
 
     agent_id = norm_agent_id(args.agent_name)
-    workspace = str(Path(args.workspace_root) / f"claw-{agent_id}")
+    if not agent_id:
+        raise SystemExit("Error: agent-name cannot be empty or contain only invalid characters")
+
+    home = Path.home()
+    workspace_root = Path(args.workspace_root).expanduser().resolve()
+    config_path = Path(args.config).expanduser().resolve()
+
+    # Validate paths to prevent arbitrary file write
+    validate_path_within(home, workspace_root, "workspace-root")
+    validate_path_within(home, config_path, "config")
+
+    workspace = str(workspace_root / f"claw-{agent_id}")
     Path(workspace).mkdir(parents=True, exist_ok=True)
 
-    with open(args.config, "r", encoding="utf-8") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         cfg = json.load(f)
 
     ensure_agent(cfg, agent_id, args.model, workspace)
@@ -82,10 +101,10 @@ def main():
     backup_path = None
     if not args.no_backup:
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup_path = f"{args.config}.bak.{ts}"
-        Path(backup_path).write_text(Path(args.config).read_text(encoding="utf-8"), encoding="utf-8")
+        backup_path = f"{config_path}.bak.{ts}"
+        Path(backup_path).write_text(Path(config_path).read_text(encoding="utf-8"), encoding="utf-8")
 
-    with open(args.config, "w", encoding="utf-8") as f:
+    with open(config_path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
     print(json.dumps({
@@ -93,7 +112,7 @@ def main():
         "workspace": workspace,
         "chat_id": args.chat_id,
         "requireMention": False,
-        "config": args.config,
+        "config": str(config_path),
         "backup": backup_path,
         "changed": [
             "agents.list(+update)",
