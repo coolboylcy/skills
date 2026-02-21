@@ -75,8 +75,9 @@ brew install jq       # macOS
 | `issue-comment <issue-id> <text>` | Добавить комментарий |
 | `issue-comment-edit <issue-id> <comment-id> <new-text>` | Редактировать комментарий |
 | `issue-comment-delete <issue-id> <comment-id>` | Удалить комментарий |
-| `issue-transitions <issue-id>` | Возможные переходы статуса |
-| `issue-close <issue-id> <resolution>` | Закрыть задачу (resolution: `fixed`, `wontFix`, `duplicate` и др.) |
+| `issue-transitions <issue-id>` | Список доступных переходов статсусы (GET) |
+| `issue-transition <issue-id> <transition-id>` | Выполнить переход статуса (POST, V3 endpoint) |
+| `issue-close <issue-id> <resolution>` | Закрыть задачу (устарел, может не работать; лучше использовать `issue-transition` с переходом `close`) |
 | `issue-worklog <issue-id> <duration> [comment]` | Добавить worklog (duration: `PT1H30M`) |
 | `issue-attachments <issue-id>` | Список вложений задачи (JSON) |
 | `attachment-download <issue-id> <fileId> [output]` | Скачать файл. Если output не указано — stdout |
@@ -112,8 +113,14 @@ yandex-tracker issue-comment BIMLAB-266 "Работаю над этим"
 # Добавить spent time
 yandex-tracker issue-worklog BIMLAB-266 PT2H "Исследование"
 
-# Получить возможные переходы (чтобы понять, как закрыть)
+# Получить возможные переходы (список)
 yandex-tracker issue-transitions BIMLAB-266 | jq .
+
+# Выполнить переход (например, «Решить»)
+yandex-tracker issue-transition BIMLAB-266 resolve
+
+# Закрыть задачу (устарел, лучше использовать transition close)
+yandex-tracker issue-transition BIMLAB-266 close
 
 # Обновить задачу (очередь, исполнитель, проект — id проекта из projects-list)
 echo '{"queue":"RAZRABOTKA"}' | yandex-tracker issue-update BIMLAB-266 # пример
@@ -159,12 +166,23 @@ yandex-tracker issue-types-list | jq .
 # Редактирование и удаление комментариев
 yandex-tracker issue-comment-edit BIMLAB-266 12345 "Обновлённый текст"
 yandex-tracker issue-comment-delete BIMLAB-266 12345
+
+# Переходы статусов
+# Посмотреть список доступных переходов
+yandex-tracker issue-transitions BIMLAB-266 | jq .
+# Выполнить переход (например, «Решить» или «Закрыть»)
+yandex-tracker issue-transition BIMLAB-266 resolve
+yandex-tracker issue-transition BIMLAB-266 close
 ```
 
 ## Примечания
 
-- **Org-ID for on-premise:** Найдите в DevTools Tracker → Network → любой запрос → заголовок `X-Org-Id`.
-- **Для Cloud Tracker** нужно изменить скрипт, заменив `X-Org-Id` на `X-Cloud-Org-Id`.
+- **Org-ID (Яндекс 360):** Найдите в DevTools Tracker → Network → любой запрос → заголовок `X-Org-ID`. Используется заголовок `X-Org-ID` (обратите внимание на заглавные "ID").
+- **Cloud Org-ID (Yandex Cloud):** Используйте заголовок `X-Cloud-Org-ID`. В зависимости от типа организации используйте соответствующий заголовок.
+- **Переходы статусов (transitions):**
+  - `issue-transitions <issue-id>` — GET-запрос к V2 endpoint `/v2/issues/{id}/transitions` (возвращает список доступных переходов).
+  - `issue-transition <issue-id> <transition-id>` — POST-запрос к V3 endpoint `/v3/issues/{id}/transitions/{transition}/_execute` для выполнения перехода. Требует заголовка `X-Org-ID` или `X-Cloud-Org-ID`.
+- **Закрытие задач:** Команда `issue-close` устарела и может возвращать 405 в новых конфигурациях. Для закрытия используйте `issue-transition <id> close`.
 - Токен можно получить в Tracker UI: Settings → Applications → OAuth → Generate new token.
 - Все команды выводят JSON через `jq` для удобной дальнейшей обработки.
 
