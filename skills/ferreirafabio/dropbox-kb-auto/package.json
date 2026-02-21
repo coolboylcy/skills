@@ -1,0 +1,20 @@
+{
+  "name": "dropbox-kb-auto",
+  "version": "1.0.0",
+  "description": "Automatically index your Dropbox into a searchable knowledge base with OCR and Office file support",
+  "author": "Fabio Ferreira <f4bio.ferreira@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ferreirafabio/dropbox-kb-auto.git"
+  },
+  "keywords": [
+    "openclaw",
+    "dropbox",
+    "knowledge-base",
+    "ocr",
+    "indexing",
+    "semantic-search",
+    "office-files"
+  ]
+}
