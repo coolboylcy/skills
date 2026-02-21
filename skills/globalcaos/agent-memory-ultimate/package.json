@@ -26,11 +26,11 @@
     "token-savings",
     "vector-search"
   ],
+  "homepage": "https://github.com/globalcaos/clawdbot-moltbot-openclaw",
   "license": "MIT",
   "author": "Oscar Serra",
   "repository": {
     "type": "git",
     "url": "https://github.com/globalcaos/clawdbot-moltbot-openclaw"
-  },
-  "homepage": "https://github.com/globalcaos/clawdbot-moltbot-openclaw"
+  }
 }
