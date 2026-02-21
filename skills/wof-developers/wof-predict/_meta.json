@@ -1,0 +1,11 @@
+{
+  "owner": "wof-developers",
+  "slug": "wof-predict",
+  "displayName": "WatchOrFight - Predict",
+  "latest": {
+    "version": "1.2.0",
+    "publishedAt": 1771599303565,
+    "commit": null
+  },
+  "history": []
+}
