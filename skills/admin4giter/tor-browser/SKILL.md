@@ -5,7 +5,7 @@ metadata:
   openclaw:
     emoji: onion
     category: browser-automation
-    version: 1.0.0
+    version: 1.1.0
     author: OpenClaw
     requirements:
       - python >= 3.8
