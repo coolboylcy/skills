@@ -1,11 +1,16 @@
 ---
 name: Garden
 slug: garden
-version: 1.0.1
+version: 1.1.6
 homepage: https://clawic.com/skills/garden
+changelog: "Natural setup flow, explicit consent, no technical jargon"
 description: Track your entire garden with structured memory for plants, zones, tasks, harvests, and climate-aware planning that compounds over seasons.
 metadata: {"clawdbot":{"emoji":"🌱","requires":{"bins":[]},"os":["linux","darwin","win32"]}}
 ---
+
+## Setup
+
+If `~/garden/` doesn't exist or is empty, read `setup.md` and follow it. The user engaging with the skill implies interest — start helping them naturally.
 
 ## When to Use
 
@@ -13,25 +18,25 @@ User needs help managing their garden: tracking plants, logging activities, plan
 
 ## Architecture
 
-Memory lives in user's `~/garden/` directory. See `memory-template.md` for setup.
+Memory lives in `~/garden/`. See `memory-template.md` for templates.
 
 ```
 ~/garden/
-├── memory.md      # HOT: current state, active alerts
-├── climate.md     # Zone, frost dates, microclimate
-├── plants/        # One file per plant species/variety
-├── zones/         # Garden areas with rotation history
-├── log/           # Activity logs (YYYY-MM.md)
-└── harvests.md    # Yield records across seasons
+├── memory.md      # REQUIRED: context and status
+├── climate.md     # Optional: zone, frost dates
+├── plants/        # Optional: detailed plant files
+├── zones/         # Optional: zone tracking
+└── harvests.md    # Optional: yield records
 ```
 
-Create on first use: `mkdir -p ~/garden/{plants,zones,log}`
+Start minimal (just memory.md). Add others only if user wants detailed tracking.
 
 ## Quick Reference
 
 | Topic | File |
 |-------|------|
-| Memory setup | `memory-template.md` |
+| Setup process | `setup.md` |
+| Memory template | `memory-template.md` |
 | Plant & zone templates | `tracking.md` |
 | Climate configuration | `climate-setup.md` |
 | Problem diagnosis | `diagnostics.md` |
@@ -80,14 +85,20 @@ When user reports issue: check plant health history, zone conditions, recent wea
 ## Security & Privacy
 
 **Data that stays local:**
-- All garden data in `~/garden/`
-- No external APIs called
-- No telemetry or analytics
+- All garden data stored in `~/garden/`
+- No external APIs or network calls
+- No telemetry, analytics, or data collection
+
+**What this skill writes:**
+- Files in `~/garden/` (memory.md, plants/, etc.)
+- Optionally: one line in user's workspace MEMORY.md (e.g., ~/MEMORY.md or equivalent) — **only after asking and receiving explicit "yes"**
 
 **This skill does NOT:**
-- Access weather APIs (manual climate config only)
-- Control irrigation hardware
-- Read files outside `~/garden/`
+- Infer or save preferences without user confirmation
+- Access weather APIs (climate is manually configured)
+- Control hardware or irrigation systems
+- Write outside `~/garden/` without asking first
+- Make any network requests
 
 ## Related Skills
 Install with `clawhub install <slug>` if user confirms:
