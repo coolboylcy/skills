@@ -1,0 +1,11 @@
+{
+  "owner": "don-gbot",
+  "slug": "cross-model-review",
+  "displayName": "Cross-Model Adversarial Review",
+  "latest": {
+    "version": "1.1.0",
+    "publishedAt": 1771739814374,
+    "commit": null
+  },
+  "history": []
+}
