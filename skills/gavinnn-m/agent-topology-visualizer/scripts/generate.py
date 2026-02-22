@@ -14,6 +14,33 @@ import sys
 import os
 import random
 import html as html_mod
+import re
+
+
+def sanitize_css(css_text: str) -> str:
+    """Strip XSS vectors from user-provided CSS.
+    
+    Removes </style> tags, <script> tags, javascript: URIs,
+    expression() calls, and @import rules that could escape
+    the style block or execute code.
+    """
+    if not css_text:
+        return ""
+    # Remove anything that closes the style tag
+    css_text = re.sub(r'<\s*/\s*style\s*>', '', css_text, flags=re.IGNORECASE)
+    # Remove script tags
+    css_text = re.sub(r'<\s*script[^>]*>.*?<\s*/\s*script\s*>', '', css_text, flags=re.IGNORECASE | re.DOTALL)
+    css_text = re.sub(r'<\s*script[^>]*>', '', css_text, flags=re.IGNORECASE)
+    # Remove HTML tags entirely
+    css_text = re.sub(r'<[^>]+>', '', css_text)
+    # Remove javascript: URIs
+    css_text = re.sub(r'javascript\s*:', '', css_text, flags=re.IGNORECASE)
+    # Remove expression() (IE CSS XSS vector)
+    css_text = re.sub(r'expression\s*\(', '/**/(', css_text, flags=re.IGNORECASE)
+    # Remove @import (can load external resources)
+    css_text = re.sub(r'@import\b', '/* @import blocked */', css_text, flags=re.IGNORECASE)
+    return css_text
+
 
 # ─── DEFAULTS ───
 
@@ -387,8 +414,8 @@ body {{ background: {bg}; color: {text}; font-family: {font}; min-height: 100vh;
 /* Star canvas */
 #starCanvas {{ position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }}
 
-/* Custom CSS injection */
-{topo.get("css", "")}'''
+/* Custom CSS */
+{sanitize_css(topo.get("css", ""))}'''
 
 
 # ─── JAVASCRIPT ───
