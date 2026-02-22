@@ -13,6 +13,18 @@ Best-practice usage:
 - Only use separated tools (`check_drift`, `plan_rebalance`, `execute_rebalance`, etc.) if you explicitly understand each step and want manual control.
 - If unsure, run `help` first (`npm run cli -- help`) and follow that guidance.
 
+## Prerequisites
+
+- Node.js 22+
+- npm
+
+## Local Setup
+
+```bash
+npm install
+npm run build
+```
+
 ## Getting Started
 
 If you have not deployed your policy stack yet, deploy it first:
