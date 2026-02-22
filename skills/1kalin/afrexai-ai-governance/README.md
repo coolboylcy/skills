@@ -1,59 +1,29 @@
-# AI Governance & Responsible AI Engine 🛡️
+# AI Governance Policy Builder
 
-Complete framework for building trustworthy AI — from regulatory compliance (EU AI Act, NIST AI RMF, ISO 42001) to bias management, incident response, and ethics board design.
+Build internal AI governance policies that actually hold up — acceptable use, vendor contracts, compliance mapping, incident response, and board reporting.
 
-## What This Does
+Covers EU AI Act, NIST AI RMF, and ISO 42001 frameworks with practical templates you can deploy this week.
 
-- **AI System Inventory & Risk Classification** — EU AI Act risk tiers + internal scoring
-- **Impact Assessments** — Full AIIA templates with necessity testing
-- **Fairness & Bias Management** — Testing protocols, metrics selection, remediation workflows
-- **Policy Framework** — Ready-to-use AUP, development standards, vendor assessment
-- **Transparency & Explainability** — Model cards, explanation selection guide
-- **AI Incident Response** — Playbooks, communication templates, post-mortem
-- **Regulatory Compliance** — EU AI Act, NIST AI RMF, ISO 42001 deep dives
-- **Ethics Board Design** — Charter template, escalation triggers, decision process
-- **GenAI Governance** — Special section for hallucination, copyright, prompt injection risks
-- **AI Literacy Program** — Training design by audience level
+## What's Inside
 
-## Install
-
-```bash
-clawhub install afrexai-ai-governance
-```
-
-## Quick Start
-
-```
-"Assess our AI governance maturity" → Get scored across 8 dimensions with priorities
-"Classify this AI system" → EU AI Act + internal risk tier classification
-"Draft our AI acceptable use policy" → Production-ready AUP in minutes
-"We had an AI incident" → Activate response playbook
-```
+- **Acceptable Use Policy** template with shadow AI detection
+- **Model Selection Scorecard** (100-point evaluation)
+- **Data Handling Audit** template for every AI integration
+- **Regulatory Mapping** — EU AI Act risk categories, NIST RMF, ISO 42001
+- **Governance Committee** structure and decision authority matrix
+- **Vendor Contract Checklist** — 12 non-negotiable clauses
+- **Board Reporting Template** — quarterly AI governance report
+- **Incident Response** categories and post-incident review
+- **90-Day Implementation Roadmap**
 
 ## Who This Is For
 
-- **CTOs / Engineering Leaders** — Building AI governance from scratch
-- **Compliance / Legal Teams** — Preparing for EU AI Act and AI regulation
-- **Product Managers** — Understanding AI risk before shipping
-- **Data Science Teams** — Bias testing and model documentation
-- **Founders** — Responsible AI as competitive advantage
+CTOs, CISOs, compliance officers, and ops leaders at companies running AI tools without a formal governance framework. Especially relevant if you're in a regulated industry (financial services, healthcare, legal) or selling to enterprise customers who ask about your AI policies.
 
-## ⚡ Level Up
+## Get More
 
-This free skill gives you the governance framework. For industry-specific AI implementation with compliance built in:
+- Full industry context packs ($47 each): https://afrexai-cto.github.io/context-packs/
+- AI Revenue Calculator (free): https://afrexai-cto.github.io/ai-revenue-calculator/
+- Agent Setup Wizard (free): https://afrexai-cto.github.io/agent-setup/
 
-- [**Healthcare AI Context Pack**](https://afrexai-cto.github.io/context-packs/) — HIPAA + FDA SaMD compliance ($47)
-- [**Fintech AI Context Pack**](https://afrexai-cto.github.io/context-packs/) — SEC + fair lending AI requirements ($47)
-- [**Legal AI Context Pack**](https://afrexai-cto.github.io/context-packs/) — AI ethics in legal practice ($47)
-- [**SaaS AI Context Pack**](https://afrexai-cto.github.io/context-packs/) — Ship AI features responsibly ($47)
-
-## 🔗 More Free Skills by AfrexAI
-
-- `afrexai-compliance-engine` — SOC 2, ISO 27001, GDPR, HIPAA compliance
-- `afrexai-risk-management` — Enterprise risk management framework
-- `afrexai-cybersecurity-engine` — Full security program design
-- `afrexai-agent-engineering` — Build & govern AI agent systems
-- `afrexai-prompt-engineering` — Prompt design with safety patterns
-
-**Browse all skills:** [AfrexAI on ClawHub](https://clawhub.com)
-**Full product catalog:** [afrexai-cto.github.io/context-packs](https://afrexai-cto.github.io/context-packs/)
+Built by [AfrexAI](https://afrexai-cto.github.io/context-packs/) — AI operations infrastructure for mid-market companies.
