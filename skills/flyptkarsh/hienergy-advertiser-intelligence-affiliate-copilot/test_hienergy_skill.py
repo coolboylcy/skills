@@ -85,6 +85,29 @@ class TestHiEnergySkill(unittest.TestCase):
         self.assertEqual(result[0]['name'], 'Test Program 1')
         called_url = mock_request.call_args.kwargs.get('url', '')
         self.assertIn('/advertisers', called_url)
+
+    @patch('scripts.hienergy_skill.requests.request')
+    def test_get_affiliate_programs_weed_query_filters_wedding_false_positive(self, mock_request):
+        """Search for weed should not match wedding brands by substring."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            'data': [
+                {'id': '1', 'name': "David's Bridal", 'description': 'Wedding dresses'},
+                {'id': '2', 'name': 'Wyld CBD', 'description': 'CBD gummies and wellness'},
+            ]
+        }
+        mock_response.raise_for_status = Mock()
+        mock_request.return_value = mock_response
+
+        result = self.skill.get_affiliate_programs(search='weed', limit=10)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['name'], 'Wyld CBD')
+
+    def test_text_has_term_avoids_false_positive_for_plain_terms(self):
+        """Plain keyword matching should not use compact substring fallback."""
+        self.assertFalse(self.skill._text_has_term("the mens wearhouse", "thc"))
+        self.assertTrue(self.skill._text_has_term("delta8 gummies", "delta-8"))
     
     @patch('scripts.hienergy_skill.requests.request')
     def test_find_deals(self, mock_request):
@@ -315,6 +338,57 @@ class TestHiEnergySkill(unittest.TestCase):
         self.assertEqual(report['summary']['total_programs_matched'], 2)
         self.assertEqual(report['programs'][0]['name'], 'High Program')
 
+    def test_commission_insight_parses_percent_range(self):
+        """Commission parser should normalize percent ranges with midpoint."""
+        insight = self.skill._commission_insight({'commission_rate': '8-12%'})
+
+        self.assertEqual(insight.model, 'percent-range')
+        self.assertEqual(insight.percent_value, 10.0)
+        self.assertIsNone(insight.flat_amount_usd)
+
+    def test_commission_insight_parses_flat_cpa(self):
+        """Commission parser should classify flat CPA payouts."""
+        insight = self.skill._commission_insight({'commission_rate': '$25 CPA'})
+
+        self.assertEqual(insight.model, 'flat')
+        self.assertEqual(insight.flat_amount_usd, 25.0)
+        self.assertIsNone(insight.percent_value)
+
+    @patch('scripts.hienergy_skill.requests.request')
+    def test_research_affiliate_programs_min_commission_filters_percent_only(self, mock_request):
+        """Min commission filter should apply to percent-based programs only."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            'data': [
+                {'id': 'p1', 'name': 'Flat Program', 'commission_rate': '$30 CPA'},
+                {'id': 'p2', 'name': 'Percent Program', 'commission_rate': '15%'},
+            ]
+        }
+        mock_response.raise_for_status = Mock()
+        mock_request.return_value = mock_response
+
+        report = self.skill.research_affiliate_programs(search='fitness', min_commission=10, top_n=5)
+
+        self.assertEqual(report['summary']['total_programs_matched'], 1)
+        self.assertEqual(report['programs'][0]['name'], 'Percent Program')
+
+    @patch('scripts.hienergy_skill.requests.request')
+    def test_answer_question_research_programs_includes_commission_type(self, mock_request):
+        """Research output should explain commission type for each program."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            'data': [
+                {'id': 'p1', 'name': 'Elite Program', 'commission_rate': '12-18%', 'advertiser_id': '3625414'}
+            ]
+        }
+        mock_response.raise_for_status = Mock()
+        mock_request.return_value = mock_response
+
+        answer = self.skill.answer_question('Research top affiliate programs for fitness')
+
+        self.assertIn('type: percent-range', answer)
+        self.assertIn('avg commission', answer)
+
     @patch('scripts.hienergy_skill.requests.request')
     def test_answer_question_programs_multiple_prompts_for_disambiguation(self, mock_request):
         """If multiple program matches exist, ask for publisher/network refinement"""
@@ -400,6 +474,26 @@ class TestHiEnergySkill(unittest.TestCase):
 
         self.assertIn('50% Off Sale', answer)
         self.assertIn('https://app.hienergy.ai/a/3625414', answer)
+
+    @patch('scripts.hienergy_skill.requests.request')
+    def test_conversational_follow_up_uses_context_intent(self, mock_request):
+        """Conversational follow-up in Slack should use prior intent from context."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            'data': [
+                {'id': '1', 'title': "Macy's Weekend Deal", 'advertiser_id': '3625439'}
+            ]
+        }
+        mock_response.raise_for_status = Mock()
+        mock_request.return_value = mock_response
+
+        answer = self.skill.answer_question(
+            "what about macys",
+            context={'last_intent': 'deals'}
+        )
+
+        self.assertIn("Macy's Weekend Deal", answer)
+        self.assertIn('https://app.hienergy.ai/a/3625439', answer)
     
     def test_extract_search_term(self):
         """Test search term extraction from questions"""

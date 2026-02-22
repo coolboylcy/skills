@@ -3,9 +3,24 @@ HiEnergy API Skill - Open Claw Skill for querying advertisers, affiliate program
 """
 
 import os
+import re
 import json
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Any
 import requests
+
+
+class HiEnergySkillError(Exception):
+    """Raised when the HiEnergy skill encounters a recoverable API/runtime error."""
+
+
+@dataclass(frozen=True)
+class CommissionInsight:
+    """Normalized view of a commission field for ranking and user explanation."""
+    model: str
+    display: str
+    percent_value: Optional[float]
+    flat_amount_usd: Optional[float]
 
 
 class HiEnergySkill:
@@ -16,8 +31,11 @@ class HiEnergySkill:
     
     BASE_URL = "https://app.hienergy.ai"
     MAX_SEARCH_TERMS = 3  # Maximum number of keywords to extract from questions
-    MAX_DISPLAY_ITEMS = 5  # Maximum number of items to display in formatted answers
+    MAX_DISPLAY_ITEMS = 20  # Show a fuller top list in chat responses
     MAX_PAGE_SIZE = 500  # API-documented max
+    DEFAULT_CHAT_LIMIT = 20  # safe interactive default; increase only when needed
+    REQUEST_TIMEOUT_SECONDS = 30
+    ALLOWED_HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
     
     def __init__(self, api_key: Optional[str] = None):
         """
@@ -69,16 +87,25 @@ class HiEnergySkill:
         Raises:
             requests.exceptions.RequestException: If the request fails
         """
-        url = f"{self.BASE_URL}/api/v1/{endpoint.lstrip('/')}"
+        clean_endpoint = endpoint.lstrip('/')
+        upper_method = method.upper()
+
+        if upper_method not in self.ALLOWED_HTTP_METHODS:
+            raise HiEnergySkillError(f"Unsupported HTTP method: {method}")
+
+        if clean_endpoint.startswith(('http://', 'https://')) or '..' in clean_endpoint:
+            raise HiEnergySkillError("Invalid endpoint path")
+
+        url = f"{self.BASE_URL}/api/v1/{clean_endpoint}"
         
         try:
             response = requests.request(
-                method=method,
+                method=upper_method,
                 url=url,
                 headers=self.headers,
                 params=params,
                 json=data,
-                timeout=30
+                timeout=self.REQUEST_TIMEOUT_SECONDS
             )
             response.raise_for_status()
             return response.json()
@@ -87,9 +114,15 @@ class HiEnergySkill:
             body_preview = ''
             if e.response is not None:
                 body_preview = (e.response.text or '')[:300]
-            raise Exception(f"API request failed (HTTP {status}): {body_preview}")
+            if status == 429:
+                retry_after = None
+                if e.response is not None:
+                    retry_after = e.response.headers.get('Retry-After')
+                hint = f" Please retry in {retry_after} seconds." if retry_after else " Please retry in a few seconds."
+                raise HiEnergySkillError(f"Rate limited by HiEnergy API (HTTP 429).{hint}")
+            raise HiEnergySkillError(f"API request failed (HTTP {status}): {body_preview}")
         except requests.exceptions.RequestException as e:
-            raise Exception(f"API request failed: {str(e)}")
+            raise HiEnergySkillError(f"API request failed: {str(e)}")
     
     def _normalize_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """Flatten JSON:API-style objects while preserving top-level keys."""
@@ -121,7 +154,7 @@ class HiEnergySkill:
         items = self._extract_list_data(response)
         return items[0] if items else {}
 
-    def get_advertisers_by_domain(self, domain_or_url: str, limit: int = 200) -> List[Dict]:
+    def get_advertisers_by_domain(self, domain_or_url: str, limit: int = DEFAULT_CHAT_LIMIT) -> List[Dict]:
         """
         Search advertisers by domain or URL.
 
@@ -182,7 +215,7 @@ class HiEnergySkill:
         return results
 
     def get_advertisers(self, search: Optional[str] = None,
-                       limit: int = 200, offset: int = 0) -> List[Dict]:
+                       limit: int = DEFAULT_CHAT_LIMIT, offset: int = 0) -> List[Dict]:
         """
         Get advertisers from the HiEnergy API.
 
@@ -194,10 +227,21 @@ class HiEnergySkill:
         Returns:
             List of advertiser dictionaries
         """
-        params = {
+        base_params = {
             'limit': self._clamp_page_size(limit),
             'offset': offset
         }
+
+        def dedupe(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            seen_ids = set()
+            merged: List[Dict[str, Any]] = []
+            for item in items:
+                item_id = str(item.get('id')) if item.get('id') is not None else json.dumps(item, sort_keys=True)
+                if item_id in seen_ids:
+                    continue
+                seen_ids.add(item_id)
+                merged.append(item)
+            return merged
 
         # Prefer domain endpoint for domain/URL-like queries.
         if search and ('.' in search or search.startswith('http://') or search.startswith('https://')):
@@ -205,35 +249,56 @@ class HiEnergySkill:
             if domain_results:
                 return domain_results
 
-        if search:
-            params['name'] = search
+        # No search term: preserve strict behavior and error surfacing.
+        if not search:
+            response = self._make_request('advertisers', params=dict(base_params))
+            return self._extract_list_data(response)
 
-        response = self._make_request('advertisers', params=params)
-        results = self._extract_list_data(response)
+        # Primary + fallback param strategies for advertiser search.
+        strategies: List[Dict[str, Any]] = [
+            {**base_params, 'name': search},
+            {**base_params, 'domain': search},
+            {**base_params, 'url': search},
+        ]
 
-        # Smart fallback: if a multi-word query returns no rows, retry by tokens and merge.
+        results: List[Dict[str, Any]] = []
+        last_error: Optional[Exception] = None
+        for params in strategies:
+            try:
+                response = self._make_request('advertisers', params=params)
+                items = self._extract_list_data(response)
+                if items:
+                    results = dedupe(items)
+                    break
+            except Exception as e:
+                last_error = e
+                continue
+
+        if not results and last_error is not None:
+            raise last_error
+
+        # Multi-word fallback: retry per token across name/domain/url and merge.
         if search and not results and ' ' in search.strip():
-            merged: List[Dict[str, Any]] = []
-            seen_ids = set()
+            token_collected: List[Dict[str, Any]] = []
             for token in [t.strip() for t in search.split() if t.strip()]:
-                token_params = {
-                    'limit': self._clamp_page_size(limit),
-                    'offset': offset,
-                    'name': token
-                }
-                token_response = self._make_request('advertisers', params=token_params)
-                for item in self._extract_list_data(token_response):
-                    item_id = str(item.get('id'))
-                    if item_id not in seen_ids:
-                        seen_ids.add(item_id)
-                        merged.append(item)
-            results = merged
+                token_strategies = [
+                    {**base_params, 'name': token},
+                    {**base_params, 'domain': token},
+                    {**base_params, 'url': token},
+                ]
+                for token_params in token_strategies:
+                    try:
+                        token_response = self._make_request('advertisers', params=token_params)
+                        token_collected.extend(self._extract_list_data(token_response))
+                    except Exception:
+                        continue
+            results = dedupe(token_collected)
 
         return results
     
     def get_affiliate_programs(self, advertiser_id: Optional[str] = None,
                               search: Optional[str] = None,
-                              limit: int = 200, offset: int = 0) -> List[Dict]:
+                              limit: int = DEFAULT_CHAT_LIMIT, offset: int = 0) -> List[Dict]:
         """
         Get affiliate program matches via advertiser endpoints.
 
@@ -256,30 +321,50 @@ class HiEnergySkill:
         except Exception:
             programs = []
 
-        # Improve matching for spaced brand names (e.g., "all birds" -> "allbirds").
-        if search and ' ' in search.strip():
+        if search:
             merged = {str(p.get('id')): p for p in programs if p.get('id') is not None}
-            compact_variants = [
-                ''.join(search.split()),
-                '-'.join(search.split()),
-            ]
-            for variant in compact_variants:
-                if not variant:
-                    continue
-                try:
-                    extra = self.get_advertisers(search=variant, limit=limit, offset=offset)
-                    for p in extra:
-                        pid = str(p.get('id'))
-                        if pid and pid not in merged:
-                            merged[pid] = p
-                except Exception:
-                    continue
-            programs = list(merged.values())
+
+            # Expand ambiguous cannabis intent (e.g., "weed") to likely network vocabulary.
+            cannabis_aliases = {'weed', 'marijuana', 'cannabis', 'thc'}
+            if search.lower().strip() in cannabis_aliases:
+                for variant in ['cbd', 'hemp', 'cannabis', 'thc']:
+                    try:
+                        extra = self.get_advertisers(search=variant, limit=limit, offset=offset)
+                        for p in extra:
+                            pid = str(p.get('id'))
+                            if pid and pid not in merged:
+                                merged[pid] = p
+                    except Exception:
+                        continue
+
+            # Improve matching for spaced brand names (e.g., "all birds" -> "allbirds").
+            if ' ' in search.strip():
+                compact_variants = [
+                    ''.join(search.split()),
+                    '-'.join(search.split()),
+                ]
+                for variant in compact_variants:
+                    if not variant:
+                        continue
+                    try:
+                        extra = self.get_advertisers(search=variant, limit=limit, offset=offset)
+                        for p in extra:
+                            pid = str(p.get('id'))
+                            if pid and pid not in merged:
+                                merged[pid] = p
+                    except Exception:
+                        continue
+
+            if merged:
+                programs = list(merged.values())
 
         # Re-rank by closeness to query string to surface strongest brand match first.
         if search:
             q = search.lower().strip()
             q_compact = ''.join(q.split())
+            topical = [p for p in programs if self._is_topical_match(p, q)]
+            if topical:
+                programs = topical
 
             def score(item: Dict[str, Any]) -> int:
                 name = str(item.get('name', '')).lower()
@@ -287,7 +372,7 @@ class HiEnergySkill:
                 s = 0
                 if q == name:
                     s += 100
-                if q in name:
+                if re.search(rf"\\b{re.escape(q)}\\b", name):
                     s += 50
                 if q_compact and q_compact == name_compact:
                     s += 80
@@ -306,25 +391,147 @@ class HiEnergySkill:
 
         return programs
     
+    def _commission_raw_value(self, program: Dict[str, Any]) -> Optional[Any]:
+        """Pick the first available commission-like field from a program payload."""
+        for key in ('commission_rate', 'avg_commission_rate', 'commission_amount'):
+            value = program.get(key)
+            if value not in (None, ''):
+                return value
+        return None
+
+    def _commission_insight(self, program: Dict[str, Any]) -> CommissionInsight:
+        """Normalize commission text so results are easier to compare and explain."""
+        raw = self._commission_raw_value(program)
+        if raw is None:
+            return CommissionInsight(
+                model='unknown',
+                display='Unknown',
+                percent_value=None,
+                flat_amount_usd=None,
+            )
+
+        if isinstance(raw, (int, float)):
+            numeric = float(raw)
+            return CommissionInsight(
+                model='percent',
+                display=f"{numeric:g}%",
+                percent_value=numeric,
+                flat_amount_usd=None,
+            )
+
+        text = str(raw).strip()
+        lower_text = text.lower()
+
+        # Range support like "8-12%" or "$10 - $25".
+        range_matches = re.findall(r'\d+(?:\.\d+)?', lower_text)
+        if len(range_matches) >= 2 and ('-' in lower_text or 'to' in lower_text):
+            low = float(range_matches[0])
+            high = float(range_matches[1])
+            midpoint = round((low + high) / 2, 2)
+            if '%' in lower_text:
+                return CommissionInsight(
+                    model='percent-range',
+                    display=f"{low:g}-{high:g}% (avg {midpoint:g}%)",
+                    percent_value=midpoint,
+                    flat_amount_usd=None,
+                )
+            if '$' in lower_text or 'usd' in lower_text:
+                return CommissionInsight(
+                    model='flat-range',
+                    display=f"${low:g}-${high:g} (avg ${midpoint:g})",
+                    percent_value=None,
+                    flat_amount_usd=midpoint,
+                )
+
+        numeric_match = re.search(r'\d+(?:\.\d+)?', lower_text.replace(',', ''))
+        if numeric_match:
+            numeric = float(numeric_match.group(0))
+            if '%' in lower_text or 'revshare' in lower_text or 'revenue share' in lower_text:
+                return CommissionInsight(
+                    model='percent',
+                    display=f"{numeric:g}%",
+                    percent_value=numeric,
+                    flat_amount_usd=None,
+                )
+            if '$' in lower_text or 'usd' in lower_text or any(k in lower_text for k in ('cpa', 'flat', 'per sale')):
+                return CommissionInsight(
+                    model='flat',
+                    display=f"${numeric:g}",
+                    percent_value=None,
+                    flat_amount_usd=numeric,
+                )
+
+            # Unknown unit: keep useful display and treat as percent for historical compatibility.
+            return CommissionInsight(
+                model='numeric-unknown-unit',
+                display=f"{numeric:g}",
+                percent_value=numeric,
+                flat_amount_usd=None,
+            )
+
+        return CommissionInsight(
+            model='text-unparsed',
+            display=text,
+            percent_value=None,
+            flat_amount_usd=None,
+        )
+
     def _parse_commission_value(self, program: Dict[str, Any]) -> float:
-        """Best-effort numeric commission extraction for ranking/filtering."""
-        candidates = [
-            program.get('commission_rate'),
-            program.get('avg_commission_rate'),
-            program.get('commission_amount'),
-        ]
-        for value in candidates:
-            if value is None:
-                continue
-            if isinstance(value, (int, float)):
-                return float(value)
-            if isinstance(value, str):
-                cleaned = value.strip().replace('%', '').replace('$', '').replace(',', '')
-                try:
-                    return float(cleaned)
-                except ValueError:
-                    continue
+        """Backwards-compatible commission value used by older filtering paths."""
+        insight = self._commission_insight(program)
+        if insight.percent_value is not None:
+            return insight.percent_value
         return 0.0
+
+    def _canonical_topic_terms(self, query: str) -> set:
+        """Map common vertical terms to canonical keyword sets."""
+        q = (query or '').lower().strip()
+        if q in {'weed', 'marijuana', 'cannabis', 'thc'}:
+            return {
+                'weed', 'marijuana', 'cannabis', 'thc', 'cbd', 'hemp',
+                'delta-8', 'delta 8', 'canna', 'kush', 'dispensary'
+            }
+        return {q} if q else set()
+
+    def _text_has_term(self, text: str, term: str) -> bool:
+        """Word-boundary match for prose, with compact fallback for terms like delta-8."""
+        if not text or not term:
+            return False
+        escaped = re.escape(term)
+        if re.search(rf"\b{escaped}\b", text):
+            return True
+
+        # Only use compact matching for punctuated terms (e.g. delta-8 -> delta8).
+        if re.search(r'[^a-z0-9]', term):
+            compact_text = re.sub(r'[^a-z0-9]+', '', text)
+            compact_term = re.sub(r'[^a-z0-9]+', '', term)
+            return bool(compact_term and compact_term in compact_text)
+        return False
+
+    def _is_topical_match(self, program: Dict[str, Any], query: str) -> bool:
+        """Check if a program actually matches the requested topic."""
+        terms = self._canonical_topic_terms(query)
+        if not terms:
+            return True
+
+        prose_haystack = ' '.join([
+            str(program.get('name', '')),
+            str(program.get('description', '')),
+            str(program.get('program_details', '')),
+        ]).lower()
+
+        id_haystack = ' '.join([
+            str(program.get('domain', '')),
+            str(program.get('url', '')),
+            str(program.get('slug', '')),
+        ]).lower()
+
+        for term in terms:
+            if self._text_has_term(prose_haystack, term):
+                return True
+            if term.replace(' ', '').replace('-', '') in re.sub(r'[^a-z0-9]+', '', id_haystack):
+                return True
+        return False
 
     def research_affiliate_programs(self,
                                     search: Optional[str] = None,
@@ -333,7 +540,7 @@ class HiEnergySkill:
                                     network_slug: Optional[str] = None,
                                     status: Optional[str] = None,
                                     country: Optional[str] = None,
-                                    limit: int = 200,
+                                    limit: int = DEFAULT_CHAT_LIMIT,
                                     top_n: int = 10) -> Dict[str, Any]:
         """
         Research affiliate programs with ranking and summary stats.
@@ -350,10 +557,12 @@ class HiEnergySkill:
 
         filtered: List[Dict[str, Any]] = []
         for program in programs:
-            commission_value = self._parse_commission_value(program)
+            commission = self._commission_insight(program)
 
-            if min_commission is not None and commission_value < float(min_commission):
-                continue
+            # min_commission is interpreted as minimum percent threshold.
+            if min_commission is not None:
+                if commission.percent_value is None or commission.percent_value < float(min_commission):
+                    continue
 
             if network_slug:
                 network_value = str(
@@ -379,20 +588,27 @@ class HiEnergySkill:
                     continue
 
             enriched = dict(program)
-            enriched['_commission_value'] = commission_value
+            enriched['_commission_value'] = commission.percent_value or 0.0
+            enriched['_commission_display'] = commission.display
+            enriched['_commission_model'] = commission.model
+            enriched['_commission_percent'] = commission.percent_value
+            enriched['_commission_flat_usd'] = commission.flat_amount_usd
             filtered.append(enriched)
 
         ranked = sorted(
             filtered,
-            key=lambda p: (p.get('_commission_value', 0.0), p.get('transactions_count', 0) or 0),
+            key=lambda p: (
+                p.get('_commission_percent') is not None,
+                p.get('_commission_percent', 0.0),
+                p.get('_commission_flat_usd', 0.0),
+                p.get('transactions_count', 0) or 0,
+            ),
             reverse=True,
         )
 
         top_programs = ranked[:max(1, int(top_n))]
-        avg_commission = (
-            sum([p.get('_commission_value', 0.0) for p in ranked]) / len(ranked)
-            if ranked else 0.0
-        )
+        percent_values = [p.get('_commission_percent') for p in ranked if p.get('_commission_percent') is not None]
+        avg_commission = (sum(percent_values) / len(percent_values)) if percent_values else 0.0
 
         return {
             'summary': {
@@ -400,6 +616,7 @@ class HiEnergySkill:
                 'total_programs_scanned': len(programs),
                 'total_programs_matched': len(ranked),
                 'average_commission': round(avg_commission, 2),
+                'average_commission_basis': 'percent-only (flat-fee programs excluded)',
                 'filters': {
                     'advertiser_id': advertiser_id,
                     'min_commission': min_commission,
@@ -414,32 +631,48 @@ class HiEnergySkill:
     def find_deals(self, search: Optional[str] = None,
                    category: Optional[str] = None,
                    advertiser_id: Optional[str] = None,
+                   vertical_id: Optional[int] = None,
+                   country: Optional[str] = None,
+                   exclusive: Optional[bool] = None,
+                   active: Optional[bool] = None,
+                   status: Optional[str] = None,
+                   network_id: Optional[str] = None,
                    min_commission: Optional[float] = None,
-                   limit: int = 200, offset: int = 0,
+                   limit: int = DEFAULT_CHAT_LIMIT, offset: int = 0,
                    cursor: Optional[str] = None,
                    page: Optional[int] = None,
                    per_page: Optional[int] = None,
                    network_slug: Optional[str] = None,
                    start_date: Optional[str] = None,
                    end_date: Optional[str] = None,
+                   effective_after: Optional[str] = None,
+                   effective_before: Optional[str] = None,
                    sort_by: Optional[str] = None,
                    sort_order: Optional[str] = None) -> List[Dict]:
         """
         Find deals from the HiEnergy API.
 
         Args:
-            search: Optional search term to filter deals
-            category: Optional category to filter deals
+            search: Optional text search (maps to /api/v1/deals?search=...)
+            category: Optional local alias for category-like filtering (best-effort)
             advertiser_id: Optional advertiser ID/slug to filter deals
+            vertical_id: Optional vertical tag ID filter
+            country: Optional ISO2 country filter (e.g. US, CA)
+            exclusive: Optional exclusive-only filter (true/false)
+            active: Optional active-only filter (true/false)
+            status: Optional status filter (active/inactive)
+            network_id: Optional network ID/slug filter
             min_commission: Optional minimum commission rate
             limit: Maximum number of results to return
             offset: Offset for pagination (legacy)
             cursor: Cursor pagination token
             page: Offset pagination page number
             per_page: Offset pagination page size
-            network_slug: Optional network slug filter
+            network_slug: Optional legacy network slug filter
             start_date: Optional start date filter (YYYY-MM-DD)
             end_date: Optional end date filter (YYYY-MM-DD)
+            effective_after: Optional effective date lower bound (YYYY-MM-DD)
+            effective_before: Optional effective date upper bound (YYYY-MM-DD)
             sort_by: Optional sort field
             sort_order: Optional sort direction (asc/desc)
 
@@ -451,11 +684,25 @@ class HiEnergySkill:
             'offset': offset
         }
         if search:
-            params['name'] = search
+            # HiEnergy deals endpoint supports text queries via `search`
+            # e.g. /api/v1/deals?search=summer+sale
+            params['search'] = search
         if category:
             params['category'] = category
         if advertiser_id:
             params['advertiser_id'] = advertiser_id
+        if vertical_id is not None:
+            params['vertical_id'] = int(vertical_id)
+        if country:
+            params['country'] = country
+        if exclusive is not None:
+            params['exclusive'] = bool(exclusive)
+        if active is not None:
+            params['active'] = bool(active)
+        if status:
+            params['status'] = status
+        if network_id:
+            params['network_id'] = network_id
         if min_commission is not None:
             params['min_commission'] = min_commission
         if cursor:
@@ -470,6 +717,10 @@ class HiEnergySkill:
             params['start_date'] = start_date
         if end_date:
             params['end_date'] = end_date
+        if effective_after:
+            params['effective_after'] = effective_after
+        if effective_before:
+            params['effective_before'] = effective_before
         if sort_by:
             params['sort_by'] = sort_by
         if sort_order:
@@ -478,11 +729,11 @@ class HiEnergySkill:
         response = self._make_request('deals', params=params)
         results = self._extract_list_data(response)
 
-        # Fallback 1: some endpoints still expect `search` instead of `name`.
+        # Fallback 1: some backends may still expect `name` instead of `search`.
         if search and not results:
             fallback_params = dict(params)
-            fallback_params.pop('name', None)
-            fallback_params['search'] = search
+            fallback_params.pop('search', None)
+            fallback_params['name'] = search
             fallback_response = self._make_request('deals', params=fallback_params)
             results = self._extract_list_data(fallback_response)
 
@@ -492,12 +743,12 @@ class HiEnergySkill:
             seen_ids = set()
             for token in [t.strip() for t in search.split() if t.strip()]:
                 token_params = dict(params)
-                token_params['name'] = token
+                token_params['search'] = token
                 token_response = self._make_request('deals', params=token_params)
                 token_results = self._extract_list_data(token_response)
                 if not token_results:
-                    token_params.pop('name', None)
-                    token_params['search'] = token
+                    token_params.pop('search', None)
+                    token_params['name'] = token
                     token_response = self._make_request('deals', params=token_params)
                     token_results = self._extract_list_data(token_response)
 
@@ -518,7 +769,7 @@ class HiEnergySkill:
                          currency: Optional[str] = None,
                          sort_by: Optional[str] = None,
                          sort_order: Optional[str] = None,
-                         limit: int = 200,
+                         limit: int = DEFAULT_CHAT_LIMIT,
                          offset: int = 0,
                          cursor: Optional[str] = None,
                          page: Optional[int] = None,
@@ -642,7 +893,7 @@ class HiEnergySkill:
     def get_contacts(self, search: Optional[str] = None,
                      email: Optional[str] = None,
                      phone: Optional[str] = None,
-                     limit: int = 200, offset: int = 0) -> List[Dict]:
+                     limit: int = DEFAULT_CHAT_LIMIT, offset: int = 0) -> List[Dict]:
         """
         Get contacts from the HiEnergy API.
 
@@ -748,20 +999,29 @@ class HiEnergySkill:
         cleaned = question_lower.strip()
         return cleaned in yes_tokens
 
+    def _infer_intent(self, question_lower: str, context: Optional[Dict] = None) -> str:
+        """Infer intent from question text, with conversational context fallback."""
+        if any(term in question_lower for term in ['advertiser', 'company', 'brand', 'merchant']):
+            return 'advertisers'
+        if any(term in question_lower for term in ['program', 'affiliate program', 'partnership']):
+            return 'programs'
+        if any(term in question_lower for term in ['deal', 'offer', 'discount', 'promotion', 'coupon']):
+            return 'deals'
+        if any(term in question_lower for term in ['transaction', 'payment', 'sale', 'order', 'invoice']):
+            return 'transactions'
+        if any(term in question_lower for term in ['contact', 'customer', 'lead', 'client', 'prospect']):
+            return 'contacts'
+
+        # Conversational follow-up fallback (e.g., "what about macys?")
+        if isinstance(context, dict):
+            last_intent = str(context.get('last_intent', '')).strip().lower()
+            if last_intent in {'advertisers', 'programs', 'deals', 'transactions', 'contacts'}:
+                return last_intent
+
+        return 'general'
+
     def answer_question(self, question: str, context: Optional[Dict] = None) -> str:
-        """
-        Answer a question about advertisers, affiliate programs, or deals.
-        
-        This method analyzes the question and queries the appropriate endpoints
-        to provide an answer.
-        
-        Args:
-            question: The question to answer
-            context: Optional context to help answer the question
-            
-        Returns:
-            Answer string
-        """
+        """Answer a natural-language question using intent routing + API calls."""
         question_lower = question.lower()
 
         # Follow-up flow: user replied "yes" to detail offer from advertiser index results.
@@ -772,10 +1032,10 @@ class HiEnergySkill:
                 return self._format_advertiser_details_answer(details)
 
         search_term = self._extract_search_term(question)
+        intent = self._infer_intent(question_lower, context=context)
+        preface = f"Looking for {search_term or 'matches'} in {intent}..."
 
-        # Determine the type of question
-        if any(term in question_lower for term in ['advertiser', 'company', 'brand', 'merchant']) or self._looks_like_domain_or_url(search_term):
-            # Question about advertisers
+        if intent == 'advertisers' or self._looks_like_domain_or_url(search_term):
             advertisers = self.get_advertisers(search=search_term)
             if advertisers:
                 if self._is_detail_request(question_lower):
@@ -783,55 +1043,45 @@ class HiEnergySkill:
                     adv_id = first.get('id')
                     if adv_id:
                         details = self.get_advertiser_details(str(adv_id))
-                        return self._format_advertiser_details_answer(details)
-                return self._format_advertisers_answer(advertisers, question)
-            else:
-                return "I couldn't find any advertisers matching your query."
+                        return f"{preface}\n{self._format_advertiser_details_answer(details)}"
+                return f"{preface}\n{self._format_advertisers_answer(advertisers, question)}"
+            return f"{preface}\nI couldn't find any advertisers matching your query.\n{self._search_tips()}"
 
-        elif any(term in question_lower for term in ['program', 'affiliate program', 'partnership']):
-            # Question about affiliate programs
+        if intent == 'programs':
             if 'research' in question_lower or 'best' in question_lower or 'top' in question_lower:
-                report = self.research_affiliate_programs(search=self._extract_search_term(question), top_n=5)
+                report = self.research_affiliate_programs(search=search_term, top_n=5)
                 if report.get('programs'):
-                    return self._format_program_research_answer(report)
-                return "I couldn't find any affiliate programs matching your query."
+                    return f"{preface}\n{self._format_program_research_answer(report)}"
+                return f"{preface}\nI couldn't find any affiliate programs matching your query.\n{self._search_tips()}"
 
-            programs = self.get_affiliate_programs(search=self._extract_search_term(question))
+            programs = self.get_affiliate_programs(search=search_term)
             if programs:
                 answer = self._format_programs_answer(programs, question)
                 if len(programs) > 1:
                     answer += "\nThere are multiple matches. Do you want a specific publisher or network?"
-                return answer
-            else:
-                return "I couldn't find any affiliate programs matching your query."
-        
-        elif any(term in question_lower for term in ['deal', 'offer', 'discount', 'promotion', 'coupon']):
-            # Question about deals
-            deals = self.find_deals(search=self._extract_search_term(question))
+                return f"{preface}\n{answer}"
+            return f"{preface}\nI couldn't find any affiliate programs matching your query.\n{self._search_tips()}"
+
+        if intent == 'deals':
+            deals = self.find_deals(search=search_term)
             if deals:
-                return self._format_deals_answer(deals, question)
-            else:
-                return "I couldn't find any deals matching your query."
+                return f"{preface}\n{self._format_deals_answer(deals, question)}"
+            return f"{preface}\nI couldn't find any deals matching your query.\n{self._search_tips()}"
 
-        elif any(term in question_lower for term in ['transaction', 'payment', 'sale', 'order', 'invoice']):
-            # Question about transactions
-            transactions = self.get_transactions(search=self._extract_search_term(question))
+        if intent == 'transactions':
+            transactions = self.get_transactions(search=search_term)
             if transactions:
-                return self._format_transactions_answer(transactions, question)
-            else:
-                return "I couldn't find any transactions matching your query."
+                return f"{preface}\n{self._format_transactions_answer(transactions, question)}"
+            return f"{preface}\nI couldn't find any transactions matching your query.\n{self._search_tips()}"
 
-        elif any(term in question_lower for term in ['contact', 'customer', 'lead', 'client', 'prospect']):
-            # Question about contacts
-            contacts = self.get_contacts(search=self._extract_search_term(question))
+        if intent == 'contacts':
+            contacts = self.get_contacts(search=search_term)
             if contacts:
-                return self._format_contacts_answer(contacts, question)
-            else:
-                return "I couldn't find any contacts matching your query."
+                return f"{preface}\n{self._format_contacts_answer(contacts, question)}"
+            return f"{preface}\nI couldn't find any contacts matching your query.\n{self._search_tips()}"
 
-        else:
-            # General search across all
-            return self._general_search(question)
+        # General search across all
+        return f"{preface}\n{self._general_search(question)}"
     
     def _extract_search_term(self, question: str) -> str:
         """Extract the main search term from a question."""
@@ -872,6 +1122,25 @@ class HiEnergySkill:
             return 'N/A'
         return f"https://app.hienergy.ai/a/{advertiser_id}"
 
+    def _search_tips(self) -> str:
+        """Return concise examples of what users can search for."""
+        return (
+            "Tips: Ask for advertisers by brand/domain, programs by vertical, deals by category, "
+            "transactions by date range, or contacts by name/email. For commissions, ask for "
+            "min % and I'll separate percent vs flat-fee payouts."
+        )
+
+    def _format_structured_answer(self, summary: str, top_results: List[str], next_filter: str) -> str:
+        """Standard response shape for readability in chat."""
+        lines = [f"Summary: {summary}", "Top Results:"]
+        if top_results:
+            lines.extend([f"- {row}" for row in top_results[:self.MAX_DISPLAY_ITEMS]])
+        else:
+            lines.append("- None")
+        lines.append(f"Next Filter: {next_filter}")
+        lines.append(self._search_tips())
+        return "\n".join(lines)
+
     def _format_advertisers_answer(self, advertisers: List[Dict], question: str) -> str:
         """Format advertisers data into an answer (including publisher context)."""
         if len(advertisers) == 1:
@@ -885,7 +1154,8 @@ class HiEnergySkill:
                 f"(publisher: {publisher}, network: {network}) - "
                 f"{adv.get('description', 'No description available')}\n"
                 f"More info: {link}\n"
-                f"Want a deeper summary from the advertiser profile? Reply 'yes'."
+                f"Want a deeper summary from the advertiser profile? Reply 'yes'.\n"
+                f"{self._search_tips()}"
             )
         else:
             rows = []
@@ -895,7 +1165,8 @@ class HiEnergySkill:
                 rows.append(f"{adv.get('name', 'Unknown')} [publisher: {publisher}] ({link})")
             return (
                 f"Found {len(advertisers)} advertisers: {', '.join(rows)}\n"
-                f"Want a deeper summary for the top match from the advertiser profile? Reply 'yes'."
+                f"Want a deeper summary for the top match from the advertiser profile? Reply 'yes'.\n"
+                f"{self._search_tips()}"
             )
 
     def _format_advertiser_details_answer(self, advertiser: Dict[str, Any]) -> str:
@@ -920,45 +1191,36 @@ class HiEnergySkill:
             f"- Publisher: {publisher}\n"
             f"- Network: {network}\n"
             f"- Commission: {commission}\n"
-            f"- More info: {self._advertiser_link(str(advertiser_id))}"
+            f"- More info: {self._advertiser_link(str(advertiser_id))}\n"
+            f"{self._search_tips()}"
         )
     
     def _format_programs_answer(self, programs: List[Dict], question: str) -> str:
         """Format affiliate program matches (backed by advertiser endpoints)."""
-        if len(programs) == 1:
-            prog = programs[0]
-            link = self._advertiser_link(self._extract_advertiser_id(prog))
-            network = prog.get('network_name') or 'Unknown'
-            publisher = prog.get('publisher_name') or prog.get('agency_name') or prog.get('publisher_id') or 'Unknown'
-            return (
-                f"Found affiliate program: {prog.get('name', 'Unknown')} "
-                f"(network: {network}, publisher: {publisher})\n"
-                f"Related advertiser: {link}"
-            )
-
         rows = []
         for prog in programs:
             link = self._advertiser_link(self._extract_advertiser_id(prog))
             network = prog.get('network_name') or 'Unknown'
             publisher = prog.get('publisher_name') or prog.get('agency_name') or prog.get('publisher_id') or 'Unknown'
             rows.append(f"{prog.get('name', 'Unknown')} [network: {network}, publisher: {publisher}] ({link})")
-        return f"Found {len(programs)} affiliate programs: {', '.join(rows)}"
+        summary = f"Found {len(programs)} affiliate programs."
+        return self._format_structured_answer(
+            summary=summary,
+            top_results=rows,
+            next_filter="Add publisher name or network to narrow the list."
+        )
     
     def _format_deals_answer(self, deals: List[Dict], question: str) -> str:
         """Format deals data into an answer."""
-        if len(deals) == 1:
-            deal = deals[0]
+        rows = []
+        for deal in deals[:self.MAX_DISPLAY_ITEMS]:
             link = self._advertiser_link(self._extract_advertiser_id(deal))
-            return (
-                f"Found deal: {deal.get('title', 'Unknown')} - {deal.get('description', 'No description')}\n"
-                f"Related advertiser: {link}"
-            )
-        else:
-            titles = []
-            for deal in deals[:self.MAX_DISPLAY_ITEMS]:
-                link = self._advertiser_link(self._extract_advertiser_id(deal))
-                titles.append(f"{deal.get('title', 'Unknown')} ({link})")
-            return f"Found {len(deals)} deals: {', '.join(titles)}"
+            rows.append(f"{deal.get('title', 'Unknown')} ({link})")
+        return self._format_structured_answer(
+            summary=f"Found {len(deals)} deals.",
+            top_results=rows,
+            next_filter="Filter by category, advertiser_id, or min_commission."
+        )
 
     def _format_program_research_answer(self, report: Dict[str, Any]) -> str:
         """Format affiliate program research report."""
@@ -967,50 +1229,51 @@ class HiEnergySkill:
         if not programs:
             return "No affiliate programs matched your research filters."
 
-        lines = [
-            (
-                f"Program research: {summary.get('total_programs_matched', 0)} matches "
-                f"(avg commission {summary.get('average_commission', 0)})."
-            )
-        ]
+        rows = []
         for p in programs[:self.MAX_DISPLAY_ITEMS]:
             name = p.get('name', 'Unknown')
-            commission = p.get('commission_rate', p.get('_commission_value', 'N/A'))
+            commission = p.get('_commission_display') or p.get('commission_rate') or p.get('_commission_value', 'N/A')
+            commission_model = p.get('_commission_model', 'unknown')
             link = self._advertiser_link(self._extract_advertiser_id(p))
-            lines.append(f"- {name} (commission: {commission}) | advertiser: {link}")
-        return '\n'.join(lines)
+            rows.append(f"{name} (commission: {commission}, type: {commission_model}) | advertiser: {link}")
+
+        basis = summary.get('average_commission_basis', '')
+        basis_suffix = f"; {basis}" if basis else ''
+        return self._format_structured_answer(
+            summary=(
+                f"Program research: {summary.get('total_programs_matched', 0)} matches "
+                f"(avg commission {summary.get('average_commission', 0)}%{basis_suffix})."
+            ),
+            top_results=rows,
+            next_filter="Try min commission %, country, status, or network_slug to narrow it down."
+        )
 
     def _format_transactions_answer(self, transactions: List[Dict], question: str) -> str:
         """Format transactions data into an answer."""
-        if len(transactions) == 1:
-            tx = transactions[0]
+        tx_rows = []
+        for tx in transactions[:self.MAX_DISPLAY_ITEMS]:
+            link = self._advertiser_link(self._extract_advertiser_id(tx))
             amount = tx.get('amount', tx.get('sale_amount', 'N/A'))
             status = tx.get('status', 'unknown')
-            link = self._advertiser_link(self._extract_advertiser_id(tx))
-            return (
-                f"Found transaction: {tx.get('id', 'Unknown')} - Amount: {amount}, Status: {status}\n"
-                f"Related advertiser: {link}"
-            )
-        else:
-            tx_rows = []
-            for tx in transactions[:self.MAX_DISPLAY_ITEMS]:
-                link = self._advertiser_link(self._extract_advertiser_id(tx))
-                tx_rows.append(f"{str(tx.get('id', 'Unknown'))} ({link})")
-            return f"Found {len(transactions)} transactions: {', '.join(tx_rows)}"
+            tx_rows.append(f"{str(tx.get('id', 'Unknown'))} - amount: {amount}, status: {status} ({link})")
+        return self._format_structured_answer(
+            summary=f"Found {len(transactions)} transactions.",
+            top_results=tx_rows,
+            next_filter="Filter by date range, advertiser_id, network_slug, or status."
+        )
 
     def _format_contacts_answer(self, contacts: List[Dict], question: str) -> str:
         """Format contacts data into an answer."""
-        if len(contacts) == 1:
-            contact = contacts[0]
-            name = contact.get('name') or contact.get('full_name') or 'Unknown'
-            email = contact.get('email', 'N/A')
-            return f"Found contact: {name} - Email: {email}"
-        else:
-            names = [
-                (c.get('name') or c.get('full_name') or 'Unknown')
-                for c in contacts[:self.MAX_DISPLAY_ITEMS]
-            ]
-            return f"Found {len(contacts)} contacts: {', '.join(names)}"
+        rows = []
+        for c in contacts[:self.MAX_DISPLAY_ITEMS]:
+            name = c.get('name') or c.get('full_name') or 'Unknown'
+            email = c.get('email', 'N/A')
+            rows.append(f"{name} - Email: {email}")
+        return self._format_structured_answer(
+            summary=f"Found {len(contacts)} contacts.",
+            top_results=rows,
+            next_filter="Filter by name, email, or phone."
+        )
     
     def _general_search(self, question: str) -> str:
         """Perform a general search when question type is unclear."""
@@ -1038,9 +1301,9 @@ class HiEnergySkill:
             )
         
         if results:
-            return "Found the following:\n" + "\n".join(results)
+            return "Found the following:\n" + "\n".join(results) + "\n" + self._search_tips()
         else:
-            return "I couldn't find any results for your question."
+            return "I couldn't find any results for your question.\n" + self._search_tips()
 
 
 def main():

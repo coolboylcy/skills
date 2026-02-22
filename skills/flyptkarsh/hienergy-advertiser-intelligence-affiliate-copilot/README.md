@@ -1,6 +1,6 @@
-# Hi Energy Advertiser Intelligence / Affiliate Copilot
+# Hi Energy AI
 
-**Officially published by HiEnergy Agency** for OpenClaw.
+**Officially published by Hi Energy AI** for OpenClaw.
 
 OpenClaw skill for **Hi Energy / HiEnergy advertiser intelligence and affiliate research** using the v1 API.
 
@@ -12,11 +12,23 @@ This skill supports:
 - Contacts
 
 Useful links:
-- HiEnergy website: https://hienergy.ai
-- HiEnergy app: https://app.hienergy.ai
+- HiEnergy website (homepage): https://www.hienergy.ai
+- HiEnergy app (main app): https://www.hienergy.ai
 - API docs index: https://app.hienergy.ai/api_documentation
 - API key page: https://app.hienergy.ai/api_documentation/api_key
 - Login: https://app.hienergy.ai/sign_in
+- Source repository: https://github.com/HiEnergyAgency/open_claw_skill
+
+---
+
+## Security metadata (explicit)
+
+- **Primary credential:** `HIENERGY_API_KEY` (API key)
+- **Accepted alias:** `HI_ENERGY_API_KEY`
+- **Required environment variables:** `HIENERGY_API_KEY` (or `HI_ENERGY_API_KEY`)
+- **External API host used by runtime code:** `https://app.hienergy.ai` only
+- **Skill homepage:** `https://www.hienergy.ai`
+- **Skill source:** `https://github.com/HiEnergyAgency/open_claw_skill`
 
 ---
 
@@ -48,6 +60,8 @@ export HI_ENERGY_API_KEY="$HIENERGY_API_KEY"
 python3 example_usage.py
 ```
 
+Tip: copy `.env.example` to `.env` for local development and export `HIENERGY_API_KEY` from your shell.
+
 ---
 
 ## What this skill does
@@ -66,6 +80,12 @@ python3 example_usage.py
 - Query contacts
 - Answer natural-language affiliate questions
 
+### Power prompts
+
+- "Find top affiliate programs for [vertical] with commission >= 10%."
+- "Show active affiliate deals for [brand/category] and rank by payout potential."
+- "Find partner contacts for [advertiser] and summarize next outreach filters."
+
 ---
 
 ## API behavior
@@ -73,7 +93,7 @@ python3 example_usage.py
 - Root URL: `https://app.hienergy.ai`
 - API base path used by this client: `/api/v1` (requests resolve to `https://app.hienergy.ai/api/v1/...`)
 - Auth header: `X-Api-Key: <HIENERGY_API_KEY>`
-- Default method limit: `200`
+- Default method limit (safe mode): `20`
 - Max page size clamp: `500`
 - Supports cursor and page/per_page pagination where available
 - Normalizes JSON:API payloads (`data[].attributes`) for easier downstream usage
@@ -145,6 +165,10 @@ If the API key is missing, the skill raises a clear error that tells users exact
 ```bash
 python3 -m unittest test_hienergy_skill.py -v
 ```
+
+## Suggested ClawHub tags
+
+`affiliate-marketing,affiliate-program-management,affiliate-program-discovery,affiliate-deal-discovery,deal-management,partner-marketing,commission-analysis,advertiser-intelligence,publisher-contacts,transactions,impact,rakuten,cj,hienergy,hi-energy-ai`
 
 ---
 
