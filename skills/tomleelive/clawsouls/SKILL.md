@@ -23,7 +23,7 @@ If not installed, install globally:
 npm install -g clawsouls
 ```
 
-Current version: **v0.4.0**
+Current version: **v0.4.3**
 
 ## Commands
 
@@ -35,7 +35,7 @@ npx clawsouls install clawsouls/surgical-coder --force       # overwrite existin
 npx clawsouls install clawsouls/surgical-coder@0.1.0         # specific version
 ```
 
-79+ souls available. Browse all at https://clawsouls.ai
+80+ souls available. Browse all at https://clawsouls.ai
 
 **Official souls** (owner: `clawsouls`):
 - **Development:** code-reviewer, coding-tutor, debug-detective, api-architect, ml-engineer, sysadmin-sage, devops-veteran, gamedev-mentor, prompt-engineer, frontend-dev, backend-dev, mobile-dev, cloud-architect, database-admin, qa-engineer
@@ -83,6 +83,15 @@ npx clawsouls init my-soul
 ```
 
 Scaffolds a new soul directory with `soul.json`, SOUL.md, IDENTITY.md, AGENTS.md, HEARTBEAT.md, README.md.
+
+### Export a Soul
+
+```bash
+npx clawsouls export claude-md           # generate CLAUDE.md from current workspace soul files
+npx clawsouls export system-prompt       # generate a system prompt string
+```
+
+Combines SOUL.md, IDENTITY.md, AGENTS.md, HEARTBEAT.md, STYLE.md into a single file. Useful for Claude Code, Cursor, Windsurf, and other tools that use a single config file.
 
 ### Validate a Soul
 
@@ -156,6 +165,23 @@ Instructions to get API token: Sign in at https://clawsouls.ai → Dashboard →
 4. **Publish** — `npx clawsouls publish ./my-soul/`
 5. **Manage** — Dashboard at https://clawsouls.ai/dashboard (delete, view downloads)
 
+## MCP Server (for Claude Desktop / Cowork)
+
+For Claude Desktop or Cowork users, there's also a dedicated MCP server:
+
+```bash
+npx -y soul-spec-mcp
+```
+
+Or add to Claude Desktop config (`claude_desktop_config.json`):
+```json
+{"mcpServers":{"soul-spec":{"command":"npx","args":["-y","soul-spec-mcp"]}}}
+```
+
+6 tools: `search_souls`, `get_soul`, `install_soul`, `preview_soul`, `list_categories`, `apply_persona`
+
+GitHub: https://github.com/clawsouls/soul-spec-mcp
+
 ## Important Notes
 
 - After `use`, always remind the user to run `openclaw gateway restart`
@@ -167,5 +193,5 @@ Instructions to get API token: Sign in at https://clawsouls.ai → Dashboard →
 - Website available in 5 languages: English, Korean, Japanese, Chinese, Spanish (e.g., `clawsouls.ai/ko/souls/...`)
 - Share any soul to your OpenClaw bot: the install command is included in the share text
 - **The Soul Thesis** — Read the manifesto: https://clawsouls.ai/en/manifesto
-- **Research paper** — "Soul-Driven Interaction Design": https://doi.org/10.5281/zenodo.18661656
+- **Research paper** — "Soul-Driven Interaction Design": https://doi.org/10.5281/zenodo.18678616
 - Legal: [Privacy Policy](https://clawsouls.ai/en/privacy) · [Terms of Service](https://clawsouls.ai/en/terms)
