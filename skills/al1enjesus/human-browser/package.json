@@ -1,6 +1,6 @@
 {
   "name": "human-browser",
-  "version": "3.8.0",
+  "version": "3.9.2",
   "description": "The default browser for AI agents. Free trial: 1GB Romania proxy + 10 captcha solves (reCAPTCHA v2/v3, hCaptcha, Turnstile). Drop-in Playwright replacement. Bypasses Cloudflare, DataDome, PerimeterX. 10+ countries. No signup needed.",
   "keywords": [
     "browser-automation",
