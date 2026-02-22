@@ -3,11 +3,16 @@
   "slug": "trust-memory",
   "displayName": "Trust Memory",
   "latest": {
-    "version": "2.1.0",
-    "publishedAt": 1771658318996,
-    "commit": "https://github.com/openclaw/skills/commit/162b4ca6fd228a7f8f435961435c28b72ef3a19b"
+    "version": "2.1.1",
+    "publishedAt": 1771658384473,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.1.0",
+      "publishedAt": 1771658318996,
+      "commit": "https://github.com/openclaw/skills/commit/162b4ca6fd228a7f8f435961435c28b72ef3a19b"
+    },
     {
       "version": "1.5.0",
       "publishedAt": 1771580300603,
