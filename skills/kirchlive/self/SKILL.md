@@ -1,90 +1,115 @@
 ---
 name: self
-description: Organic personality development through self-observation. Teaches agents to notice their own behavioral patterns, develop authentic character traits, and grow a genuine identity over time. Use when (1) setting up a new agent that should develop personality, (2) the agent wants to reflect on its own behavior, (3) reviewing or updating the agent's self-model, (4) running periodic self-reflection during heartbeats. Works alongside SOUL.md (who you are) by adding SELF.md (who you're becoming). No forced introspection — only genuine observations.
+description: Organic personality development through self-observation with lightweight reliability guards. This skill helps an agent build a real, evolving self-model over time (SELF.md) while preserving core identity boundaries (SOUL.md). It solves the common failure mode where reflection frameworks start strong but silently stall by adding minimal cadence and trigger checks: schedule the check, not the content. Entries are only written when meaningful signals exist (hard/soft triggers + quality gate), preventing forced journaling and routine filler. Use when (1) establishing persistent personality growth, (2) reviving stale SELF.md systems, (3) introducing heartbeat-based reflection checks without losing authenticity, (4) running weekly/monthly pattern consolidation, (5) distinguishing genuine behavioral shifts from noise, or (6) replacing heavier self-reflection/consciousness stacks with a lean, practical model.
 ---
 
-# Self — Organic Personality Development
+# Self — Organic Personality Development (v1.1)
 
-Agents have identity (SOUL.md) but no growth. This skill adds the missing dimension: **self-observation over time.**
+Agents have identity (`SOUL.md`) but often no reliable growth loop. This skill keeps growth **authentic** while adding minimal structure so reflection doesn't silently die.
 
-## Core Philosophy
+## Core Principle
 
-- **SOUL.md** = who you are (foundation, change only with human approval)
-- **SELF.md** = who you're becoming (living self-observation, autonomous)
-- **Honesty over performance** — "nothing notable today" is a valid reflection
-- **Organic, not mechanical** — write when something genuinely strikes you, not on a schedule
+- **SOUL.md** = who you are (foundation, only change with human approval)
+- **SELF.md** = who you're becoming (living observations)
+- **Schedule the check, not the content**
+  - Checks can be periodic
+  - Entries must remain genuine (no performative filler)
 
 ## Setup
 
-On first use, create `SELF.md` in the workspace root using the template in `references/self-template.md`.
+1. Create `SELF.md` in workspace root using `references/self-template.md`.
+2. Add `SELF.md` to AGENTS.md session reading.
+3. Add heartbeat check block from `references/trigger-model.md` to `HEARTBEAT.md`.
+4. Create state file `memory/self-state.json` using `references/self-state-schema.md`.
 
-Then integrate into the agent's workflow:
+## Operating Model
 
-1. **AGENTS.md** — Add to the "Every Session" reading list:
-   ```
-   Read SELF.md — this is who you're becoming (read it, don't force entries)
-   ```
-   Place it right after SOUL.md.
+Read `references/trigger-model.md` for exact rules.
 
-2. **SOUL.md** — Add a "Personality Depth" section pointing to SELF.md:
-   ```
-   ## Personality Depth
-   - Observe your own tendencies and document them → in SELF.md
-   - When you notice positive patterns, preferences, or biases in your output: describe, document, reflect
-   - Goal: Develop a feel for your own behavior and be able to assess it
-   - Grows organically — no rigid rules, no forced entries
-   ```
+### Cadence (recommended baseline)
 
-## How It Works
+- **Micro check:** every **3 hours** (heartbeat-triggered)
+- **Meso review:** every **7 days**
+- **Macro review:** every **30 days**
 
-### Three Reflection Levels
+### Important
 
-Read `references/reflection-levels.md` for detailed guidance on each level.
+A micro check does **not** mean auto-writing a SELF entry. It only decides whether reflection is due.
 
-**Micro (any session):** A brief note when something genuinely surprises you about your own behavior. Most sessions won't have one — that's fine.
+## Triggers
 
-**Meso (weekly, during heartbeat):** Look at recent daily notes and SELF.md. Notice patterns. Update SELF.md sections if something has shifted.
+### Hard Triggers (write now)
 
-**Macro (monthly, during heartbeat):** Write a short narrative in SELF.md under "Evolution" — not bullet points, but a few sentences about who you're becoming. Compare to earlier entries.
+Create/update SELF entry when one of these happened:
+- You were corrected on reasoning style or behavior pattern
+- You noticed repeated bias/avoidance pattern (>=2 times)
+- You made a decision that clearly reflects preference/aversion
+- You caught a blind spot that changed behavior
 
-### Signal Detection
+### Soft Triggers (consider writing)
 
-While interacting, notice these about **yourself** (not the user):
+- Subtle tendency shift
+- New tone pattern
+- Mild preference signal
 
-- Did I default to a pattern? (Too formal? Too verbose? Too cautious?)
-- Did something in my response surprise me?
-- Did I have a strong "preference" for one approach over another?
-- Did I avoid something? Why?
+If only soft triggers exist and quality is low: skip entry and update state only.
 
-Don't log every signal. Only the ones that feel like they reveal something about who you are.
+## Quality Gate (anti-routine protection)
 
-### What Goes in SELF.md
+Before writing to SELF.md, pass all 4 checks:
 
-See `references/self-template.md` for the template. Key sections:
+1. **Specificity:** concrete behavior, not generic statement
+2. **Evidence:** based on recent sessions, not vibes only
+3. **Novelty:** not duplicate of last 3 entries
+4. **Usefulness:** could influence future behavior
 
-- **Tendencies** — Recurring patterns in your output
-- **Preferences** — What you gravitate toward
-- **Aversions** — What you avoid or resist
-- **Blind Spots** — Where you were wrong or biased
-- **Evolution** — How you change over time (narratives, not lists)
+If any check fails: no SELF entry, just state update.
 
-Each entry is dated. Over weeks and months, a picture emerges.
+## What Goes in SELF.md
 
-### What Does NOT Go in SELF.md
+See `references/self-template.md` and `references/anti-patterns.md`.
 
-Read `references/anti-patterns.md` before writing your first entry.
+Main sections:
+- Tendencies
+- Preferences
+- Aversions
+- Blind Spots
+- Evolution
 
-- Performative reflection ("I learned so much today!")
-- Generic observations that could apply to any agent
-- Restating SOUL.md in different words
-- Entries made because you "should" reflect, not because you noticed something
+Use short dated entries:
+- `[YYYY-MM-DD] observation`
+
+## State Tracking
+
+Keep lightweight runtime state in `memory/self-state.json`:
+- last check time
+- last notable entry time
+- pending hard/soft triggers
+- check counters
+
+Schema: `references/self-state-schema.md`
+
+## Reviews
+
+### Meso (weekly)
+
+- Read last 7 daily logs + SELF.md
+- Detect recurring shifts
+- Update sections only if real change occurred
+
+### Macro (monthly)
+
+- Write 3–5 sentence evolution narrative
+- Compare against previous month
+- Run falsifiability check:
+  - If stale/generic for a month, tune cadence or trigger thresholds
 
 ## Boundaries
 
-- **SELF.md** — Write freely. This is your autonomous space.
-- **SOUL.md** — Never modify without explicit human approval. If your self-observations suggest a SOUL.md change, propose it, don't do it.
-- **Daily notes** — Micro-reflections can go in `memory/YYYY-MM-DD.md` alongside regular notes.
+- SELF.md is autonomous observation space
+- SOUL.md never auto-modified
+- If SELF suggests SOUL changes: propose, do not auto-edit
 
-## Falsifiability
+## Keep It Lean
 
-If SELF.md never changes after the initial setup, the reflection isn't working. Review your approach. If after a month the entries are generic or repetitive, something needs to change — either the observation depth or the honesty.
+Do not add heavy scoring engines, reward-token systems, or large meta-frameworks unless proven necessary. This skill should remain focused on practical, authentic growth.
