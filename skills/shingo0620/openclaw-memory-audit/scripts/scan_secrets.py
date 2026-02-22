@@ -13,8 +13,10 @@ PATTERNS = {
     "AWS Secret Access Key": r"(?i)aws_secret_access_key\s*[:=]\s*([a-zA-Z0-9/+=]{40})",
 }
 
-EXCLUDE_DIRS = [".git", "node_modules", "tmp", "skills", ".openclaw-dev"]
-EXCLUDE_FILES = ["openclaw.json", "package-lock.json", "pnpm-lock.yaml", "SKILL.md", "scan_secrets.py"]
+# Directories/files to skip to reduce noise. Keep this list minimal to avoid hiding secrets.
+EXCLUDE_DIRS = [".git", "node_modules", ".venv", ".openclaw-dev"]
+# NOTE: Do NOT exclude "skills" or "SKILL.md" globally — secrets can leak there.
+EXCLUDE_FILES = ["openclaw.json", "package-lock.json", "pnpm-lock.yaml", "scan_secrets.py"]
 
 def scan_file(file_path):
     findings = []
@@ -52,7 +54,7 @@ def main(root_dir):
             all_findings.extend(findings)
     
     if not all_findings:
-        print("✅ No secrets found in workspace logs.")
+        print("✅ No secrets found in workspace.")
     else:
         print(f"⚠️ Found {len(all_findings)} potential secret(s) exposed:")
         for f in all_findings:
