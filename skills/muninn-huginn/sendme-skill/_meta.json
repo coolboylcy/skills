@@ -1,0 +1,11 @@
+{
+  "owner": "muninn-huginn",
+  "slug": "sendme-skill",
+  "displayName": "Sendme",
+  "latest": {
+    "version": "0.1.4",
+    "publishedAt": 1771743595916,
+    "commit": null
+  },
+  "history": []
+}
