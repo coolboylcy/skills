@@ -1,0 +1,11 @@
+{
+  "owner": "honestqiao",
+  "slug": "dockerfile-generator",
+  "displayName": "Dockerfile Generator",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771720388441,
+    "commit": null
+  },
+  "history": []
+}
