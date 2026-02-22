@@ -221,21 +221,109 @@ Flag:
 
 ### D. Skill vetting (before installing community skills)
 
-Before installing any skill from ClawHub or elsewhere:
+**Important:** ClawHub security scans can have false negatives. A "clean" scan does not guarantee safety. Always run your own checks.
 
-1. Check ClawHub security status (if flagged, do not install without review)
-2. Read SKILL.md for:
-   - Shell commands (exec, bash, curl, wget)
-   - Network calls (fetch, http, API endpoints)
-   - File access patterns (read/write outside skill folder)
-   - Credential references (env vars, tokens)
-   - Obfuscated code (base64, unicode tricks)
-3. Check permissions requested in metadata
+**Layer 1: Check ClawHub security inspection**
+- Visit the skill page on clawhub.ai
+- Look for the security scan badge/status
+- If flagged as suspicious or malicious, do NOT install
+- Read the security findings summary if available
+
+**Layer 2: Run your own inspection (even if ClawHub says clean)**
+
+Scan the skill files yourself for:
+
+```bash
+# Dangerous shell patterns
+grep -rE "(curl|wget|bash|sh|eval|exec)\s" ./skill-folder/
+
+# Network calls to external endpoints
+grep -rE "(http://|https://|fetch|request|axios)" ./skill-folder/
+
+# Credential/secret access patterns
+grep -rE "(API_KEY|SECRET|TOKEN|PASSWORD|\.env|credentials)" ./skill-folder/
+
+# Base64 obfuscation (common in malicious code)
+grep -rE "base64|atob|btoa" ./skill-folder/
+
+# Encoded/obfuscated strings
+grep -rE "\\\\x[0-9a-f]{2}|\\\\u[0-9a-f]{4}" ./skill-folder/
+
+# File system access outside skill folder
+grep -rE "(\/etc\/|\/root\/|~\/\.|\.\.\/)" ./skill-folder/
+```
+
+**Layer 3: Check permissions requested in metadata**
+- What bins does it require?
+- What env vars does it need access to?
+- Does it request more than necessary?
+
+**Decision matrix:**
+| ClawHub Status | Your Scan | Action |
+|----------------|-----------|--------|
+| Clean | Clean | OK to install |
+| Clean | Suspicious | DO NOT install, review manually |
+| Flagged | Any | DO NOT install |
+| No scan | Any | Run full manual review first |
 
 If anything looks suspicious:
 - Do not install automatically
 - Show the user the concerning lines
 - Let them decide
+
+### D2. Update security check (after updating skills)
+
+**Critical:** When running `clawhub update --all` or updating individual skills, malicious code could be introduced in new versions. ClawHub scans may not catch everything.
+
+**Before updating, run pre-flight check:**
+
+```bash
+# See what updates are available
+clawhub list --outdated
+
+# For each skill, check ClawHub security status
+# Then decide which to update
+```
+
+**After any skill update, automatically:**
+
+1. **Check ClawHub security status** for updated skills (first pass)
+
+2. **Run your own diff inspection** (defense in depth):
+   ```bash
+   # Compare old vs new version for suspicious additions
+   # Look for new:
+   # - Shell commands (curl, wget, bash, exec)
+   # - Network endpoints
+   # - Credential access
+   # - Obfuscated code
+   ```
+
+3. **Red flags in updates:**
+   - New network calls that weren't there before
+   - New shell command execution
+   - New credential/env var access
+   - Obfuscated or minified code added
+   - Significant size increase without clear reason
+
+4. **If an update looks suspicious:**
+   - Alert the user immediately
+   - Do not use the skill until reviewed
+   - Rollback: `clawhub install skillname --version <previous>`
+
+**Safe update workflow:**
+```
+1. "Check which skills have updates available and their ClawHub security status"
+2. "Download updates but don't activate yet"
+3. "Scan the updated files for new dangerous patterns"
+4. "Show me anything suspicious before I approve"
+5. "Activate only the ones that pass all checks"
+```
+
+**Paranoid mode (recommended for production):**
+- Never auto-update skills
+- Review every update manually before applying
+- Keep a known-good version pinned until you verify the new one
 
 ### E. VPS baseline hardening (workshop-safe)
 

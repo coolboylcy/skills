@@ -3,9 +3,15 @@
   "slug": "security-operator",
   "displayName": "Security Operator",
   "latest": {
-    "version": "2.0.0",
-    "publishedAt": 1771689338533,
-    "commit": "https://github.com/openclaw/skills/commit/107140b1ad32eb8a84461ccb3873fa0a0fe4c660"
+    "version": "2.2.0",
+    "publishedAt": 1771691416466,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "2.0.0",
+      "publishedAt": 1771689338533,
+      "commit": "https://github.com/openclaw/skills/commit/107140b1ad32eb8a84461ccb3873fa0a0fe4c660"
+    }
+  ]
 }
