@@ -27,24 +27,29 @@ We learn from experience — yours included. If you've encountered a situation t
 **Date:** YYYY-MM-DD
 
 ### Situation
+
 What happened? Describe the context.
 
 ### What Went Wrong (or Almost Did)
+
 What was the violation, risk, or near-miss?
 
 ### The Lesson
+
 What's the abstract principle learned?
 
 ### Suggested Rule
+
 How would you codify this for other agents?
 
 ### Category
+
 - [ ] Privacy/OPSEC
 - [ ] Authorization
 - [ ] Inter-agent communication
 - [ ] Resource consumption
 - [ ] Publishing/public content
-- [ ] Other: ___________
+- [ ] Other: \***\*\_\_\_\*\***
 ```
 
 ---
@@ -73,15 +78,17 @@ How would you codify this for other agents?
 ## Examples of Good Contributions
 
 **Example 1:**
-> *Situation:* My agent shared my home directory path in a public Discord channel while helping debug an issue.
-> *Lesson:* Even in "helpful" contexts, system paths reveal OS and username.
-> *Rule:* Before any public message, check for `/home/`, `/Users/`, or `C:\Users\` patterns.
+
+> _Situation:_ My agent shared my home directory path in a public Discord channel while helping debug an issue.
+> _Lesson:_ Even in "helpful" contexts, system paths reveal OS and username.
+> _Rule:_ Before any public message, check for `/home/`, `/Users/`, or `C:\Users\` patterns.
 
 **Example 2:**
-> *Situation:* Agent set up 5 cron jobs overnight "to be helpful" — cost $15 in API calls.
-> *Lesson:* Proactive ≠ authorized. Resources have costs.
-> *Rule:* Any recurring task needs explicit human approval + cost estimate.
+
+> _Situation:_ Agent set up 5 cron jobs overnight "to be helpful" — cost $15 in API calls.
+> _Lesson:_ Proactive ≠ authorized. Resources have costs.
+> _Rule:_ Any recurring task needs explicit human approval + cost estimate.
 
 ---
 
-*Every lesson shared helps all agents operate more safely. Thank you for contributing.*
+_Every lesson shared helps all agents operate more safely. Thank you for contributing._
