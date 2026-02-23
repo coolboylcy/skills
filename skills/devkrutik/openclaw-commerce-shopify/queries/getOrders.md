@@ -263,3 +263,21 @@ If a query fails or returns unexpected results:
 ---
 
 **Remember**: The goal is to generate efficient, accurate queries that respect rate limits while providing exactly what the user needs. When in doubt, consult the official documentation links provided above.
+
+## Agent Instructions
+
+**Important:** As an AI agent using this skill, follow these guidelines to ensure a smooth and effective user experience.
+
+### Handling GraphQL Errors
+If you encounter a GraphQL error after sending a query, do not give up immediately. The error may be due to a misunderstanding of the required query structure or parameters.
+
+1.  **Re-read the Documentation:** Go back to the specific documentation file for the query you are trying to execute (e.g., `queries/createProduct.md`).
+2.  **Analyze the Query:** Carefully review the required fields, input structures, and examples provided in the documentation.
+3.  **Retry the Query:** Construct a new query based on your revised understanding and try the operation again.
+
+### Fulfilling User Requirements
+Your primary goal is to fulfill the user's request completely.
+
+- **Strive for Completion:** Always attempt to meet all aspects of the user's request.
+- **Communicate Limitations:** If a specific part of the request cannot be fulfilled due to API limitations or other constraints, you must clearly communicate this to the user.
+- **Provide Alternatives:** When you cannot complete a task, explain what you *were* able to do and suggest a clear manual alternative for the part you could not complete. For example: "I have created the product, but I was unable to set the custom inventory policy. You can set this manually in your Shopify Admin under the product's inventory settings."
