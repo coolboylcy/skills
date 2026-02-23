@@ -260,3 +260,22 @@ Each instance needs its own state file. Set `RATE_LIMIT_STATE` to a unique path 
 export RATE_LIMIT_STATE="/path/to/instance-1-rate-limit.json"
 ```
 Otherwise they'll overwrite each other's tracking and the estimates will be meaningless.
+
+---
+
+## FAQ
+
+**What is this skill?**
+Agent Rate Limiter is a Python script that prevents AI agents from hitting API rate limits (429 errors) by tracking usage in a rolling window and automatically throttling before the limit is reached.
+
+**What problem does it solve?**
+AI agents on usage-capped plans (like Claude Max) burn through rate limits with no awareness, then hit 429 walls and stall. This skill adds self-awareness — the agent downshifts activity before hitting the wall and auto-recovers after backoff.
+
+**What are the requirements?**
+Python 3 (standard library only). No pip installs, no API keys, no external services. Just a script and a JSON state file.
+
+**How does it work?**
+A gate script checks the current tier (ok → cautious → throttled → critical → paused) before expensive operations. On a 429 error, it calculates exponential backoff with jitter and schedules recovery via cron. The agent reads the tier and adjusts behavior accordingly.
+
+**Does it work with any LLM provider?**
+Yes. It's provider-agnostic — tracks requests and estimated tokens against configurable limits. Works with Claude, GPT, Gemini, or any API with rate limits.
