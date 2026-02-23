@@ -37,30 +37,6 @@ class GuardianScanner:
         mapping = {"low": 0, "medium": 50, "high": 80, "critical": 90}
         return mapping.get(severity, 50)
 
-    @staticmethod
-    def _read_definition_file(defs_dir, fname: str) -> Optional[dict]:
-        """Read a definition file, trying encoded (.enc) first, then plaintext JSON."""
-        import base64
-        # Try encoded version first (definitions/encoded/<name>.enc)
-        enc_dir = defs_dir / "encoded"
-        enc_name = fname.replace(".json", ".enc")
-        enc_path = enc_dir / enc_name
-        if enc_path.exists():
-            try:
-                encoded = enc_path.read_text(encoding="utf-8").strip()
-                raw = base64.b64decode(encoded).decode("utf-8")
-                return json.loads(raw)
-            except Exception:
-                pass  # Fall through to plaintext
-        # Fallback to plaintext JSON
-        fpath = defs_dir / fname
-        if fpath.exists():
-            try:
-                return json.loads(fpath.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                pass
-        return None
-
     def _load_patterns(self) -> List[Dict[str, Any]]:
         """Load all definition files and compile regex patterns."""
         compiled: List[Dict[str, Any]] = []
@@ -74,8 +50,12 @@ class GuardianScanner:
         dismissed = {str(sig).strip() for sig in self.config.get("dismissed_signatures", []) if str(sig).strip()}
 
         for fname in def_files:
-            data = self._read_definition_file(defs_dir, fname)
-            if data is None:
+            fpath = defs_dir / fname
+            if not fpath.exists():
+                continue
+            try:
+                data = json.loads(fpath.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
                 continue
 
             items = data if isinstance(data, list) else data.get("signatures", data.get("patterns", []))

@@ -39,46 +39,21 @@ def _load_json(path: Path) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _read_def_file(defs_dir, filename: str):
-    """Read a definition file — tries plaintext JSON first, then encoded (.enc)."""
-    import base64
-    plain = defs_dir / filename
-    if plain.exists():
-        try:
-            return _load_json(plain)
-        except (json.JSONDecodeError, OSError):
-            pass
-    enc_path = defs_dir / "encoded" / filename.replace(".json", ".enc")
-    if enc_path.exists():
-        try:
-            raw = base64.b64decode(enc_path.read_text(encoding="utf-8").strip()).decode("utf-8")
-            return json.loads(raw)
-        except Exception:
-            pass
-    return None
-
-
 def load_definitions(config_path: str | None = None) -> Dict[str, List[Dict[str, Any]]]:
     """Load signature definition files configured for this skill."""
     config = load_config(config_path)
     defs = {}
     defs_dir = definitions_dir(config)
 
-    # Collect all definition filenames from plaintext JSON and encoded .enc files
-    filenames = set()
-    for p in defs_dir.glob("*.json"):
-        if p.name != "manifest.json":
-            filenames.add(p.name)
-    enc_dir = defs_dir / "encoded"
-    if enc_dir.exists():
-        for p in enc_dir.glob("*.enc"):
-            filenames.add(p.name.replace(".enc", ".json"))
-
-    for fname in sorted(filenames):
-        data = _read_def_file(defs_dir, fname)
-        if data is None:
+    for file_path in defs_dir.glob("*.json"):
+        if file_path.name == "manifest.json":
             continue
-        category = data.get("category", Path(fname).stem)
+        try:
+            data = _load_json(file_path)
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        category = data.get("category", file_path.stem)
         sigs = data.get("signatures", data.get("checks", []))
         if isinstance(sigs, list):
             defs[category] = sigs

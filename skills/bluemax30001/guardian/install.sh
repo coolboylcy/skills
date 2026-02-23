@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── 1. Prerequisites ────────────────────────────────────────────────────────
-
 if ! command -v python3 >/dev/null 2>&1; then
   echo "Error: python3 is required." >&2
   exit 1
@@ -20,7 +19,6 @@ PY
 export PYTHONPATH="$ROOT_DIR/core:${PYTHONPATH:-}"
 
 # ── 2. Database ─────────────────────────────────────────────────────────────
-
 python3 - <<'PY'
 import sys
 sys.path.insert(0, 'core')
@@ -31,7 +29,6 @@ db.close()
 PY
 
 # ── 3. Validate definitions ─────────────────────────────────────────────────
-
 python3 - <<'PY'
 import json, re
 from pathlib import Path
@@ -59,6 +56,10 @@ PY
 echo ""
 echo "✅ Guardian installation complete."
 echo ""
-echo "  Database initialised and definitions validated."
-echo "  Run 'python3 skills/guardian/scripts/onboard.py' to complete setup."
+echo "Onboarding checklist:"
+echo " 1) python3 scripts/onboard.py --setup-crons   (optional cron helpers)"
+echo " 2) python3 scripts/admin.py status            (confirm running state)"
+echo " 3) python3 scripts/admin.py threats           (confirm signatures loaded; should show 0/blocked)"
+echo " 4) Optional: python3 scripts/serve.py --port 8090   (HTTP API)"
+echo "    Optional: set webhook_url in config.json for outbound alerts"
 echo ""

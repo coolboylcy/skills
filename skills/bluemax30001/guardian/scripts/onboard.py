@@ -345,7 +345,7 @@ def build_human_notification(
         f"  • Config file: `skills/guardian/config.json`",
         f"  • DB: `{db_path.name}` (in workspace root)",
         f"  • Block threshold: **{threshold}** and above",
-        f"  • Trusted channels: {', '.join(trusted) if trusted else '(none — run --config-review to set this)'}",
+        f"  • Trusted channels: {', '.join(trusted)}",
         "",
         "🔔 **Alerts configured:**",
     ]
@@ -886,7 +886,7 @@ def main() -> None:
     ops = detect_operational_status(SKILL_DIR, workspace, db_path, cfg)
 
     # Check version
-    version = "2.0.0"
+    version = "1.0.0"
     pyproject = SKILL_DIR / "pyproject.toml"
     if pyproject.exists():
         for line in pyproject.read_text().splitlines():
@@ -999,8 +999,7 @@ def main() -> None:
 
     if args.json:
         print(json.dumps({
-            "status": "dry_run" if args.dry_run else "onboarded",
-            "dry_run": args.dry_run,
+            "status": "onboarded",
             "first_run": is_first_run,
             "dashboard_url": dashboard_url,
             "workspace": str(workspace),
@@ -1015,12 +1014,8 @@ def main() -> None:
         print("\n" + "="*60)
         print("SECTION 1 — AGENT BRIEFING")
         print("="*60)
-        if args.dry_run:
-            print(f"⚠️  DRY RUN — no changes made")
-            print(f"   GUARDIAN.md was NOT written. Re-run without --dry-run to apply.\n")
-        else:
-            print(f"✅ GUARDIAN.md written to: {workspace / 'GUARDIAN.md'}")
-            print(f"   The AI agent loads this every session — no further action needed.\n")
+        print(f"✅ GUARDIAN.md written to: {workspace / 'GUARDIAN.md'}")
+        print(f"   The AI agent loads this every session — no further action needed.\n")
         print("="*60)
         print("SECTION 2 — ADMIN NOTIFICATION  [send this to the user]")
         print("="*60)
