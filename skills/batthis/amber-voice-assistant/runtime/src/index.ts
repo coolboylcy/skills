@@ -9,6 +9,8 @@ import OpenAI from 'openai';
 import WebSocket from 'ws';
 import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
+import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall } from './skills/index.js';
+import type { HandleSkillCallDeps } from './skills/index.js';
 
 // ─── Security Helpers ───
 
@@ -149,8 +151,24 @@ interface AgentSections {
 }
 
 function loadAgentMd(): AgentSections | null {
-  const agentPath = process.env.AGENT_MD_PATH
-    || path.join(process.cwd(), '..', 'AGENT.md');
+  const defaultAgentPath = path.join(process.cwd(), '..', 'AGENT.md');
+
+  // Validate AGENT_MD_PATH to prevent path traversal / prompt injection via env var.
+  // The env var is operator-configured, but we still enforce basic constraints:
+  //   1. Resolve to absolute path (eliminates traversal via relative segments)
+  //   2. Must end in .md (prevents loading arbitrary system files as prompts)
+  //   3. Must not contain null bytes (defence against null-byte injection)
+  // Falls back to the default AGENT.md if validation fails.
+  let agentPath = defaultAgentPath;
+  const envPath = process.env.AGENT_MD_PATH;
+  if (envPath) {
+    const resolved = path.resolve(envPath);
+    if (resolved.includes('\0') || !resolved.endsWith('.md')) {
+      console.error(`[AGENT.md] AGENT_MD_PATH rejected (must be a .md file path): ${envPath} — using default`);
+    } else {
+      agentPath = resolved;
+    }
+  }
   try {
     const raw = fs.readFileSync(agentPath, 'utf-8');
     const calendarRef = DEFAULT_CALENDAR ? `the ${DEFAULT_CALENDAR} calendar` : 'the calendar';
@@ -338,6 +356,11 @@ const OPENCLAW_TOOLS = [
   },
 ];
 
+/** Get all tools — OPENCLAW_TOOLS + dynamically loaded Amber Skills */
+function getAllTools() {
+  return [...OPENCLAW_TOOLS, ...getSkillTools()];
+}
+
 // Active call websockets keyed by callId, so we can interact with them
 const activeCallSockets = new Map<string, WebSocket>();
 
@@ -408,6 +431,12 @@ const voiceProvider: IVoiceProvider = createProvider(VOICE_PROVIDER, {
 console.log(`[provider] Voice provider: ${VOICE_PROVIDER}`);
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+// OpenClaw gateway client — routes to Claude via Pro token (no OpenAI API charges)
+const clawdClient = new OpenAI({
+  apiKey: OPENCLAW_GATEWAY_TOKEN || 'no-token',
+  baseURL: `${OPENCLAW_GATEWAY_URL}/v1`,
+});
 
 app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
 
@@ -656,8 +685,10 @@ const callAccept = {
       instructions,
       type: 'realtime',
       model: 'gpt-realtime',
-      tools: OPENCLAW_TOOLS,
+      tools: getAllTools(),
       tool_choice: 'auto',
+      // NOTE: turn_detection is NOT supported in callAccept — only in session.update
+      // VAD settings are applied via session.update after WebSocket connects
       audio: {
         output: { voice: OPENAI_VOICE },
         // Enable caller-side transcription (no `enabled` flag; schema expects a model)
@@ -740,18 +771,18 @@ const callAccept = {
         const sessionUpdate = {
           type: 'session.update',
           session: {
-            tools: OPENCLAW_TOOLS,
+            tools: getAllTools(),
             tool_choice: 'auto',
             turn_detection: {
               type: 'server_vad',
               threshold: 0.99,
-              prefix_padding_ms: 1200,
-              silence_duration_ms: 2500,
+              prefix_padding_ms: 500,
+              silence_duration_ms: 800,
             },
           },
         };
         ws.send(JSON.stringify(sessionUpdate));
-        writeJsonl({ type: 'c2.tools_registered', call_id: callId, received_at: new Date().toISOString(), toolCount: OPENCLAW_TOOLS.length });
+        writeJsonl({ type: 'c2.tools_registered', call_id: callId, received_at: new Date().toISOString(), toolCount: getAllTools().length });
       }
 
       const responseCreate = {
@@ -883,6 +914,20 @@ const callAccept = {
           writeJsonl({ type: 'c2.filler_sent', call_id: callId, received_at: new Date().toISOString(), filler: fillerInstruction });
 
           handleAskOpenClaw(ws, callId, itemId, fnCallId, fnArgs, outboundObjective, outboundCallPlan, transcriptStream, writeJsonl);
+        } else if (isSkillFunction(fnName)) {
+          // Route to Amber Skills system
+          const skillDeps: HandleSkillCallDeps = {
+            clawdClient,
+            operatorName: OPERATOR_NAME || '',
+            operatorTelegramId: undefined, // determined by OpenClaw gateway routing
+            callId,
+            callerId: inbound?.from || '',
+            transcript: '', // transcript is streaming; skills get what's available
+            writeJsonl,
+            sendFunctionCallOutput: (wsRef: any, fCallId: string, output: string) =>
+              sendFunctionCallOutput(wsRef, fCallId, output),
+          };
+          handleSkillCall(fnName, fnArgs, ws, fnCallId, skillDeps);
         } else {
           // Unknown function — return a generic error
           sendFunctionCallOutput(ws, fnCallId, JSON.stringify({ error: `Unknown function: ${fnName}` }));
@@ -929,6 +974,11 @@ const callAccept = {
     return res.status(500).send('Server error');
   }
 });
+
+// ─── Load Amber Skills at startup ───
+const SKILLS_DIR = path.resolve(new URL('.', import.meta.url).pathname, '../../amber-skills');
+const loadedSkills = loadSkills(SKILLS_DIR);
+registerSkills(loadedSkills);
 
 app.listen(PORT, () => {
   console.log(`twilio-openai-sip-bridge listening on http://127.0.0.1:${PORT}`);

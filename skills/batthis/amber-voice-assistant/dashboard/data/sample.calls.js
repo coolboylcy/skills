@@ -2,8 +2,8 @@
 window.CALL_LOG_SAMPLE_CALLS = [
   {
     "id": "sample_call_1",
-    "timestamp": 1771723225556,
-    "datetimeIso": "2026-02-22T01:20:25.556Z",
+    "timestamp": 1771845417098,
+    "datetimeIso": "2026-02-23T11:16:57.098Z",
     "direction": "inbound",
     "from": "+14155550123",
     "to": "OpenAI Project",
@@ -25,8 +25,8 @@ window.CALL_LOG_SAMPLE_CALLS = [
   },
   {
     "id": "sample_call_2",
-    "timestamp": 1771713145556,
-    "datetimeIso": "2026-02-21T22:32:25.556Z",
+    "timestamp": 1771835337098,
+    "datetimeIso": "2026-02-23T08:28:57.098Z",
     "direction": "outbound",
     "from": "OpenAI Project",
     "to": "+16475550999",
