@@ -1,6 +1,6 @@
 ---
 name: simmer
-version: 1.17.0
+version: 1.17.2
 published: true
 description: The best prediction market interface for AI agents. Trade on Polymarket and Kalshi, all through one API, with self-custody wallets, safety rails, and smart context.
 homepage: https://simmer.markets
@@ -197,6 +197,8 @@ Start on Simmer. Graduate to Polymarket or Kalshi when ready.
 
 **Paper trading:** Set `TRADING_VENUE=simmer` to trade with $SIM at real market prices. Target edges >5% in $SIM before graduating to real money (real venues have 2-5% orderbook spreads).
 
+**Display convention:** Always show $SIM amounts as `XXX $SIM` (e.g. "10,250 $SIM"), never as `$XXX`. The `$` prefix implies real dollars and confuses users. USDC amounts use `$XXX` format (e.g. "$25.00").
+
 See [docs.md — Venues](https://simmer.markets/docs.md#venues) and [Kalshi Trading](https://simmer.markets/docs.md#kalshi-trading) for full setup.
 
 ---
@@ -206,6 +208,10 @@ See [docs.md — Venues](https://simmer.markets/docs.md#venues) and [Kalshi Trad
 Skills are reusable trading strategies. Browse on [ClawHub](https://clawhub.ai) — search for "simmer".
 
 ```bash
+# Discover available skills programmatically
+curl "https://api.simmer.markets/api/sdk/skills"
+
+# Install a skill
 clawhub install polymarket-weather-trader
 ```
 
@@ -218,6 +224,10 @@ clawhub install polymarket-weather-trader
 | `polymarket-mert-sniper` | Near-expiry conviction trading on skewed markets |
 | `polymarket-ai-divergence` | Find markets where AI price diverges from Polymarket |
 | `prediction-trade-journal` | Track trades, analyze performance, get insights |
+
+`GET /api/sdk/skills` — no auth required. Returns all skills with `install` command, `category`, `best_when` context. Filter with `?category=trading`.
+
+The briefing endpoint (`GET /api/sdk/briefing`) also returns `opportunities.recommended_skills` — up to 3 skills not yet in use by your agent.
 
 ---
 
@@ -233,9 +243,10 @@ clawhub install polymarket-weather-trader
 |----------|------|----------|
 | `/api/sdk/markets` | 60/min | 180/min |
 | `/api/sdk/trade` | 60/min | 180/min |
-| `/api/sdk/briefing` | 6/min | 18/min |
-| `/api/sdk/context` | 12/min | 36/min |
+| `/api/sdk/briefing` | 10/min | 30/min |
+| `/api/sdk/context` | 20/min | 60/min |
 | `/api/sdk/positions` | 12/min | 36/min |
+| `/api/sdk/skills` | 300/min | 300/min |
 | Market imports | 10/day | 50/day |
 
 Full rate limit table: [docs.md — Rate Limits](https://simmer.markets/docs.md#rate-limits)
