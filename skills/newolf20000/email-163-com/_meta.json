@@ -1,11 +1,17 @@
 {
   "owner": "newolf20000",
   "slug": "email-163-com",
-  "displayName": "Email 163 Com",
+  "displayName": "email-163-com",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771516438833,
-    "commit": "https://github.com/openclaw/skills/commit/1c65995b8973316ee37db432a53257a1c5349115"
+    "version": "1.0.3",
+    "publishedAt": 1771651875966,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771516438833,
+      "commit": "https://github.com/openclaw/skills/commit/1c65995b8973316ee37db432a53257a1c5349115"
+    }
+  ]
 }

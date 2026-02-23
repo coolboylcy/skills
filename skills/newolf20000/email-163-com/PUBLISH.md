@@ -166,12 +166,25 @@ email-163-com/
 
 **发布日期**: 2026-02-19 23:55  
 **ClawHub 账号**: @newolf20000  
-**技能 ID**: k975bnvyyyhvsw71k0majm5bqd81eftd  
+**技能 ID**: k97dmx6h8tw9wbh8nw69031bfx81erag  
 **版本**: 1.0.1  
 **状态**: ✅ 已发布  
 **Changelog**: 修复华为等客户端标题 emoji 显示问题
 
 **ClawHub 页面**: https://clawhub.com/skills/email-163-com
+
+**发布命令**:
+```bash
+clawhub publish /home/wff/.openclaw/workspace/skills/email-163-com \
+  --slug email-163-com \
+  --version 1.0.1 \
+  --changelog "修复华为等客户端标题 emoji 显示问题"
+```
+
+**发布结果**:
+```
+✔ OK. Published email-163-com@1.0.1 (k97dmx6h8tw9wbh8nw69031bfx81erag)
+```
 
 ### v1.0.0 (初始版本)
 

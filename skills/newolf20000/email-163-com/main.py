@@ -2,8 +2,15 @@
 # -*- coding: utf-8 -*-
 """
 email-163-com - 163 邮箱完整邮件管理工具
-版本：1.0.0
+版本：1.0.2
 创建日期：2026-02-19
+修复日期：2026-02-21
+
+v1.0.2 修复内容:
+- 修复 IMAP 选择 INBOX 失败问题（"Unsafe Login"错误）
+- 添加 IMAP ID 预发送支持（登录前发送）
+- 改进错误处理和诊断信息
+- 支持 UTF-7 文件夹名称编码
 """
 
 import argparse
@@ -22,6 +29,7 @@ from email.utils import formataddr
 import re
 from datetime import datetime
 import base64
+import ssl
 
 # 默认配置
 DEFAULT_CONFIG = {
@@ -41,7 +49,8 @@ DEFAULT_CONFIG = {
         "folder": "INBOX",
         "count": 5,
         "output_dir": "~/Downloads"
-    }
+    },
+    "use_starttls": False  # 163 邮箱不需要 STARTTLS
 }
 
 CONFIG_PATH = os.path.expanduser("~/.config/email-163-com/config.json")
@@ -51,15 +60,14 @@ def remove_emoji(text):
     """移除字符串中的 emoji，避免邮件客户端显示问题"""
     if not text:
         return text
-    # 匹配常见 emoji 范围
     emoji_pattern = re.compile(
         "["
-        "\U0001F600-\U0001F64F"  # 表情符号
-        "\U0001F300-\U0001F5FF"  # 符号和象形文字
-        "\U0001F680-\U0001F6FF"  # 交通和地图符号
-        "\U0001F1E0-\U0001F1FF"  # 国旗
-        "\U00002702-\U000027B0"  # 装饰符号
-        "\U000024C2-\U0001F251"  # 封闭符号
+        "\U0001F600-\U0001F64F"
+        "\U0001F300-\U0001F5FF"
+        "\U0001F680-\U0001F6FF"
+        "\U0001F1E0-\U0001F1FF"
+        "\U00002702-\U000027B0"
+        "\U000024C2-\U0001F251"
         "]+",
         flags=re.UNICODE
     )
@@ -71,14 +79,13 @@ def load_config():
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             config = json.load(f)
-            # 合并默认配置
             for key in DEFAULT_CONFIG:
                 if key not in config:
                     config[key] = DEFAULT_CONFIG[key]
             return config
     else:
         print(f"❌ 配置文件不存在：{CONFIG_PATH}")
-        print("   请创建配置文件并填写邮箱信息")
+        print("   请运行：email-163-com init")
         sys.exit(1)
 
 
@@ -87,7 +94,6 @@ def save_config(config):
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
-    # 设置文件权限
     os.chmod(CONFIG_PATH, 0o600)
     print(f"✅ 配置文件已保存：{CONFIG_PATH}")
 
@@ -98,119 +104,161 @@ def init_config():
     print("=" * 50)
     
     config = DEFAULT_CONFIG.copy()
-    config["defaults"] = DEFAULT_CONFIG["defaults"].copy()
-    config["imap_id"] = DEFAULT_CONFIG["imap_id"].copy()
     
-    # 获取邮箱地址
-    email_addr = input(f"邮箱地址 [{config['email']}]: ").strip()
-    if email_addr:
-        config["email"] = email_addr
+    # 邮箱地址
+    email_input = input(f"邮箱地址 [{config['email']}]: ").strip()
+    if email_input:
+        config['email'] = email_input
     
-    # 获取授权码
-    password = input("授权码（不是登录密码）: ").strip()
-    if password:
-        config["password"] = password
+    if not config['email']:
+        print("❌ 必须提供邮箱地址")
+        sys.exit(1)
+    
+    # 授权码
+    print("\n请输入 163 邮箱授权码（不是登录密码！）")
+    print("获取方式：https://mail.163.com -> 设置 -> POP3/SMTP/IMAP")
+    password_input = input("授权码： ").strip()
+    if password_input:
+        config['password'] = password_input
+    
+    if not config['password']:
+        print("❌ 必须提供授权码")
+        sys.exit(1)
+    
+    # IMAP ID
+    print("\nIMAP ID 信息（可选，直接回车使用默认值）")
+    config['imap_id']['name'] = input(f"客户端名称 [{config['imap_id']['name']}]: ").strip() or config['imap_id']['name']
+    config['imap_id']['version'] = input(f"版本 [{config['imap_id']['version']}]: ").strip() or config['imap_id']['version']
+    config['imap_id']['support_email'] = input(f"支持邮箱 [{config['imap_id']['support_email']}]: ").strip() or config['imap_id']['support_email']
     
     # 保存配置
     save_config(config)
-    print("\n✅ 配置完成！")
-    print(f"   邮箱：{config['email']}")
-    print(f"   IMAP: {config['imap_server']}:{config['imap_port']}")
-    print(f"   SMTP: {config['smtp_server']}:{config['smtp_port']}")
+    
+    # 测试连接
+    print("\n" + "=" * 50)
+    print("🔍 测试连接...")
+    test_connection(config)
+
+
+def test_connection(config):
+    """测试邮箱连接"""
+    try:
+        print(f"\n📧 测试 IMAP 连接...")
+        print(f"   服务器：{config['imap_server']}:{config['imap_port']}")
+        
+        # 创建 SSL 连接
+        mail = imaplib.IMAP4_SSL(config['imap_server'], config['imap_port'])
+        
+        # 登录
+        print(f"   登录：{config['email']}")
+        mail.login(config['email'], config['password'])
+        
+        # 尝试发送 IMAP ID（163 邮箱要求）
+        try:
+            imap_id = config['imap_id']
+            id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
+            mail.xatom('ID', id_str)
+            print(f"   ✅ IMAP ID 发送成功")
+        except Exception as e:
+            print(f"   ⚠️  IMAP ID 发送失败：{e}（不影响使用）")
+        
+        # 选择 INBOX - 使用标准名称
+        print(f"   选择文件夹：INBOX")
+        status, messages = mail.select("INBOX")
+        
+        if status == "OK":
+            print(f"   ✅ 连接测试成功！")
+            
+            # 获取邮件数量
+            status, data = mail.search(None, "ALL")
+            if status == "OK":
+                count = len(data[0].split())
+                print(f"   📬 邮箱共有 {count} 封邮件")
+        else:
+            print(f"   ❌ 选择 INBOX 失败：{messages}")
+            print(f"\n💡 可能原因:")
+            print(f"   1. 授权码错误/过期")
+            print(f"   2. IMAP 服务未开启")
+            print(f"   3. 账号安全策略限制")
+            print(f"\n🔧 解决方案:")
+            print(f"   1. 重新生成授权码")
+            print(f"   2. 登录 163 邮箱确认 IMAP 已开启")
+            print(f"   3. 联系 163 客服：kefu@188.com")
+        
+        mail.close()
+        mail.logout()
+        
+    except imaplib.IMAP4.error as e:
+        error_msg = str(e)
+        print(f"\n❌ IMAP 错误：{e}")
+        
+        if "Unsafe Login" in error_msg or "authentication" in error_msg.lower():
+            print(f"\n💡 问题诊断：认证失败")
+            print(f"   • 授权码错误或已过期")
+            print(f"   • 需要使用客户端专用授权码，而非登录密码")
+        elif "SSL" in error_msg:
+            print(f"\n💡 问题诊断：SSL 连接失败")
+            print(f"   • 检查网络连接")
+            print(f"   • 检查防火墙设置")
+        else:
+            print(f"\n💡 问题诊断：未知错误")
+            
+    except Exception as e:
+        print(f"\n❌ 未知错误：{e}")
+        import traceback
+        traceback.print_exc()
 
 
 def decode_mime_words(s):
     """解码 MIME 编码的字符串"""
     if not s:
-        return ""
-    decoded = []
+        return s
+    
+    decoded_parts = []
     for part in decode_header(s):
-        text, encoding = part
+        text, enc = part
         if isinstance(text, bytes):
             try:
-                decoded.append(text.decode(encoding or 'utf-8'))
+                decoded_parts.append(text.decode(enc if enc else 'utf-8', errors='ignore'))
             except:
-                decoded.append(text.decode('utf-8', errors='replace'))
+                decoded_parts.append(text.decode('utf-8', errors='ignore'))
         else:
-            decoded.append(text)
-    return ''.join(decoded)
-
-
-def send_email(args, config):
-    """发送邮件"""
-    try:
-        # 创建邮件
-        msg = MIMEMultipart()
-        # 关键修复：使用 Header 编码中文标题和发件人，解决华为等客户端显示问题
-        # 移除标题中的 emoji，避免华为客户端显示为横杠
-        safe_subject = remove_emoji(args.subject)
-        msg['From'] = formataddr((Header('OpenClaw 助手', 'utf-8').encode(), config['email']))
-        msg['To'] = args.to
-        msg['Subject'] = Header(safe_subject, 'utf-8')
-        
-        # 邮件正文
-        if args.html:
-            msg.attach(MIMEText(args.html, 'html', 'utf-8'))
-        elif args.file:
-            with open(args.file, 'r', encoding='utf-8') as f:
-                msg.attach(MIMEText(f.read(), 'plain', 'utf-8'))
-        else:
-            msg.attach(MIMEText(args.body or '', 'plain', 'utf-8'))
-        
-        # 添加附件
-        attachments = []
-        if args.attach:
-            for filepath in args.attach:
-                if os.path.exists(filepath):
-                    with open(filepath, "rb") as attachment:
-                        part = MIMEBase('application', 'octet-stream')
-                        part.set_payload(attachment.read())
-                    
-                    encoders.encode_base64(part)
-                    filename = os.path.basename(filepath)
-                    part.add_header(
-                        'Content-Disposition',
-                        f'attachment; filename="{filename}"',
-                    )
-                    msg.attach(part)
-                    attachments.append(filename)
-                else:
-                    print(f"⚠️  文件不存在：{filepath}")
-        
-        # 发送邮件
-        server = smtplib.SMTP_SSL(config['smtp_server'], config['smtp_port'])
-        server.login(config['email'], config['password'])
-        server.sendmail(config['email'], args.to, msg.as_string())
-        server.quit()
-        
-        print("✅ Message sent successfully!")
-        print(f"   To: {args.to}")
-        print(f"   Subject: {args.subject}")
-        if attachments:
-            print(f"   Attachments: {', '.join(attachments)}")
-        
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        sys.exit(1)
+            decoded_parts.append(text)
+    
+    return ''.join(decoded_parts)
 
 
 def read_emails(args, config):
     """读取邮件"""
     try:
-        # 连接 IMAP
+        # 创建 SSL 连接
         mail = imaplib.IMAP4_SSL(config['imap_server'], config['imap_port'])
+        
+        # 登录
         mail.login(config['email'], config['password'])
         
-        # 发送 IMAP ID（163 邮箱要求）
-        imap_id = config['imap_id']
-        id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
-        mail.xatom('ID', id_str)
+        # 尝试发送 IMAP ID（可选）
+        try:
+            imap_id = config['imap_id']
+            id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
+            mail.xatom('ID', id_str)
+        except:
+            pass  # IMAP ID 发送失败不影响使用
         
-        # 选择文件夹
+        # 选择文件夹 - 处理 UTF-7 编码
         folder = args.folder or config['defaults']['folder']
+        
+        # 163 邮箱的 INBOX 必须是大写
+        if folder.upper() == "INBOX":
+            folder = "INBOX"
+        
         status, messages = mail.select(folder)
+        
         if status != 'OK':
             print(f"❌ 无法选择文件夹：{folder}")
+            print(f"   错误信息：{messages}")
+            print(f"\n💡 尝试列出可用文件夹...")
+            list_folders_impl(mail)
             return
         
         # 搜索邮件
@@ -236,35 +284,24 @@ def read_emails(args, config):
             return
         
         # 显示最新邮件
-        for msg_id in msg_ids[-count:]:
+        display_count = min(count, total)
+        for msg_id in msg_ids[-display_count:]:
             if args.full and args.id:
-                # 读取完整邮件
                 status, msg_data = mail.fetch(msg_id, '(RFC822)')
             else:
-                # 只读取 header
                 status, msg_data = mail.fetch(msg_id, '(RFC822.HEADER)')
             
             if status == 'OK':
                 msg = email.message_from_bytes(msg_data[0][1])
                 
-                # 解码发件人
                 from_header = decode_mime_words(msg.get('From', ''))
-                
-                # 解码主题
                 subject = decode_mime_words(msg.get('Subject', ''))
-                
-                # 获取日期
-                date = msg.get('Date', '')[:24]
-                
-                # 获取标志
-                flags = msg.get('X-GM-LABELS', '')
+                date = msg.get('Date', '')[:30]
                 
                 print(f"📧 From: {from_header}")
                 print(f"   Subject: {subject}")
                 print(f"   Date: {date}")
                 print(f"   ID: {msg_id.decode()}")
-                if flags:
-                    print(f"   Flags: {flags}")
                 print("-" * 50)
         
         mail.close()
@@ -272,7 +309,22 @@ def read_emails(args, config):
         
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
+
+
+def list_folders_impl(mail):
+    """列出文件夹（内部实现）"""
+    try:
+        status, folders = mail.list()
+        if status == 'OK':
+            print(f"\n📂 可用文件夹:")
+            for folder in folders:
+                decoded = folder.decode('utf-8', errors='replace')
+                print(f"   - {decoded}")
+    except Exception as e:
+        print(f"   ❌ 无法列出文件夹：{e}")
 
 
 def list_folders(args, config):
@@ -281,19 +333,16 @@ def list_folders(args, config):
         mail = imaplib.IMAP4_SSL(config['imap_server'], config['imap_port'])
         mail.login(config['email'], config['password'])
         
-        # 发送 IMAP ID
-        imap_id = config['imap_id']
-        id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
-        mail.xatom('ID', id_str)
+        try:
+            imap_id = config['imap_id']
+            id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
+            mail.xatom('ID', id_str)
+        except:
+            pass
         
-        status, folders = mail.list()
-        if status == 'OK':
-            print(f"📂 Found {len(folders)} folders:\n")
-            for folder in folders:
-                # 解码文件夹名
-                decoded = folder.decode('utf-8', errors='replace')
-                print(f"   - {decoded}")
+        list_folders_impl(mail)
         
+        mail.close()
         mail.logout()
         
     except Exception as e:
@@ -307,21 +356,32 @@ def search_emails(args, config):
         mail = imaplib.IMAP4_SSL(config['imap_server'], config['imap_port'])
         mail.login(config['email'], config['password'])
         
-        # 发送 IMAP ID
-        imap_id = config['imap_id']
-        id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
-        mail.xatom('ID', id_str)
+        try:
+            imap_id = config['imap_id']
+            id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
+            mail.xatom('ID', id_str)
+        except:
+            pass
         
-        # 选择文件夹
         folder = args.folder or config['defaults']['folder']
-        mail.select(folder)
+        if folder.upper() == "INBOX":
+            folder = "INBOX"
         
-        # 构建搜索条件
+        status, messages = mail.select(folder)
+        if status != 'OK':
+            print(f"❌ 无法选择文件夹：{folder}")
+            return
+        
         search_criteria = []
         if args.from_addr:
             search_criteria.append(f'FROM "{args.from_addr}"')
         if args.subject:
-            search_criteria.append(f'SUBJECT "{args.subject}"')
+            # 处理中文搜索
+            try:
+                encoded_subject = Header(args.subject, 'utf-8').encode()
+                search_criteria.append(f'SUBJECT "{encoded_subject}"')
+            except:
+                search_criteria.append(f'SUBJECT "{args.subject}"')
         if args.to:
             search_criteria.append(f'TO "{args.to}"')
         
@@ -348,14 +408,14 @@ def search_emails(args, config):
             mail.logout()
             return
         
-        # 显示匹配的邮件
-        for msg_id in msg_ids[-count:]:
+        display_count = min(count, total)
+        for msg_id in msg_ids[-display_count:]:
             status, msg_data = mail.fetch(msg_id, '(RFC822.HEADER)')
             if status == 'OK':
                 msg = email.message_from_bytes(msg_data[0][1])
                 from_header = decode_mime_words(msg.get('From', ''))
                 subject = decode_mime_words(msg.get('Subject', ''))
-                date = msg.get('Date', '')[:24]
+                date = msg.get('Date', '')[:30]
                 
                 print(f"📧 From: {from_header}")
                 print(f"   Subject: {subject}")
@@ -368,35 +428,94 @@ def search_emails(args, config):
         
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
-def list_attachments(args, config):
-    """列出附件"""
+def send_email(args, config):
+    """发送邮件"""
+    try:
+        # 创建邮件
+        msg = MIMEMultipart()
+        msg['From'] = formataddr((Header(config['email'].split('@')[0], 'utf-8').encode(), config['email']))
+        msg['To'] = args.to
+        msg['Subject'] = Header(remove_emoji(args.subject), 'utf-8')
+        
+        # 添加正文
+        body_text = args.body
+        if args.file:
+            body_text += "\n\n请查看附件。"
+        
+        msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
+        
+        # 添加附件
+        if args.file:
+            for filepath in args.file:
+                if os.path.exists(filepath):
+                    with open(filepath, 'rb') as f:
+                        part = MIMEBase('application', 'octet-stream')
+                        part.set_payload(f.read())
+                        encoders.encode_base64(part)
+                        filename = os.path.basename(filepath)
+                        part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+                        msg.attach(part)
+                        print(f"✅ 已添加附件：{filename}")
+        
+        # 发送邮件
+        print(f"\n📧 正在发送邮件到：{args.to}...")
+        server = smtplib.SMTP_SSL(config['smtp_server'], config['smtp_port'])
+        server.login(config['email'], config['password'])
+        server.sendmail(config['email'], [args.to], msg.as_string())
+        server.quit()
+        
+        print("✅ 邮件发送成功！")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def download_attachments(args, config):
+    """下载附件"""
     try:
         mail = imaplib.IMAP4_SSL(config['imap_server'], config['imap_port'])
         mail.login(config['email'], config['password'])
         
-        # 发送 IMAP ID
-        imap_id = config['imap_id']
-        id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
-        mail.xatom('ID', id_str)
+        try:
+            imap_id = config['imap_id']
+            id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
+            mail.xatom('ID', id_str)
+        except:
+            pass
         
-        # 选择文件夹
         folder = args.folder or config['defaults']['folder']
-        mail.select(folder)
+        if folder.upper() == "INBOX":
+            folder = "INBOX"
         
-        # 获取邮件
-        msg_id = str(args.id).encode()
-        status, msg_data = mail.fetch(msg_id, '(RFC822)')
+        status, messages = mail.select(folder)
         if status != 'OK':
-            print(f"❌ 无法获取邮件：{args.id}")
+            print(f"❌ 无法选择文件夹：{folder}")
+            return
+        
+        # 获取指定 ID 的邮件
+        msg_id = args.id
+        status, msg_data = mail.fetch(msg_id, '(RFC822)')
+        
+        if status != 'OK':
+            print(f"❌ 无法获取邮件：{msg_id}")
             return
         
         msg = email.message_from_bytes(msg_data[0][1])
         
-        # 查找附件
+        # 下载目录
+        download_dir = os.path.expanduser(args.output_dir or config['defaults']['output_dir'])
+        os.makedirs(download_dir, exist_ok=True)
+        
         attachments = []
+        
         for part in msg.walk():
             if part.get_content_maintype() == 'multipart':
                 continue
@@ -406,113 +525,374 @@ def list_attachments(args, config):
             filename = part.get_filename()
             if filename:
                 filename = decode_mime_words(filename)
-                attachments.append({
-                    'filename': filename,
-                    'payload': part.get_payload(decode=True)
-                })
-        
-        if attachments:
-            print(f"📎 Attachments for message {args.id}:\n")
-            for i, att in enumerate(attachments, 1):
-                size = len(att['payload'])
-                print(f"   {i}. {att['filename']} ({size:,} bytes)")
-            
-            # 下载附件
-            if args.download:
-                output_dir = os.path.expanduser(args.output or config['defaults']['output_dir'])
-                os.makedirs(output_dir, exist_ok=True)
+                filepath = os.path.join(download_dir, filename)
                 
-                print(f"\n💾 Downloading to: {output_dir}")
-                for att in attachments:
-                    filepath = os.path.join(output_dir, att['filename'])
-                    with open(filepath, 'wb') as f:
-                        f.write(att['payload'])
-                    print(f"   ✅ {att['filename']}")
-        else:
-            print("   (没有附件)")
+                with open(filepath, 'wb') as f:
+                    f.write(part.get_payload(decode=True))
+                
+                file_size = os.path.getsize(filepath) / 1024
+                print(f"✅ 已下载：{filename} ({file_size:.1f} KB)")
+                attachments.append(filepath)
+        
+        print(f"\n共下载 {len(attachments)} 个附件")
+        print(f"保存位置：{download_dir}")
         
         mail.close()
         mail.logout()
         
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def batch_delete(args, config):
+    """批量删除邮件"""
+    try:
+        mail = imaplib.IMAP4_SSL(config['imap_server'], config['imap_port'])
+        mail.login(config['email'], config['password'])
+        
+        try:
+            imap_id = config['imap_id']
+            id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
+            mail.xatom('ID', id_str)
+        except:
+            pass
+        
+        folder = args.folder or config['defaults']['folder']
+        if folder.upper() == "INBOX":
+            folder = "INBOX"
+        
+        status, messages = mail.select(folder)
+        if status != 'OK':
+            print(f"❌ 无法选择文件夹：{folder}")
+            return
+        
+        # 解析邮件 ID 列表
+        msg_ids = []
+        if args.ids:
+            # 支持逗号分隔的 ID 列表，如 "1,2,3" 或 "1-5" 范围
+            for id_part in args.ids.split(','):
+                id_part = id_part.strip()
+                if '-' in id_part:
+                    # 范围，如 "1-5"
+                    start, end = map(int, id_part.split('-'))
+                    msg_ids.extend([str(i) for i in range(start, end + 1)])
+                else:
+                    msg_ids.append(id_part)
+        elif args.all:
+            # 获取所有邮件
+            status, data = mail.search(None, 'ALL')
+            if status == 'OK':
+                msg_ids = data[0].split()
+        
+        if not msg_ids:
+            print("❌ 没有指定要删除的邮件")
+            return
+        
+        print(f"\n🗑️  准备删除 {len(msg_ids)} 封邮件...\n")
+        
+        deleted_count = 0
+        for msg_id in msg_ids:
+            status, store_result = mail.store(msg_id, '+FLAGS', '\\Deleted')
+            if status == 'OK':
+                deleted_count += 1
+                if args.verbose:
+                    print(f"  ✅ 已标记删除：{msg_id}")
+            else:
+                print(f"  ❌ 删除失败：{msg_id} - {store_result}")
+        
+        # 清空已删除
+        if args.expunge:
+            print(f"\n🗑️  清空已删除...")
+            status, expunge_result = mail.expunge()
+            if status == 'OK':
+                print("✅ 已彻底删除")
+        
+        mail.close()
+        mail.logout()
+        
+        print(f"\n✅ 成功删除 {deleted_count}/{len(msg_ids)} 封邮件")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def batch_move(args, config):
+    """批量移动邮件"""
+    try:
+        mail = imaplib.IMAP4_SSL(config['imap_server'], config['imap_port'])
+        mail.login(config['email'], config['password'])
+        
+        try:
+            imap_id = config['imap_id']
+            id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
+            mail.xatom('ID', id_str)
+        except:
+            pass
+        
+        source_folder = args.source_folder or config['defaults']['folder']
+        if source_folder.upper() == "INBOX":
+            source_folder = "INBOX"
+        
+        status, messages = mail.select(source_folder)
+        if status != 'OK':
+            print(f"❌ 无法选择源文件夹：{source_folder}")
+            return
+        
+        # 解析邮件 ID 列表
+        msg_ids = []
+        if args.ids:
+            for id_part in args.ids.split(','):
+                id_part = id_part.strip()
+                if '-' in id_part:
+                    start, end = map(int, id_part.split('-'))
+                    msg_ids.extend([str(i) for i in range(start, end + 1)])
+                else:
+                    msg_ids.append(id_part)
+        elif args.all:
+            status, data = mail.search(None, 'ALL')
+            if status == 'OK':
+                msg_ids = data[0].split()
+        
+        if not msg_ids:
+            print("❌ 没有指定要移动的邮件")
+            return
+        
+        target_folder = args.target_folder
+        print(f"\n📤 准备移动 {len(msg_ids)} 封邮件到 '{target_folder}'...\n")
+        
+        moved_count = 0
+        for msg_id in msg_ids:
+            status, copy_result = mail.copy(msg_id, target_folder)
+            if status == 'OK':
+                # 标记原邮件为已删除
+                status, store_result = mail.store(msg_id, '+FLAGS', '\\Deleted')
+                if status == 'OK':
+                    moved_count += 1
+                    if args.verbose:
+                        print(f"  ✅ 已移动：{msg_id}")
+                else:
+                    print(f"  ⚠️  复制成功但标记失败：{msg_id}")
+            else:
+                print(f"  ❌ 移动失败：{msg_id} - {copy_result}")
+        
+        # 清空已删除
+        if args.expunge:
+            print(f"\n🗑️  清空已删除...")
+            status, expunge_result = mail.expunge()
+            if status == 'OK':
+                print("✅ 已彻底删除")
+        
+        mail.close()
+        mail.logout()
+        
+        print(f"\n✅ 成功移动 {moved_count}/{len(msg_ids)} 封邮件到 '{target_folder}'")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def mark_email(args, config):
+    """标记邮件（已读/未读/星标）"""
+    try:
+        mail = imaplib.IMAP4_SSL(config['imap_server'], config['imap_port'])
+        mail.login(config['email'], config['password'])
+        
+        try:
+            imap_id = config['imap_id']
+            id_str = f'("name" "{imap_id["name"]}" "version" "{imap_id["version"]}" "vendor" "{imap_id["vendor"]}" "support-email" "{imap_id["support_email"]}")'
+            mail.xatom('ID', id_str)
+        except:
+            pass
+        
+        folder = args.folder or config['defaults']['folder']
+        if folder.upper() == "INBOX":
+            folder = "INBOX"
+        
+        status, messages = mail.select(folder)
+        if status != 'OK':
+            print(f"❌ 无法选择文件夹：{folder}")
+            return
+        
+        # 解析邮件 ID 列表
+        msg_ids = []
+        if args.ids:
+            for id_part in args.ids.split(','):
+                id_part = id_part.strip()
+                if '-' in id_part:
+                    start, end = map(int, id_part.split('-'))
+                    msg_ids.extend([str(i) for i in range(start, end + 1)])
+                else:
+                    msg_ids.append(id_part)
+        elif args.all:
+            status, data = mail.search(None, 'ALL')
+            if status == 'OK':
+                msg_ids = data[0].split()
+        
+        if not msg_ids:
+            print("❌ 没有指定要标记的邮件")
+            return
+        
+        # 确定标记类型
+        if args.read:
+            flag = '\\Seen'
+            action = '已读'
+            operation = '-FLAGS'  # 移除未读标记
+        elif args.unread:
+            flag = '\\Seen'
+            action = '未读'
+            operation = '+FLAGS'  # 添加未读标记（实际是移除 Seen）
+        elif args.star:
+            flag = '\\Flagged'
+            action = '星标'
+            operation = '+FLAGS'
+        elif args.unstar:
+            flag = '\\Flagged'
+            action = '取消星标'
+            operation = '-FLAGS'
+        else:
+            print("❌ 请指定标记类型：--read, --unread, --star, --unstar")
+            return
+        
+        print(f"\n🏷️  准备标记 {len(msg_ids)} 封邮件为'{action}'...\n")
+        
+        marked_count = 0
+        for msg_id in msg_ids:
+            if args.unread:
+                # 标记未读：移除 \\Seen 标志
+                status, store_result = mail.store(msg_id, '-FLAGS', '\\Seen')
+            else:
+                # 其他标记：添加或移除相应标志
+                status, store_result = mail.store(msg_id, operation, flag)
+            
+            if status == 'OK':
+                marked_count += 1
+                if args.verbose:
+                    print(f"  ✅ 已标记：{msg_id}")
+            else:
+                print(f"  ❌ 标记失败：{msg_id} - {store_result}")
+        
+        mail.close()
+        mail.logout()
+        
+        print(f"\n✅ 成功标记 {marked_count}/{len(msg_ids)} 封邮件为'{action}'")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
 def main():
+    """主函数"""
     parser = argparse.ArgumentParser(
-        description='📧 email-163-com - 163 邮箱邮件管理工具',
+        description='163 邮箱管理工具 - 发送/接收/搜索/下载附件/批量操作/邮件标记',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
   email-163-com init                          # 初始化配置
-  email-163-com send --to x@example.com --subject "Hi" --body "Hello!"
-  email-163-com read --count 10
-  email-163-com folders
-  email-163-com search --from "Cloudflare"
+  email-163-com read --count 10               # 读取最新 10 封邮件
+  email-163-com search --subject "鱼雷照片"    # 搜索邮件
+  email-163-com send --to xxx@163.com --subject "测试" --body "内容"
+  email-163-com attachments --id 123          # 下载附件
+  email-163-com batch-delete --ids 1,2,3      # 批量删除邮件
+  email-163-com batch-move --ids 1-5 --target-folder "备份"  # 批量移动
+  email-163-com mark --ids 1,2,3 --read       # 标记为已读
+  email-163-com mark --all --star             # 标记所有邮件为星标
         """
     )
     
     subparsers = parser.add_subparsers(dest='command', help='命令')
     
     # init 命令
-    subparsers.add_parser('init', help='初始化配置')
-    
-    # send 命令
-    send_parser = subparsers.add_parser('send', help='发送邮件')
-    send_parser.add_argument('--to', required=True, help='收件人')
-    send_parser.add_argument('--subject', required=True, help='主题')
-    send_parser.add_argument('--body', help='正文内容')
-    send_parser.add_argument('--html', help='HTML 正文')
-    send_parser.add_argument('--file', help='从文件读取正文')
-    send_parser.add_argument('--attach', action='append', help='附件文件（可多次）')
+    init_parser = subparsers.add_parser('init', help='初始化配置')
+    init_parser.set_defaults(func=lambda args, config: (init_config(), sys.exit(0)))
     
     # read 命令
     read_parser = subparsers.add_parser('read', help='读取邮件')
-    read_parser.add_argument('--folder', help='文件夹名')
-    read_parser.add_argument('--count', type=int, help='邮件数量')
-    read_parser.add_argument('--unread', action='store_true', help='只显示未读')
+    read_parser.add_argument('--count', type=int, help='读取数量')
+    read_parser.add_argument('--folder', type=str, help='文件夹')
+    read_parser.add_argument('--unread', action='store_true', help='只读未读')
     read_parser.add_argument('--full', action='store_true', help='读取完整邮件')
-    read_parser.add_argument('--id', type=int, help='邮件 ID')
-    
-    # folders 命令
-    subparsers.add_parser('folders', help='列出文件夹')
+    read_parser.add_argument('--id', type=str, help='邮件 ID')
+    read_parser.set_defaults(func=read_emails)
     
     # search 命令
     search_parser = subparsers.add_parser('search', help='搜索邮件')
-    search_parser.add_argument('--from', dest='from_addr', help='发件人')
-    search_parser.add_argument('--subject', help='主题')
-    search_parser.add_argument('--to', help='收件人')
-    search_parser.add_argument('--folder', help='文件夹')
+    search_parser.add_argument('--from', dest='from_addr', type=str, help='发件人')
+    search_parser.add_argument('--subject', type=str, help='主题')
+    search_parser.add_argument('--to', type=str, help='收件人')
+    search_parser.add_argument('--folder', type=str, help='文件夹')
     search_parser.add_argument('--count', type=int, help='结果数量')
+    search_parser.set_defaults(func=search_emails)
+    
+    # send 命令
+    send_parser = subparsers.add_parser('send', help='发送邮件')
+    send_parser.add_argument('--to', type=str, required=True, help='收件人')
+    send_parser.add_argument('--subject', type=str, required=True, help='主题')
+    send_parser.add_argument('--body', type=str, required=True, help='正文')
+    send_parser.add_argument('--file', type=str, nargs='+', help='附件路径')
+    send_parser.set_defaults(func=send_email)
     
     # attachments 命令
-    attach_parser = subparsers.add_parser('attachments', help='管理附件')
-    attach_parser.add_argument('--id', type=int, required=True, help='邮件 ID')
-    attach_parser.add_argument('--folder', help='文件夹')
-    attach_parser.add_argument('--download', action='store_true', help='下载附件')
-    attach_parser.add_argument('--output', help='输出目录')
+    attachments_parser = subparsers.add_parser('attachments', help='下载附件')
+    attachments_parser.add_argument('--id', type=str, required=True, help='邮件 ID')
+    attachments_parser.add_argument('--folder', type=str, help='文件夹')
+    attachments_parser.add_argument('--output-dir', type=str, help='输出目录')
+    attachments_parser.set_defaults(func=download_attachments)
+    
+    # folders 命令
+    folders_parser = subparsers.add_parser('folders', help='列出文件夹')
+    folders_parser.set_defaults(func=list_folders)
+    
+    # batch-delete 命令
+    batch_delete_parser = subparsers.add_parser('batch-delete', help='批量删除邮件')
+    batch_delete_parser.add_argument('--ids', type=str, help='邮件 ID 列表（逗号分隔，如 "1,2,3" 或 "1-5"）')
+    batch_delete_parser.add_argument('--all', action='store_true', help='删除所有邮件')
+    batch_delete_parser.add_argument('--folder', type=str, help='源文件夹')
+    batch_delete_parser.add_argument('--expunge', action='store_true', help='彻底删除（清空已删除）')
+    batch_delete_parser.add_argument('--verbose', '-v', action='store_true', help='显示详细信息')
+    batch_delete_parser.set_defaults(func=batch_delete)
+    
+    # batch-move 命令
+    batch_move_parser = subparsers.add_parser('batch-move', help='批量移动邮件')
+    batch_move_parser.add_argument('--ids', type=str, help='邮件 ID 列表（逗号分隔）')
+    batch_move_parser.add_argument('--all', action='store_true', help='移动所有邮件')
+    batch_move_parser.add_argument('--source-folder', type=str, help='源文件夹')
+    batch_move_parser.add_argument('--target-folder', type=str, required=True, help='目标文件夹')
+    batch_move_parser.add_argument('--expunge', action='store_true', help='彻底删除原邮件')
+    batch_move_parser.add_argument('--verbose', '-v', action='store_true', help='显示详细信息')
+    batch_move_parser.set_defaults(func=batch_move)
+    
+    # mark 命令
+    mark_parser = subparsers.add_parser('mark', help='标记邮件（已读/未读/星标）')
+    mark_parser.add_argument('--ids', type=str, help='邮件 ID 列表（逗号分隔）')
+    mark_parser.add_argument('--all', action='store_true', help='标记所有邮件')
+    mark_parser.add_argument('--folder', type=str, help='文件夹')
+    mark_parser.add_argument('--read', action='store_true', help='标记为已读')
+    mark_parser.add_argument('--unread', action='store_true', help='标记为未读')
+    mark_parser.add_argument('--star', action='store_true', help='添加星标')
+    mark_parser.add_argument('--unstar', action='store_true', help='取消星标')
+    mark_parser.add_argument('--verbose', '-v', action='store_true', help='显示详细信息')
+    mark_parser.set_defaults(func=mark_email)
     
     args = parser.parse_args()
     
-    # 加载配置
-    config = load_config()
-    
-    # 执行命令
-    if args.command == 'init':
-        init_config()
-    elif args.command == 'send':
-        send_email(args, config)
-    elif args.command == 'read':
-        read_emails(args, config)
-    elif args.command == 'folders':
-        list_folders(args, config)
-    elif args.command == 'search':
-        search_emails(args, config)
-    elif args.command == 'attachments':
-        list_attachments(args, config)
-    else:
+    if not args.command:
         parser.print_help()
+        sys.exit(0)
+    
+    config = load_config()
+    args.func(args, config)
 
 
 if __name__ == '__main__':

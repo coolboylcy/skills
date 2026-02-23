@@ -1,7 +1,7 @@
 {
   "name": "email-163-com",
-  "version": "1.0.1",
-  "description": "163 邮箱完整邮件管理工具 - 发送/接收/搜索/管理邮件，支持 IMAP ID 认证和附件（修复华为客户端标题显示问题）",
+  "version": "1.0.3",
+  "description": "163 邮箱完整邮件管理工具 - 发送/接收/搜索/管理邮件，支持 IMAP ID 认证、附件、批量操作和邮件标记（新增批量删除/移动、已读/未读/星标功能）",
   "author": "OpenClaw",
   "license": "MIT",
   "keywords": [
