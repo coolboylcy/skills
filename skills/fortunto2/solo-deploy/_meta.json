@@ -3,9 +3,15 @@
   "slug": "solo-deploy",
   "displayName": "Deploy",
   "latest": {
-    "version": "1.2.0",
-    "publishedAt": 1771616105232,
-    "commit": "https://github.com/openclaw/skills/commit/a28713d184e1c92cb44f4141cf2bfb7ad8aca632"
+    "version": "1.2.1",
+    "publishedAt": 1771711574598,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.2.0",
+      "publishedAt": 1771616105232,
+      "commit": "https://github.com/openclaw/skills/commit/a28713d184e1c92cb44f4141cf2bfb7ad8aca632"
+    }
+  ]
 }
