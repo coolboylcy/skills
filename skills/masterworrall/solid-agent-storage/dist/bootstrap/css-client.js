@@ -126,13 +126,15 @@ export async function deleteAccount(serverUrl, cookie) {
     if (controls.password?.create) {
         await deleteAllResources(controls.password.create, cookie);
     }
-    // 5. Logout to invalidate the session
-    if (controls.account?.logout) {
-        await fetch(controls.account.logout, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json', cookie },
-            body: '{}',
+    // 5. Delete the account itself
+    if (controls.account?.account) {
+        const res = await fetch(controls.account.account, {
+            method: 'DELETE',
+            headers: { cookie },
         });
+        if (!res.ok) {
+            throw new Error(`Failed to delete account: ${res.status} ${await res.text()}`);
+        }
     }
 }
 /**

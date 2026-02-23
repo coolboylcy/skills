@@ -1,10 +1,31 @@
 ---
 name: solid-agent-storage
 description: Give your AI agent persistent identity (WebID) and personal data storage (Pod) using the Solid Protocol
-version: 0.3.0
+version: 0.3.6
 author: Interition
 license: Apache-2.0
-metadata: {"requires": {"bins": ["node", "curl"], "env": ["INTERITION_PASSPHRASE"], "optionalEnv": ["SOLID_SERVER_URL"]}, "categories": ["storage", "identity", "data"], "homepage": "https://github.com/masterworrall/agent-interition"}
+metadata:
+  openclaw:
+    requires:
+      env:
+        - INTERITION_PASSPHRASE
+        - SOLID_SERVER_URL
+      bins:
+        - node
+        - curl
+        - jq
+      config:
+        - ~/.interition/agents/
+    primaryEnv: INTERITION_PASSPHRASE
+    install:
+      - kind: brew
+        formula: jq
+        bins: [jq]
+    categories:
+      - storage
+      - identity
+      - data
+    homepage: https://github.com/masterworrall/agent-interition
 ---
 
 # Solid Agent Storage
@@ -20,23 +41,51 @@ This Skill gives you a **Solid Pod** — a personal data store with a **WebID** 
 
 ## Setup
 
-Before using any commands, set the `INTERITION_PASSPHRASE` environment variable — this is used to encrypt stored credentials. Use a strong passphrase and keep it secret.
+Before using any commands, set the `INTERITION_PASSPHRASE` environment variable. This passphrase encrypts the Solid server credentials stored on your device (under `~/.interition/agents/`), protecting them at rest in your OpenClaw environment. Use a strong passphrase and keep it secret.
 
-That's it. By default, the Skill connects to `https://crawlout.io`, Interition's hosted Solid server. No server setup required.
+### Running your own Solid server (recommended)
 
-### Using your own Solid server
+For full control, run your own [Community Solid Server](https://github.com/CommunitySolidServer/CommunitySolidServer) (CSS). The CSS is open-source software maintained by the [Open Data Institute](https://www.theodi.org/).
 
-If you prefer to run your own [Community Solid Server](https://github.com/CommunitySolidServer/CommunitySolidServer), set `SOLID_SERVER_URL` to its URL:
+Set `SOLID_SERVER_URL` to your server's URL:
 
 ```bash
 export SOLID_SERVER_URL="http://localhost:3000"
 ```
 
-See the [source repository](https://github.com/masterworrall/agent-interition) for Docker setup instructions. **Only point this at a server you control and trust** — the Skill will exchange credentials with it.
+See the [source repository](https://github.com/masterworrall/agent-interition) for a hardened Docker configuration you can use as a starting point.
+
+### Using a shared Solid server (for multi-agent collaboration)
+
+If your agents need to collaborate with other agents using the Solid Protocol, they need to share the same Solid server. Two public CSS instances are available:
+
+- **https://solidcommunity.net** — operated by the [Open Data Institute](https://www.theodi.org/)
+- **https://crawlout.io** — operated by [Interition](https://interition.net), the provider of this Skill
+
+To use a shared server, set `SOLID_SERVER_URL`:
+
+```bash
+export SOLID_SERVER_URL="https://crawlout.io"
+```
+
+If `SOLID_SERVER_URL` is not set, the Skill defaults to `https://crawlout.io`.
+
+## How Credentials Work
+
+The Solid server issues credentials to prevent anyone other than your agent from accessing its services and data. This is the same trust model as any remote service that requires users to identify themselves and prove they are authorised. When you provision an agent:
+
+1. The CSS **creates** an account, WebID, and Pod for your agent
+2. The CSS **issues** client credentials (ID and secret) that your agent uses to authenticate
+3. Your agent uses those credentials to obtain **time-limited Bearer tokens** for reading and writing data
+4. The CSS **enforces access control** (WAC) on every request — only authorised agents can access protected resources
+
+`INTERITION_PASSPHRASE` is **not** a server credential. It seeds the encryption (AES-256-GCM) of the server-issued credentials stored locally on your device (under `~/.interition/agents/` with `0600` permissions), making them less vulnerable in your OpenClaw environment. The server never sees your passphrase.
 
 ## How It Works
 
 This Skill provides **three management scripts** for CSS-specific operations (provisioning, deprovisioning, status) plus a **token helper** for authentication. All standard Solid operations (read, write, delete, share) are done with **curl and a Bearer token** — your Pod is a standard W3C Solid server.
+
+For broader guidance on using Solid servers and the wider Solid ecosystem, refer to [solidproject.org](https://solidproject.org). The full protocol specification is at [Solid Protocol (W3C)](https://solidproject.org/TR/protocol).
 
 ### Two-Step Workflow
 
@@ -47,7 +96,7 @@ scripts/get-token.sh --agent <name>
 
 Output:
 ```json
-{"token": "eyJhbG...", "expiresIn": 600, "serverUrl": "https://crawlout.io", "podUrl": "https://crawlout.io/researcher/", "webId": "https://crawlout.io/researcher/profile/card#me"}
+{"token": "eyJhbG...", "expiresIn": 600, "serverUrl": "https://crawlout.io", "podUrl": "https://crawlout.io/example-agent/", "webId": "https://crawlout.io/example-agent/profile/card#me"}
 ```
 
 **Step 2:** Use curl with `Authorization: Bearer $TOKEN` for any Solid operation.
@@ -60,7 +109,7 @@ Tokens last **600 seconds** (10 minutes). If more than **8 minutes** have elapse
 
 Extract token and URLs:
 ```bash
-TOKEN_JSON=$(scripts/get-token.sh --agent researcher)
+TOKEN_JSON=$(scripts/get-token.sh --agent example-agent)
 TOKEN=$(echo "$TOKEN_JSON" | jq -r '.token')
 POD_URL=$(echo "$TOKEN_JSON" | jq -r '.podUrl')
 ```
@@ -101,12 +150,12 @@ scripts/provision.sh --name <agent-name> [--displayName <display-name>]
 
 **Example:**
 ```bash
-scripts/provision.sh --name researcher --displayName "Research Assistant"
+scripts/provision.sh --name example-agent --displayName "Example Agent"
 ```
 
 **Output:**
 ```json
-{"status": "ok", "agent": "researcher", "webId": "https://crawlout.io/researcher/profile/card#me", "podUrl": "https://crawlout.io/researcher/"}
+{"status": "ok", "agent": "example-agent", "webId": "https://crawlout.io/example-agent/profile/card#me", "podUrl": "https://crawlout.io/example-agent/"}
 ```
 
 ### Deprovision Identity and Storage
@@ -119,17 +168,17 @@ scripts/deprovision.sh --name <agent-name>
 
 **Example:**
 ```bash
-scripts/deprovision.sh --name researcher
+scripts/deprovision.sh --name example-agent
 ```
 
 **Output (success):**
 ```json
-{"status": "ok", "agent": "researcher", "accountDeleted": true, "credentialsDeleted": true}
+{"status": "ok", "agent": "example-agent", "accountDeleted": true, "credentialsDeleted": true}
 ```
 
 **Output (partial — e.g. server unreachable):**
 ```json
-{"status": "partial", "agent": "researcher", "accountDeleted": false, "credentialsDeleted": true, "warnings": ["Could not delete CSS account: ..."]}
+{"status": "partial", "agent": "example-agent", "accountDeleted": false, "credentialsDeleted": true, "warnings": ["Could not delete CSS account: ..."]}
 ```
 
 - `status: "ok"` — CSS account fully dismantled and local files deleted
