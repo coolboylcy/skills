@@ -3,7 +3,7 @@ name: binance-watchlist
 version: 1.0.0
 description: Scan a full Binance spot watchlist using multi-indicator TA scoring. Returns ranked trading opportunities sorted by signal strength. No API key required (uses public data). Use for Binance scanning, watchlist screening, signal ranking, or finding the best trade setup right now.
 author: JamieRossouw
-tags: [binance,trading,watchlist,scanner,crypto,technical-analysis,signals]
+tags: [binance, watchlist, crypto, trading, ta, signals, scanner]
 ---
 # Binance Watchlist Scanner
 
