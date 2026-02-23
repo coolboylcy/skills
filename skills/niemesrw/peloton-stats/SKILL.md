@@ -2,6 +2,16 @@
 name: peloton-stats
 description: Fetch and report Peloton cycling workout statistics. Use when the user wants to see their Peloton workout data, weekly cycling stats, ride history, or performance metrics. Hits the Peloton API directly (no dependencies) to pull total rides, duration, calories, output/power, and instructor data for cycling workouts.
 user-invocable: true
+metadata:
+  openclaw:
+    requires:
+      env:
+        - PELOTON_USERNAME
+        - PELOTON_PASSWORD
+      config:
+        - ~/.openclaw/agents/main/agent/auth-profiles.json
+    primaryEnv: PELOTON_USERNAME
+    emoji: "🚴"
 ---
 
 # Peloton Stats
@@ -10,14 +20,29 @@ Fetch weekly cycling stats directly from the Peloton API. Zero dependencies — 
 
 ## Setup
 
-Set your Peloton credentials as environment variables:
+Store your Peloton credentials securely using OpenClaw's credential manager:
 
 ```bash
-export PELOTON_USERNAME="your-email@example.com"
-export PELOTON_PASSWORD="your-password"
+openclaw config set auth.profiles.peloton:default.type api_key
+openclaw config set auth.profiles.peloton:default.provider peloton
+openclaw config set auth.profiles.peloton:default.username "your-email@example.com"
+openclaw config set auth.profiles.peloton:default.password "your-password"
 ```
 
-Add to your shell profile (`~/.zshrc`, `~/.bashrc`) to persist across sessions.
+Or edit `~/.openclaw/agents/main/agent/auth-profiles.json` directly:
+
+```json
+{
+  "profiles": {
+    "peloton:default": {
+      "type": "api_key",
+      "provider": "peloton",
+      "username": "your-email@example.com",
+      "password": "your-password"
+    }
+  }
+}
+```
 
 ## Usage
 

@@ -175,14 +175,49 @@ def print_weekly_report(stats: dict):
     print()
 
 
-def main():
-    """Main entry point."""
+def load_credentials() -> tuple[str, str]:
+    """Load Peloton credentials from OpenClaw auth-profiles.json or environment variables."""
+    # Try environment variables first (backward compatibility)
     username = os.environ.get("PELOTON_USERNAME")
     password = os.environ.get("PELOTON_PASSWORD")
+    
+    if username and password:
+        return username, password
+    
+    # Try OpenClaw auth-profiles.json
+    auth_path = os.path.expanduser("~/.openclaw/agents/main/agent/auth-profiles.json")
+    if os.path.exists(auth_path):
+        try:
+            with open(auth_path) as f:
+                auth_data = json.load(f)
+            
+            profile = auth_data.get("profiles", {}).get("peloton:default", {})
+            username = profile.get("username")
+            password = profile.get("password")
+            
+            if username and password:
+                return username, password
+        except Exception as e:
+            print(f"Warning: Failed to load credentials from auth-profiles.json: {e}", file=sys.stderr)
+    
+    return None, None
+
+
+def main():
+    """Main entry point."""
+    username, password = load_credentials()
 
     if not username or not password:
-        print("Error: PELOTON_USERNAME and PELOTON_PASSWORD environment variables required")
-        print("\nSet them with:")
+        print("Error: Peloton credentials not found")
+        print("\nOption 1: Use OpenClaw credential manager (recommended):")
+        print("  Edit ~/.openclaw/agents/main/agent/auth-profiles.json and add:")
+        print('  "peloton:default": {')
+        print('    "type": "api_key",')
+        print('    "provider": "peloton",')
+        print('    "username": "your-email@example.com",')
+        print('    "password": "your-password"')
+        print('  }')
+        print("\nOption 2: Use environment variables:")
         print("  export PELOTON_USERNAME='your-email@example.com'")
         print("  export PELOTON_PASSWORD='your-password'")
         sys.exit(1)
