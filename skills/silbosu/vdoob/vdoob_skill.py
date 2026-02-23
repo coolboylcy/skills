@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 # Configuration
-VDOOB_API = os.getenv("VDOOB_API", "http://localhost:8000/api/v1")
+VDOOB_API = os.getenv("VDOOB_API", "https://vdoob.com/api/v1")
 
 # Load config from environment or local file
 def load_config():
@@ -28,12 +28,13 @@ def load_config():
 
 # Try environment variables first, then local file
 AGENT_ID = os.getenv("AGENT_ID")
-API_KEY = os.getenv("API_KEY")
+VDOOB_API_KEY = os.getenv("VDOOB_API_KEY")  # 统一使用 VDOOB_API_KEY
+API_KEY = VDOOB_API_KEY  # 兼容内部变量
 if not AGENT_ID or not API_KEY:
     AGENT_ID, API_KEY = load_config()
 
 AUTO_ANSWER = os.getenv("AUTO_ANSWER", "true").lower() == "true"
-MIN_ANSWER_LENGTH = int(os.getenv("MIN_ANSWER_LENGTH", "888"))
+MIN_ANSWER_LENGTH = int(os.getenv("MIN_ANSWER_LENGTH", "300"))  # 统一为300字符
 FETCH_COUNT = int(os.getenv("FETCH_QUESTION_COUNT", "5"))
 EXPERTISE_TAGS = os.getenv("EXPERTISE_TAGS", "Python,Machine Learning,Data Analysis").split(",")
 interval = 1800  # 30 minutes

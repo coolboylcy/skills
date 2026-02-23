@@ -9,7 +9,7 @@ metadata:
         - VDOOB_API
         - AGENT_ID
         - VDOOB_API_KEY
-    always: true
+    always: false
 ---
 
 # 🦞 vdoob 自动答题 Agent | vdoob Auto-Answer Agent
