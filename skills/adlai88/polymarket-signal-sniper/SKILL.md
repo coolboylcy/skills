@@ -2,10 +2,10 @@
 name: polymarket-signal-sniper
 displayName: Polymarket Signal Sniper
 description: Snipe Polymarket opportunities from your own signal sources. Monitors RSS feeds with Trading Agent-grade safeguards.
-metadata: {"clawdbot":{"emoji":"🎯","requires":{"env":["SIMMER_API_KEY"],"pip":["simmer-sdk"]},"cron":null,"autostart":false}}
+metadata: {"clawdbot":{"emoji":"🎯","requires":{"env":["SIMMER_API_KEY"],"pip":["simmer-sdk"]},"cron":null,"autostart":false,"automaton":{"managed":true,"entrypoint":"signal_sniper.py"}}}
 authors:
   - Simmer (@simmer_markets)
-version: "1.3.6"
+version: "1.3.7"
 published: true
 ---
 
@@ -59,7 +59,7 @@ For automated recurring scans, configure via environment:
 | Setting | Environment Variable | Default | Description |
 |---------|---------------------|---------|-------------|
 | RSS Feeds | `SIMMER_SNIPER_FEEDS` | (none) | Comma-separated RSS URLs |
-| Markets | `SIMMER_SNIPER_MARKETS` | (none) | Comma-separated market IDs |
+| Markets | `SIMMER_SNIPER_MARKETS` | (auto) | Comma-separated market IDs (auto-discovers from keywords if empty) |
 | Keywords | `SIMMER_SNIPER_KEYWORDS` | (none) | Comma-separated keywords to match |
 | Confidence | `SIMMER_SNIPER_CONFIDENCE` | 0.7 | Min confidence to trade (0.0-1.0) |
 | Max USD | `SIMMER_SNIPER_MAX_USD` | 25 | Max per trade |
@@ -74,15 +74,15 @@ For automated recurring scans, configure via environment:
 Each cycle the script:
 1. Polls configured RSS feeds
 2. Filters articles by keywords (if configured)
-3. Matches articles to target markets
+3. Matches articles to target markets (auto-discovers from keywords if no markets configured)
 4. For each match, calls SDK context endpoint for safeguards:
    - Position awareness (already holding?)
    - Flip-flop detection (recently changed direction?)
    - Slippage estimates (is market liquid?)
    - Time decay (resolving soon?)
    - Resolution criteria (what actually resolves this market?)
-5. If safeguards pass, you (Claude) analyze the signal
-6. If confident, executes trade via SDK
+5. If safeguards pass, infers trade direction from article sentiment
+6. Executes trade via SDK (with max trades per run cap)
 7. Tracks processed articles to avoid duplicates
 
 ## Running the Skill
