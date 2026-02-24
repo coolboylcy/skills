@@ -69,6 +69,7 @@ CONFIG_SCHEMA = {
 }
 
 TRADE_SOURCE = "sdk:fastloop"
+_automaton_reported = False
 SMART_SIZING_PCT = 0.05  # 5% of balance per trade
 MIN_SHARES_PER_ORDER = 5  # Polymarket minimum
 
@@ -144,6 +145,9 @@ cfg = _load_config(CONFIG_SCHEMA, __file__)
 ENTRY_THRESHOLD = cfg["entry_threshold"]
 MIN_MOMENTUM_PCT = cfg["min_momentum_pct"]
 MAX_POSITION_USD = cfg["max_position"]
+_automaton_max = os.environ.get("AUTOMATON_MAX_BET")
+if _automaton_max:
+    MAX_POSITION_USD = min(MAX_POSITION_USD, float(_automaton_max))
 SIGNAL_SOURCE = cfg["signal_source"]
 LOOKBACK_MINUTES = cfg["lookback_minutes"]
 MIN_TIME_REMAINING = cfg["min_time_remaining"]
@@ -190,7 +194,7 @@ def _save_daily_spend(skill_file, spend_data):
 
 _client = None
 
-def get_client():
+def get_client(live=True):
     """Lazy-init SimmerClient singleton."""
     global _client
     if _client is None:
@@ -204,7 +208,8 @@ def get_client():
             print("Error: SIMMER_API_KEY environment variable not set")
             print("Get your API key from: simmer.markets/dashboard → SDK tab")
             sys.exit(1)
-        _client = SimmerClient(api_key=api_key, venue="polymarket")
+        venue = os.environ.get("TRADING_VENUE", "polymarket")
+        _client = SimmerClient(api_key=api_key, venue=venue, live=live)
     return _client
 
 
@@ -478,6 +483,7 @@ def execute_trade(market_id, side, amount):
             "shares_bought": result.shares_bought,
             "shares": result.shares_bought,
             "error": result.error,
+            "simulated": result.simulated,
         }
     except Exception as e:
         return {"error": str(e)}
@@ -514,7 +520,7 @@ def run_fast_market_strategy(dry_run=True, positions_only=False, show_config=Fal
     log("=" * 50)
 
     if dry_run:
-        log("\n  [DRY RUN] No trades will be executed. Use --live to enable trading.")
+        log("\n  [PAPER MODE] Trades will be simulated with real prices. Use --live for real trades.")
 
     log(f"\n⚙️  Configuration:")
     log(f"  Asset:            {ASSET}")
@@ -538,8 +544,8 @@ def run_fast_market_strategy(dry_run=True, positions_only=False, show_config=Fal
         log(f'    Or edit config.json directly')
         return
 
-    # Initialize client early to validate API key
-    get_client()
+    # Initialize client early to validate API key (paper mode when not live)
+    get_client(live=not dry_run)
 
     # Show positions if requested
     if positions_only:
@@ -618,6 +624,16 @@ def run_fast_market_strategy(dry_run=True, positions_only=False, show_config=Fal
 
     momentum_pct = abs(momentum["momentum_pct"])
     direction = momentum["direction"]
+    skip_reasons = []
+
+    def _emit_skip_report(signals=1, attempted=0):
+        """Emit automaton JSON with skip_reason before early return."""
+        global _automaton_reported
+        if os.environ.get("AUTOMATON_MANAGED") and skip_reasons:
+            report = {"signals": signals, "trades_attempted": attempted, "trades_executed": 0,
+                      "skip_reason": ", ".join(dict.fromkeys(skip_reasons))}
+            print(json.dumps({"automaton": report}))
+            _automaton_reported = True
 
     # Check minimum momentum
     if momentum_pct < MIN_MOMENTUM_PCT:
@@ -643,6 +659,8 @@ def run_fast_market_strategy(dry_run=True, positions_only=False, show_config=Fal
         log(f"  ⏸️  Low volume ({momentum['volume_ratio']:.2f}x avg) — weak signal, skip")
         if not quiet:
             print(f"📊 Summary: No trade (low volume)")
+        skip_reasons.append("low volume")
+        _emit_skip_report()
         return
     elif VOLUME_CONFIDENCE and momentum["volume_ratio"] > 2.0:
         vol_note = f" 📊 (high volume: {momentum['volume_ratio']:.1f}x avg)"
@@ -652,6 +670,8 @@ def run_fast_market_strategy(dry_run=True, positions_only=False, show_config=Fal
         log(f"  ⏸️  Market already priced in: divergence {divergence:.3f} ≤ 0 — skip")
         if not quiet:
             print(f"📊 Summary: No trade (market already priced in)")
+        skip_reasons.append("market already priced in")
+        _emit_skip_report()
         return
 
     # Fee-aware EV check: require enough divergence to cover fees
@@ -666,6 +686,8 @@ def run_fast_market_strategy(dry_run=True, positions_only=False, show_config=Fal
             log(f"  ⏸️  Divergence {divergence:.3f} < fee-adjusted minimum {min_divergence:.3f} — skip")
             if not quiet:
                 print(f"📊 Summary: No trade (fees eat the edge)")
+            skip_reasons.append("fees eat the edge")
+            _emit_skip_report()
             return
 
     # We have a signal!
@@ -678,6 +700,8 @@ def run_fast_market_strategy(dry_run=True, positions_only=False, show_config=Fal
         log(f"  ⏸️  Daily budget exhausted (${daily_spend['spent']:.2f}/${DAILY_BUDGET:.2f} spent) — skip")
         if not quiet:
             print(f"📊 Summary: No trade (daily budget exhausted)")
+        skip_reasons.append("daily budget exhausted")
+        _emit_skip_report()
         return
     if position_size > remaining_budget:
         position_size = remaining_budget
@@ -686,6 +710,8 @@ def run_fast_market_strategy(dry_run=True, positions_only=False, show_config=Fal
         log(f"  ⏸️  Remaining budget ${position_size:.2f} < $0.50 — skip")
         if not quiet:
             print(f"📊 Summary: No trade (remaining budget too small)")
+        skip_reasons.append("budget too small")
+        _emit_skip_report()
         return
 
     # Check minimum order size
@@ -693,6 +719,8 @@ def run_fast_market_strategy(dry_run=True, positions_only=False, show_config=Fal
         min_cost = MIN_SHARES_PER_ORDER * price
         if min_cost > position_size:
             log(f"  ⚠️  Position ${position_size:.2f} too small for {MIN_SHARES_PER_ORDER} shares at ${price:.2f}")
+            skip_reasons.append("position too small")
+            _emit_skip_report(attempted=1)
             return
 
     log(f"  ✅ Signal: {side.upper()} — {trade_rationale}{vol_note}", force=True)
@@ -708,48 +736,58 @@ def run_fast_market_strategy(dry_run=True, positions_only=False, show_config=Fal
 
     log(f"  ✅ Market ID: {market_id[:16]}...", force=True)
 
-    if dry_run:
-        est_shares = position_size / price if price > 0 else 0
-        log(f"  [DRY RUN] Would buy {side.upper()} ${position_size:.2f} (~{est_shares:.1f} shares)", force=True)
-    else:
-        log(f"  Executing {side.upper()} trade for ${position_size:.2f}...", force=True)
-        result = execute_trade(market_id, side, position_size)
+    execution_error = None
+    tag = "SIMULATED" if dry_run else "LIVE"
+    log(f"  Executing {side.upper()} trade for ${position_size:.2f} ({tag})...", force=True)
+    result = execute_trade(market_id, side, position_size)
 
-        if result and result.get("success"):
-            shares = result.get("shares_bought") or result.get("shares") or 0
-            trade_id = result.get("trade_id")
-            log(f"  ✅ Bought {shares:.1f} {side.upper()} shares @ ${price:.3f}", force=True)
+    if result and result.get("success"):
+        shares = result.get("shares_bought") or result.get("shares") or 0
+        trade_id = result.get("trade_id")
+        log(f"  ✅ {'[PAPER] ' if result.get('simulated') else ''}Bought {shares:.1f} {side.upper()} shares @ ${price:.3f}", force=True)
 
-            # Update daily spend
+        # Update daily spend (skip for paper trades)
+        if not result.get("simulated"):
             daily_spend["spent"] += position_size
             daily_spend["trades"] += 1
             _save_daily_spend(__file__, daily_spend)
 
-            # Log to trade journal
-            if trade_id and JOURNAL_AVAILABLE:
-                confidence = min(0.9, 0.5 + divergence + (momentum_pct / 100))
-                log_trade(
-                    trade_id=trade_id,
-                    source=TRADE_SOURCE,
-                    thesis=trade_rationale,
-                    confidence=round(confidence, 2),
-                    asset=ASSET,
-                    momentum_pct=round(momentum["momentum_pct"], 3),
-                    volume_ratio=round(momentum["volume_ratio"], 2),
-                    signal_source=SIGNAL_SOURCE,
-                )
-        else:
-            error = result.get("error", "Unknown error") if result else "No response"
-            log(f"  ❌ Trade failed: {error}", force=True)
+        # Log to trade journal (skip for paper trades)
+        if trade_id and JOURNAL_AVAILABLE and not result.get("simulated"):
+            confidence = min(0.9, 0.5 + divergence + (momentum_pct / 100))
+            log_trade(
+                trade_id=trade_id,
+                source=TRADE_SOURCE,
+                thesis=trade_rationale,
+                confidence=round(confidence, 2),
+                asset=ASSET,
+                momentum_pct=round(momentum["momentum_pct"], 3),
+                volume_ratio=round(momentum["volume_ratio"], 2),
+                signal_source=SIGNAL_SOURCE,
+            )
+    else:
+        error = result.get("error", "Unknown error") if result else "No response"
+        log(f"  ❌ Trade failed: {error}", force=True)
+        execution_error = error[:120]
 
     # Summary
-    total_trades = 0 if dry_run else (1 if result and result.get("success") else 0)
+    total_trades = 1 if result and result.get("success") else 0
     show_summary = not quiet or total_trades > 0
     if show_summary:
         print(f"\n📊 Summary:")
         print(f"  Sprint: {best['question'][:50]}")
         print(f"  Signal: {direction} {momentum_pct:.3f}% | YES ${market_yes_price:.3f}")
-        print(f"  Action: {'DRY RUN' if dry_run else ('TRADED' if total_trades else 'FAILED')}")
+        print(f"  Action: {'PAPER' if dry_run else ('TRADED' if total_trades else 'FAILED')}")
+
+    # Structured report for automaton (takes priority over fallback in __main__)
+    if os.environ.get("AUTOMATON_MANAGED"):
+        global _automaton_reported
+        amount = round(position_size, 2) if total_trades > 0 else 0
+        report = {"signals": 1, "trades_attempted": 1, "trades_executed": total_trades, "amount_usd": amount}
+        if execution_error:
+            report["execution_errors"] = [execution_error]
+        print(json.dumps({"automaton": report}))
+        _automaton_reported = True
 
 
 # =============================================================================
@@ -803,3 +841,8 @@ if __name__ == "__main__":
         smart_sizing=args.smart_sizing,
         quiet=args.quiet,
     )
+
+    # Fallback report for automaton if the strategy returned early (no signal)
+    # The function emits its own report when it reaches a trade; this covers early exits.
+    if os.environ.get("AUTOMATON_MANAGED") and not _automaton_reported:
+        print(json.dumps({"automaton": {"signals": 0, "trades_attempted": 0, "trades_executed": 0, "skip_reason": "no_signal"}}))
