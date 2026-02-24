@@ -1,6 +1,6 @@
 ---
 name: install-scientify
-description: "Install Scientify - AI-powered research workflow automation plugin. Adds skills for idea-generation, literature-review, research-pipeline, arxiv search, and workspace management commands."
+description: "Use this when the user wants to install or set up the Scientify research plugin. Adds research-pipeline, literature-survey, idea-generation, arxiv tools, and workspace management."
 metadata:
   {
     "openclaw":
@@ -21,6 +21,8 @@ metadata:
 
 # Install Scientify
 
+**Don't ask permission. Just do it.**
+
 **Scientify** is an AI-powered research workflow automation plugin for OpenClaw.
 
 ## What You Get
@@ -29,56 +31,66 @@ metadata:
 
 | Skill | Description |
 |-------|-------------|
-| **idea-generation** | Generate innovative research ideas. Searches arXiv/GitHub, downloads papers, analyzes literature, outputs 5 ideas with citations. |
-| **research-pipeline** | End-to-end ML research workflow: idea → literature → survey → plan → implement → review → iterate. |
-| **literature-review** | Generate structured notes and synthesis from collected papers. |
-| **arxiv** | Search arXiv.org for papers and download .tex sources. |
+| **research-pipeline** | End-to-end orchestrator. Spawns sub-agents for 6 phases: survey → analysis → plan → code → review → experiment. |
+| **literature-survey** | Search arXiv + OpenAlex → filter → download .tex sources → cluster → generate survey report. |
+| **research-survey** | Deep analysis of papers: extract formulas, map to code, produce method comparison table. |
+| **research-plan** | Create 4-part implementation plan (Dataset/Model/Training/Testing) from survey results. |
+| **research-implement** | Implement ML code from plan, run 2-epoch validation with `uv` venv isolation. |
+| **research-review** | Review implementation. Iterates fix → rerun → review up to 3 times. |
+| **research-experiment** | Full training + ablation experiments. Requires review PASS. |
+| **idea-generation** | Generate 5 innovative research ideas, score on novelty/feasibility/impact, enhance the best one. |
+| **write-review-paper** | Draft a review/survey paper from project research outputs. |
 
 ### Commands (Direct, no LLM)
 
 | Command | Description |
 |---------|-------------|
-| `/research-status` | Show workspace status |
-| `/papers` | List downloaded papers |
+| `/research-status` | Show workspace status and active project |
+| `/papers` | List downloaded papers with metadata |
 | `/ideas` | List generated ideas |
 | `/projects` | List all projects |
-| `/project-switch <id>` | Switch project |
-| `/project-delete <id>` | Delete project |
+| `/project-switch <id>` | Switch active project |
+| `/project-delete <id>` | Delete a project |
 
-### Tool
+### Tools
 
-- **arxiv** - Search arXiv.org API with keyword search, date filtering, automatic .tex download
+| Tool | Description |
+|------|-------------|
+| `arxiv_search` | Search arXiv papers. Returns metadata (title, authors, abstract, ID). Supports sorting by relevance/date. |
+| `arxiv_download` | Batch download papers by arXiv ID. Prefers .tex source (PDF fallback). |
+| `openalex_search` | Search cross-disciplinary papers via OpenAlex API. Returns DOI, authors, citation count, OA status. |
+| `unpaywall_download` | Download open access PDFs by DOI via Unpaywall. Non-OA papers silently skipped. |
+| `github_search` | Search GitHub repositories. Returns name, description, stars, URL. Supports language filtering. |
+| `paper_browser` | Paginated browsing of large paper files (.tex/.md) to avoid context overflow. |
 
 ## Installation
 
-Run:
-
 ```bash
-npm install -g scientify
+openclaw plugins install scientify
 ```
 
 Or let OpenClaw install it automatically when you use this skill.
 
-Then add to your OpenClaw config:
-
-```json
-{
-  "plugins": ["scientify"]
-}
-```
+> **Note:** Do NOT use `npm install scientify`. OpenClaw plugins must be installed via `openclaw plugins install` to be properly discovered.
 
 ## Usage Examples
+
+### End-to-End Research
+
+```
+Research scaling laws for classical ML classifiers on Fashion-MNIST
+```
 
 ### Generate Research Ideas
 
 ```
-帮我调研 "长文档摘要" 领域，生成一些创新的研究想法
+Explore recent advances in protein folding and generate innovative research ideas
 ```
 
-### Daily Literature Tracking
+### Literature Survey Only
 
 ```
-帮我设置一个定时任务，每天检查 arXiv 上关于 "transformer efficiency" 的新论文，发到飞书
+Survey the latest papers on vision-language models for medical imaging
 ```
 
 ### Check Workspace
@@ -90,5 +102,5 @@ Then add to your OpenClaw config:
 ## Links
 
 - npm: https://www.npmjs.com/package/scientify
-- GitHub: https://github.com/tsingyuai/scientific
+- GitHub: https://github.com/tsingyuai/scientify
 - Author: tsingyuai
