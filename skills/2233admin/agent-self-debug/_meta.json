@@ -1,0 +1,11 @@
+{
+  "owner": "2233admin",
+  "slug": "agent-self-debug",
+  "displayName": "agent-self-debug",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771895365103,
+    "commit": null
+  },
+  "history": []
+}
