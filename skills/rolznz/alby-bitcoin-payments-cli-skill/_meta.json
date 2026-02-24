@@ -3,9 +3,15 @@
   "slug": "alby-bitcoin-payments-cli-skill",
   "displayName": "Alby Bitcoin Payments CLI Skill",
   "latest": {
-    "version": "1.1.0",
-    "publishedAt": 1770130093843,
-    "commit": "https://github.com/clawdbot/skills/commit/260d55977b3d02183187a4abdcc71c9261cdd1cf"
+    "version": "1.1.1",
+    "publishedAt": 1771922165850,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.1.0",
+      "publishedAt": 1770130093843,
+      "commit": "https://github.com/clawdbot/skills/commit/260d55977b3d02183187a4abdcc71c9261cdd1cf"
+    }
+  ]
 }
