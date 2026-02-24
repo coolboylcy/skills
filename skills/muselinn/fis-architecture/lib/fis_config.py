@@ -1,5 +1,5 @@
 """
-FIS 3.1 Lite - Configuration
+FIS Configuration - Shared hub path configuration
 共享中心路径配置 - 可自定义
 """
 

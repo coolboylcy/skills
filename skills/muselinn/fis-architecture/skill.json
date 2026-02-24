@@ -1,70 +1,23 @@
 {
   "name": "fis-architecture",
-  "version": "3.2.7",
-  "description": "Federal Intelligence System (FIS) 3.2 - File-based multi-agent workflow framework. FIS manages workflow (JSON tickets), QMD manages content. Optional Python helpers for badge generation.",
+  "version": "3.2.11",
+  "description": "FIS - Multi-agent workflow with JSON tickets (clean, no personal data)",
   "author": "CyberMao",
   "license": "MIT",
-  "keywords": [
-    "fis",
-    "multi-agent",
-    "workflow",
-    "tickets",
-    "qmd",
-    "badge",
-    "openclaw"
-  ],
+  "keywords": ["fis", "multi-agent", "workflow", "tickets"],
   "homepage": "https://github.com/MuseLinn/fis-architecture",
   "repository": {
     "type": "git",
     "url": "https://github.com/MuseLinn/fis-architecture.git"
   },
-  "bugs": {
-    "url": "https://github.com/MuseLinn/fis-architecture/issues"
-  },
   "main": "SKILL.md",
-  "files": [
-    "SKILL.md",
-    "README.md",
-    "QUICK_REFERENCE.md",
-    "AGENT_GUIDE.md",
-    "CONFIGURATION.md",
-    "POST_INSTALL.md",
-    "INSTALL_CHECKLIST.md",
-    "SECURITY.md",
-    "lib/"
-  ],
-  "engines": {
-    "python": ">=3.10"
-  },
-  "binaries": ["mcporter", "openclaw"],
+  "files": ["SKILL.md", "lib/", "examples/"],
+  "engines": {"python": ">=3.10"},
   "dependencies": {
-    "pillow": ">=9.0.0 (optional - badge generation)",
-    "qrcode": ">=7.0 (optional - badge generation)"
-  },
-  "env": {
-    "FIS_SHARED_HUB": "Optional: Override default hub path (~/.openclaw/fis-hub)"
+    "pillow": ">=9.0.0 (optional)"
   },
   "openclaw": {
     "minVersion": "2026.2.15",
-    "skillType": "architecture",
-    "capabilities": [
-      "multi-agent",
-      "workflow",
-      "ticket-management",
-      "badge-generation"
-    ],
-    "forAgents": {
-      "whenToUse": "Complex multi-role tasks requiring workflow tracking",
-      "whenNotToUse": "Simple queries or tasks completable in < 10 minutes",
-      "entryPoint": "AGENT_GUIDE.md",
-      "keyDecision": "Use decision tree to determine SubAgent delegation",
-      "securityNote": "Review SECURITY.md before granting code_execute permissions"
-    },
-    "postInstall": {
-      "required": false,
-      "message": "Core FIS requires no initialization. Optional: pip install Pillow qrcode for badge generation.",
-      "docs": "POST_INSTALL.md",
-      "security": "SECURITY.md"
-    }
+    "skillType": "architecture"
   }
 }
