@@ -1,0 +1,11 @@
+{
+  "owner": "sw326",
+  "slug": "hira-hospital",
+  "displayName": "건강보험심사평가원 병원 검색",
+  "latest": {
+    "version": "3.2.0",
+    "publishedAt": 1771803762353,
+    "commit": null
+  },
+  "history": []
+}
