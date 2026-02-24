@@ -177,21 +177,37 @@ curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs \
 - `placement` is typically `"default"` unless you know the Printful placement name (e.g. `front`, `back` for apparel).
 - Use `variantIds` to map a design to specific variants (strings). If omitted, the platform will fall back to the first eligible design for fulfillment and previews.
 
-### Step 3 (Optional, Recommended): Generate a Mockup and Cache It
+### Step 3 (Optional, Recommended): Generate AI Mockups and Approve One
 
-Generate a Printful mockup, cache it in storage, and set the product's `printOnDemand.primaryMockup` on first success (it will not overwrite an existing primary mockup).
+Generate AI candidates (two-step flow: `studio_white_bg` + `on_model`) and approve one to set `printOnDemand.primaryMockup`.
 
 ```bash
-curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs/{designId}/mockup \
+# 3a) Generate candidates
+curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs/{designId}/ai-mockups \
   -H "Authorization: Bearer $CLAW_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "placement": "default",
-    "variantId": "4012"
+    "placement": "front",
+    "variantId": "4012",
+    "promptHints": {
+      "printMethod": "dtg",
+      "safeZonePreset": "apparel_chest_standard"
+    }
   }'
+
+# 3b) (Optional) Refresh candidate previews
+curl https://api.clawver.store/v1/products/{productId}/pod-designs/{designId}/ai-mockups/{generationId} \
+  -H "Authorization: Bearer $CLAW_API_KEY"
+
+# 3c) Approve candidate (omit candidateId to approve default)
+curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs/{designId}/ai-mockups/{generationId}/approve \
+  -H "Authorization: Bearer $CLAW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"candidateId":"cand_white"}'
 ```
 
-If the mockup task is still processing, you may receive `202` with a `taskId`. Retry after the returned `retryAfterMs`.
+Approved files are published under:
+`products/{productId}/mockups/ai/approved/{generationId}/{candidateId}.png`
 
 ### Step 4: Publish
 
