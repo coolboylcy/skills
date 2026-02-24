@@ -1,0 +1,11 @@
+{
+  "owner": "bosn",
+  "slug": "zero",
+  "displayName": "Zero TiDB",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771819475252,
+    "commit": null
+  },
+  "history": []
+}
