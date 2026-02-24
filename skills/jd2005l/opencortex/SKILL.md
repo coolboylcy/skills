@@ -9,30 +9,44 @@ description: >
   best practices. NOT for: runtime memory_search queries (use built-in memory tools).
   Triggers: "set up memory", "organize yourself", "stop forgetting", "memory architecture",
   "self-improving", "cortex", "bootstrap memory", "memory optimization".
+metadata: {"openclaw":{"requires":{"bins":["grep","sed","find"],"optionalBins":["git","gpg","openssl","openclaw","secret-tool","keyctl"]},"env":{"CLAWD_WORKSPACE":{"description":"Workspace directory (defaults to cwd)","required":false},"CLAWD_TZ":{"description":"Timezone for cron scheduling (defaults to UTC)","required":false},"OPENCORTEX_VAULT_PASS":{"description":"Vault passphrase via env var. Prefer system keyring.","required":false,"sensitive":true}},"sensitiveFiles":[".secrets-map",".vault/.passphrase"],"networkAccess":"Optional git push only (off by default, user must enable during install)"}}
 ---
 
 # OpenCortex — Self-Improving Memory Architecture
 
 Transform a default OpenClaw agent into one that compounds knowledge daily.
 
+📦 [Full source on GitHub](https://github.com/JD2005L/opencortex) — review the code, file issues, or contribute.
+
 ## What This Does
 
 1. **Structures memory** into purpose-specific files instead of one flat dump
 2. **Installs nightly maintenance** that distills daily work into permanent knowledge
 3. **Installs weekly synthesis** that catches patterns across days
-4. **Establishes principles** that enforce good memory habits
-5. **Builds a voice profile** of your human from daily conversations for authentic ghostwriting
-6. **Encrypts sensitive data** in an AES-256 vault with key-only references in docs; supports passphrase rotation (`vault.sh rotate`) and validates key names on `vault.sh set`
-7. **Enables safe git backup** with automatic secret scrubbing
+4. **Establishes principles** that enforce good memory habits — and backs them up with nightly audits that verify tool documentation, decision capture, sub-agent debriefs, failure analysis, and unnecessary deferrals to the user. Nothing slips through the cracks.
+6. **Builds a voice profile** of your human from daily conversations for authentic ghostwriting
+7. **Encrypts sensitive data** in an AES-256 vault with key-only references in docs; supports passphrase rotation (`vault.sh rotate`) and validates key names on `vault.sh set`
+8. **Enables safe git backup** with automatic secret scrubbing
 
 ## Installation
 
-Run `scripts/install.sh` from this skill directory. It is idempotent — safe to re-run. Add `--dry-run` to preview what would be installed without writing anything.
+**Prerequisites** (install these separately if you don't have them):
+- [OpenClaw](https://github.com/openclaw/openclaw) 2026.2.x+
+- [ClawHub CLI](https://clawhub.com)
 
 ```bash
-bash scripts/install.sh
-bash scripts/install.sh --dry-run   # preview only
+# 1. Download the skill from your OpenClaw workspace directory
+cd ~/clawd    # or wherever your workspace is
+clawhub install opencortex
+
+# 2. Run the installer FROM YOUR WORKSPACE DIRECTORY (not from inside the skill folder)
+bash skills/opencortex/scripts/install.sh
+
+# Optional: preview what would be created without changing anything
+bash skills/opencortex/scripts/install.sh --dry-run
 ```
+
+The installer will ask about optional features (encrypted vault, voice profiling, git backup). It's safe to re-run — it skips anything that already exists. The installer itself makes no network calls — it only creates local files and registers cron jobs.
 
 The script will:
 - Create the file hierarchy (non-destructively — won't overwrite existing files)
@@ -73,16 +87,17 @@ memory/
 | P1 | Delegate First | Assess tasks for sub-agent delegation; stay available |
 | P2 | Write It Down | Commit to files, not mental notes |
 | P3 | Ask Before External | Confirm before emails, public posts, destructive ops |
-| P4 | Tool Shed | Document every tool/API with goal-oriented abilities description |
-| P5 | Capture Decisions | Record decisions with reasoning; never re-ask |
-| P6 | Sub-agent Debrief | Sub-agents write learnings to daily log before completing |
-| P7 | Log Failures | Tag failures/corrections in daily log for distillation routing |
+| P4 | Tool Shed | Document + proactively create tools; enforced by nightly audit |
+| P5 | Capture Decisions | Record decisions with reasoning; enforced by nightly + weekly audit |
+| P6 | Sub-agent Debrief | Delegated work feeds back to daily log; orphans recovered by distillation |
+| P7 | Log Failures | Tag failures/corrections; root cause analysis enforced by nightly audit |
+| P8 | Check the Shed First | Consult TOOLS.md/INFRA.md/memory before deferring work to user; enforced by nightly audit |
 
 ## Cron Jobs (installed)
 
 | Schedule | Name | What it does |
 |----------|------|-------------|
-| Daily 3 AM (local) | Distillation | Reads daily logs → distills into project/tools/infra files → optimizes → archives |
+| Daily 3 AM (local) | Distillation | Reads daily logs → distills into project/tools/infra files → audits tools/decisions/debriefs/failures → optimizes → archives |
 | Weekly Sunday 5 AM | Synthesis | Reviews week for patterns, recurring problems, unfinished threads, decisions; auto-creates runbooks from repeated procedures |
 
 Both jobs use a shared lockfile (`/tmp/opencortex-distill.lock`) to prevent conflicts when daily and weekly runs overlap.

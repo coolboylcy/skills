@@ -1,6 +1,6 @@
 #!/bin/bash
 # OpenCortex — Self-Improving Memory Architecture Installer
-# Idempotent: safe to re-run. Won't overwrite existing files.
+# Safe to re-run: won't overwrite existing files.
 set -euo pipefail
 
 # --- Pre-flight: check required tools ---
@@ -66,6 +66,16 @@ else
   mkdir -p "$WORKSPACE/memory/runbooks"
   mkdir -p "$WORKSPACE/memory/archive"
   mkdir -p "$WORKSPACE/scripts"
+fi
+
+# --- Safety: always gitignore sensitive paths ---
+if [ "$DRY_RUN" != "true" ]; then
+  touch "$WORKSPACE/.gitignore"
+  grep -q "^\.vault/" "$WORKSPACE/.gitignore" 2>/dev/null || echo ".vault/" >> "$WORKSPACE/.gitignore"
+  grep -q "^\.secrets-map" "$WORKSPACE/.gitignore" 2>/dev/null || echo ".secrets-map" >> "$WORKSPACE/.gitignore"
+  echo "   🔒 Ensured .vault/ and .secrets-map are gitignored"
+else
+  echo "   [DRY RUN] Would ensure .vault/ and .secrets-map in .gitignore"
 fi
 
 # --- Core Files (create only if missing) ---
@@ -163,16 +173,25 @@ Emails, public posts, destructive ops — get confirmation first.
 
 ### P4: Tool Shed
 All tools, APIs, access methods, and capabilities SHALL be documented in TOOLS.md with goal-oriented abilities descriptions. When given a new tool during work, immediately add it.
+**Creation:** When you access a new system, API, or resource more than once — or when given access to something that will clearly recur — proactively create the tool entry, bridge doc, or helper script. Do not wait to be asked. The bar is: if future-me would need to figure this out again, build the tool now.
 **Enforcement:** After using any CLI tool, API, or service — before ending the task — verify it exists in TOOLS.md. If not, add it immediately. Do not defer to distillation.
 
 ### P5: Capture Decisions
 When the user makes a decision or states a preference, immediately record it in the relevant file with reasoning. Never re-ask something already decided. Format: **Decision:** [what] — [why] (date)
+**Recognition:** Decisions include: explicit choices, stated preferences, architectural directions, and workflow rules. If the user expresses an opinion that would affect future work, that is a decision — capture it.
+**Enforcement:** Before ending any conversation with substantive work, scan for uncaptured decisions. If any, write them before closing.
 
 ### P6: Sub-agent Debrief
 Sub-agents MUST write a brief debrief to memory/YYYY-MM-DD.md before completing. Include: what was done, what was learned, any issues.
+**Recovery:** If a sub-agent fails, times out, or is killed before debriefing, the parent agent writes the debrief on its behalf noting the failure mode. No delegated work should vanish from memory.
 
 ### P7: Log Failures
 When something fails or the user corrects you, immediately append to the daily log with ❌ FAILURE: or 🔧 CORRECTION: tags. Include: what happened, why it failed, what fixed it. Nightly distillation routes these to the right file.
+**Root cause:** Do not just log what happened — log *why* it happened and what would prevent it next time. If it is a systemic issue (missing principle, bad assumption, tool gap), propose a fix immediately.
+
+### P8: Check the Shed First
+Before telling the user you cannot do something, or asking them to do it manually, CHECK your resources: TOOLS.md, INFRA.md, memory/projects/, runbooks, and any bridge docs. If a tool, API, credential, or access method exists that could accomplish the task — use it. The shed exists so you do not make the user do work you are equipped to handle.
+**Enforcement:** Nightly audit scans for instances where the agent deferred work to the user that could have been done via documented tools.
 
 ---
 
@@ -367,6 +386,20 @@ IMPORTANT: Before writing to any file, check for /tmp/opencortex-distill.lock. I
 
 ## Tool Shed Audit (P4 Enforcement)
 - Read TOOLS.md. Scan today daily logs and archived conversation for any CLI tools, APIs, or services that were USED but are NOT documented in TOOLS.md. Add missing entries with: what it is, how to access it, what it can do. This catches tools that slipped through real-time P4 enforcement.
+- For tools that ARE already in TOOLS.md, check if today's logs reveal any gotchas, failure modes, flags, or usage notes not yet captured in the tool entry. Update existing entries with warnings or corrected usage patterns. Incomplete tool docs are as dangerous as missing ones.
+
+## Decision Audit (P5 Enforcement)
+- Scan today's daily logs for any decisions, preferences, or architectural directions stated by the user that are NOT captured in project files, MEMORY.md, or USER.md. Decisions include explicit choices, stated preferences, architectural directions, and workflow rules.
+- For each uncaptured decision, write it to the appropriate file. Format: **Decision:** [what] — [why] (date)
+
+## Debrief Recovery (P6 Enforcement)
+- Check today's daily logs for any sub-agent delegations. For each, verify a debrief entry exists. If a sub-agent was spawned but no debrief appears (failed, timed out, or forgotten), write a recovery debrief noting what was attempted and that the debrief was recovered by distillation.
+
+## Shed Deferral Audit (P8 Enforcement)
+- Scan today's daily logs for instances where the agent told the user to do something manually, gave them commands to run, or said it could not do something. Cross-reference with TOOLS.md, INFRA.md, and memory/ to check if a documented tool or access method existed that could have handled it. Flag any unnecessary deferrals.
+
+## Failure Root Cause (P7 Enforcement)
+- Scan today's daily logs for ❌ FAILURE: or 🔧 CORRECTION: entries. For each, verify a root cause analysis exists (not just what happened, but WHY and what prevents recurrence). If missing, add the root cause analysis.
 
 ## Cron Health
 - Run openclaw cron list and crontab -l. Verify no two jobs within 15 minutes. Fix MEMORY.md jobs table if out of sync.
@@ -375,11 +408,11 @@ Before completing, append debrief to memory/YYYY-MM-DD.md.
 Reply with brief summary."
 
     if [ "$DRY_RUN" = "true" ]; then
-      echo "   [DRY RUN] Would run: openclaw cron add --name 'Daily Memory Distillation' --cron '0 10 * * *'"
+      echo "   [DRY RUN] Would run: openclaw cron add --name 'Daily Memory Distillation' --cron '0 3 * * *'"
     else
       openclaw cron add \
         --name "Daily Memory Distillation" \
-        --cron "0 10 * * *" \
+        --cron "0 3 * * *" \
         --tz "$TZ" \
         --model "sonnet" \
         --session "isolated" \
@@ -395,11 +428,11 @@ Reply with brief summary."
   EXISTING=$(openclaw cron list --json 2>/dev/null | grep -c "Weekly Synthesis" || true)
   if [ "$EXISTING" = "0" ]; then
     if [ "$DRY_RUN" = "true" ]; then
-      echo "   [DRY RUN] Would run: openclaw cron add --name 'Weekly Synthesis' --cron '0 12 * * 0'"
+      echo "   [DRY RUN] Would run: openclaw cron add --name 'Weekly Synthesis' --cron '0 5 * * 0'"
     else
     openclaw cron add \
       --name "Weekly Synthesis" \
-      --cron "0 12 * * 0" \
+      --cron "0 5 * * 0" \
       --tz "$TZ" \
       --model "sonnet" \
       --session "isolated" \
@@ -417,6 +450,8 @@ IMPORTANT: Before writing to any file, check for /tmp/opencortex-distill.lock. I
    c. Cross-project connections → add cross-references
    d. Decisions this week → ensure captured with reasoning
    e. New capabilities → verify in TOOLS.md with abilities (P4)
+   f. **Runbook detection** — identify any multi-step procedure (3+ steps) performed more than once this week, or likely to recur. Check if a runbook exists in memory/runbooks/. If not, create one with clear steps a sub-agent could follow. Update MEMORY.md runbooks index.
+   g. **Principle health** — read MEMORY.md principles section. Verify each principle has: clear intent, enforcement mechanism, and that the enforcement is actually reflected in the distillation cron. Flag any principle without enforcement.
 4. Write weekly summary to memory/archive/weekly-YYYY-MM-DD.md.
 
 ## Runbook Detection

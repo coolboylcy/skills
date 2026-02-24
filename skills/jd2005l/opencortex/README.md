@@ -18,7 +18,7 @@ OpenCortex transforms your agent into one that **gets smarter every day** throug
 - **Nightly distillation** — Daily work automatically distilled into permanent knowledge
 - **Weekly synthesis** — Pattern detection across days catches recurring problems and unfinished threads
 - **Enforced principles** — Habits that prevent knowledge loss (decision capture, tool documentation, sub-agent debriefs)
-- **Encrypted vault** — AES-256 encrypted secret storage with key-only references in docs
+- **Encrypted vault** — AES-256 encrypted secret storage with system keyring support (secret-tool, macOS Keychain, keyctl) — passphrase never needs to touch disk
 - **Voice profiling** — Learns how your human communicates for authentic ghostwriting
 - **Safe git backup** — Automatic secret scrubbing so credentials never hit your repo
 
@@ -53,10 +53,18 @@ The key: **daily distillation + weekly synthesis + decision capture** means the 
 
 ## Install
 
-### Option 1: OpenClaw Skill
+### Option 1: ClawHub (recommended)
+
+**Prerequisites:** [OpenClaw](https://github.com/openclaw/openclaw) 2026.2.x+ and [ClawHub CLI](https://clawhub.com) (install separately if needed)
+
+Run these commands from your OpenClaw workspace directory (e.g. `~/clawd`):
+
 ```bash
-openclaw skill install opencortex.skill
+clawhub install opencortex
+bash skills/opencortex/scripts/install.sh
 ```
+
+**Important:** Run the installer from your workspace root (e.g. `~/clawd`), NOT from inside the skill folder. The installer creates files in your current directory.
 
 ### Option 2: From source
 ```bash
@@ -65,7 +73,9 @@ cd opencortex
 bash scripts/install.sh
 ```
 
-The installer is idempotent — safe to re-run. It won't overwrite existing files. Pass `--dry-run` to preview what would be created without writing anything:
+**Important:** `clawhub install` downloads the skill files. You must then run `bash scripts/install.sh` to set up the memory architecture, create cron jobs, and configure features.
+
+The installer is safe to re-run — it skips anything that already exists. Pass `--dry-run` to preview what would be created without writing anything:
 
 ```bash
 bash scripts/install.sh --dry-run
@@ -94,21 +104,24 @@ bash scripts/install.sh --dry-run
 ### Cron Jobs
 | Schedule | Job | Purpose |
 |----------|-----|---------|
-| Daily 3 AM | Memory Distillation | Distill daily logs → permanent knowledge, optimize, check cron spacing |
+| Daily 3 AM | Memory Distillation | Distill daily logs → permanent knowledge, audit tools/decisions/debriefs/failures/deferrals, optimize |
 | Sunday 5 AM | Weekly Synthesis | Find patterns, recurring problems, unfinished threads, validate decisions; auto-detects repeated procedures and creates runbooks |
 
 Both jobs use a shared lockfile (`/tmp/opencortex-distill.lock`) to prevent conflicts when they run near each other.
 
-### Principles (P1–P6)
+**How these work:** OpenCortex does not bundle separate distillation/synthesis scripts. Instead, the installer registers OpenClaw cron jobs (`openclaw cron add`) that spawn isolated agent sessions with detailed task instructions. The OpenClaw agent itself performs the distillation — reading workspace files, synthesizing information, and writing results — using the same tools it uses during normal conversation. This is by design: an LLM is far better at synthesizing, summarizing, and cross-referencing knowledge than any bash script could be. The cron job messages (viewable via `openclaw cron list`) *are* the implementation. You can inspect, edit, or remove them at any time.
+
+### Principles (P1–P8)
 | # | Principle | Purpose |
 |---|-----------|---------|
 | P1 | Delegate First | Sub-agent delegation by default |
 | P2 | Write It Down | Never "mentally note" — commit to files |
 | P3 | Ask Before External | Confirm before public/destructive actions |
-| P4 | Tool Shed | Document every capability with abilities description |
-| P5 | Capture Decisions | Record decisions with reasoning, never re-ask |
-| P6 | Sub-agent Debrief | Delegated work feeds learnings back to daily log |
-| P7 | Log Failures | Tag failures/corrections with ❌/🔧 for distillation routing |
+| P4 | Tool Shed | Document + proactively create tools; enforced by nightly audit |
+| P5 | Capture Decisions | Record decisions with reasoning; enforced by nightly + weekly audit |
+| P6 | Sub-agent Debrief | Delegated work feeds back to daily log; orphans recovered by distillation |
+| P7 | Log Failures | Tag failures/corrections; root cause analysis enforced by nightly audit |
+| P8 | Check the Shed First | Consult TOOLS.md/INFRA.md/memory before deferring work to user; enforced by nightly audit |
 
 ### Voice Profile (`memory/VOICE.md`)
 The nightly distillation analyzes each day's conversations and builds a living profile of how your human communicates — vocabulary, tone, phrasing, decision style. Used when ghostwriting on their behalf (community posts, emails, social media). Not used for regular agent conversation.
@@ -139,9 +152,13 @@ The nightly distillation analyzes each day's conversations and builds a living p
 
 OpenCortex does exactly what it describes: creates structured memory files, registers nightly/weekly cron jobs for maintenance, and optionally sets up git backup. The installer (`scripts/install.sh`) and all helper scripts (`scripts/git-*.sh`) are bundled, auditable, and contain no obfuscated code. Every file is plain bash or markdown. The skill creates no executables, downloads no binaries, and installs no packages.
 
+**Note on distillation/synthesis:** These features are implemented as OpenClaw cron job messages, not standalone scripts. The installer registers cron jobs via `openclaw cron add` with detailed task instructions. At runtime, OpenClaw spawns an isolated agent session that follows these instructions to read, synthesize, and write workspace files. This is intentional — an LLM agent is the ideal tool for knowledge synthesis, summarization, and cross-referencing. The cron messages are fully inspectable via `openclaw cron list` and editable via `openclaw cron edit`.
+
 ### Instruction Scope
 
 The cron jobs instruct an OpenClaw agent session to read and write **workspace files only** — the same files listed in the Architecture section above. The distillation job routes information between workspace markdown files (e.g., daily log → project files). It does not access files outside the workspace, make API calls, or execute arbitrary commands. Voice profiling is **opt-in during installation** — declined by default.
+
+**On workspace isolation:** Automated scanners may flag that OpenCortex's cron job instructions don't technically enforce workspace sandboxing themselves. This is correct and intentional — **workspace isolation is enforced by the OpenClaw platform, not by individual skills.** OpenClaw cron jobs run in isolated agent sessions (`--session "isolated"`) that are scoped to the workspace directory by the OpenClaw runtime. This is analogous to how a Dockerfile doesn't implement kernel-level container isolation — that's the container runtime's responsibility. OpenCortex's cron instructions explicitly reference only workspace-relative paths (`memory/`, `MEMORY.md`, `TOOLS.md`, etc.) and contain no instructions to access external filesystems, make network calls, or execute system commands beyond `openclaw cron list` and `crontab -l` (for self-auditing cron health). You can verify this yourself: run `openclaw cron list`, inspect every cron message, and confirm all file references are workspace-relative.
 
 ### Install Mechanism
 
@@ -157,7 +174,15 @@ No external downloads, no package installs, no network calls during installation
 
 OpenCortex declares no required environment variables, API keys, or config files. The cron jobs reference `--model "sonnet"` which is resolved by your existing OpenClaw gateway — OpenCortex never sees or handles model provider keys. The P4 (Tool Shed) principle guides the *agent* to document tools it encounters during conversation — this is agent behavior, not skill behavior. If you prefer metadata-only documentation in TOOLS.md, instruct your agent accordingly.
 
-**Vault security:** Secrets encrypted at rest via GPG symmetric encryption (AES-256). The symmetric passphrase is stored in `.vault/.passphrase` with 600 permissions. The passphrase is generated locally by `openssl rand` during `vault init` and never transmitted externally. To rotate the passphrase, run `scripts/vault.sh rotate` — it re-encrypts all secrets in place with a new passphrase. Key names are validated on `vault.sh set`: alphanumeric and underscores only, must start with a letter or underscore.
+**Vault security:** Secrets encrypted at rest via GPG symmetric encryption (AES-256). The vault passphrase is stored in the **best available backend** (auto-detected at init):
+
+1. **secret-tool** — Linux system keyring (GNOME/KDE) — passphrase never on disk
+2. **macOS Keychain** — native macOS secret store — passphrase never on disk
+3. **keyctl** — Linux kernel keyring — passphrase in memory only
+4. **Environment variable** — `OPENCORTEX_VAULT_PASS` — no file needed
+5. **File fallback** — `.vault/.passphrase` (mode 600) — only if no keyring available
+
+To migrate an existing file-based passphrase to a system keyring: `scripts/vault.sh migrate`. To check your current backend: `scripts/vault.sh backend`. Passphrase rotation: `scripts/vault.sh rotate` re-encrypts all secrets with a new passphrase. Key names validated on set (alphanumeric + underscores only).
 
 ### Persistence & Privilege
 
@@ -170,7 +195,7 @@ The installer creates two persistent cron jobs (daily distillation, weekly synth
 Optional features that add scope (all **off by default**, enabled only if you say yes during install):
 
 - **Voice profiling:** Reads conversation logs within the workspace to build a communication profile
-- **Git backup:** Runs `git push` on a cron — requires you to configure a remote and populate `.secrets-map`
+- **Git backup:** Commits locally by default — push requires explicit `--push` flag. You control when data leaves your machine.
 
 To run fully air-gapped: decline all three optional features during install.
 
@@ -212,7 +237,7 @@ Two cron jobs are created (both run as isolated OpenClaw sessions):
 
 | Job | What it reads | What it writes | Network access |
 |-----|--------------|----------------|----------------|
-| Daily Distillation | `memory/*.md`, workspace `*.md` | `memory/projects/`, `MEMORY.md`, `TOOLS.md`, `INFRA.md`, `USER.md`, `memory/VOICE.md` | None |
+| Daily Distillation | `memory/*.md`, workspace `*.md` | `memory/projects/`, `MEMORY.md`, `TOOLS.md`, `INFRA.md`, `USER.md`, `memory/VOICE.md`, `memory/YYYY-MM-DD.md` (audit outputs: uncaptured decisions, debrief recoveries, root cause analyses, unnecessary deferrals) | None |
 | Weekly Synthesis | `memory/archive/*.md`, `memory/projects/*.md` | `memory/archive/weekly-*.md`, project files, `memory/runbooks/` | None |
 
 Both jobs acquire a lockfile (`/tmp/opencortex-distill.lock`) before running, so concurrent execution is safe if the daily and weekly jobs overlap.
@@ -235,12 +260,17 @@ OpenCortex contains **zero network operations**. No telemetry, no phone-home, no
 |---------|--------|
 | Required API keys/env vars | **None.** Model access handled by OpenClaw gateway. |
 | Raw secrets in TOOLS.md | **Prevented in secure mode.** Vault stores encrypted values, TOOLS.md gets `vault:<key>` references only. |
+| Vault passphrase on disk | **Blocked by default.** Requires system keyring (secret-tool, macOS Keychain, keyctl). File fallback only if `OPENCORTEX_ALLOW_FILE_PASSPHRASE=1` is explicitly set. |
+| Auto git push | **Disabled by default.** `git-backup.sh` commits locally only. Push requires explicit `--push` flag. No data leaves your machine unless you explicitly choose it. |
+| Scrub scope | **Known text extensions by default** (md, sh, json, conf, py, yaml, yml, toml, env, txt, cfg). Set `OPENCORTEX_SCRUB_ALL=1` to scrub all tracked files. |
 | Git scrubbing reliability | **Opt-in, manual .secrets-map, auditable scripts. Pre-push verification aborts if secrets detected.** Test before use. |
 | Root workspace default | **Configurable via `CLAWD_WORKSPACE`.** |
 | Autonomous file writes | **Workspace-only.** No system files touched. |
 | Voice profiling privacy | **Optional, local-only, removable.** |
 | Network access | **None.** All operations are local file I/O. |
 | Hidden endpoints | **None.** Full source public and auditable. |
+| Distillation/synthesis executables | **By design, none.** Implemented as OpenClaw cron job messages — the agent IS the executor. Inspect via `openclaw cron list`. |
+| Workspace sandboxing | **Enforced by OpenClaw platform**, not by the skill. Cron jobs use `--session "isolated"`. All file references are workspace-relative. No external filesystem, network, or system command access in any cron instruction. |
 
 ## Requirements
 
