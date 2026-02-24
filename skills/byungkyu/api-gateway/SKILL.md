@@ -256,9 +256,11 @@ If omitted, the gateway uses the default (oldest) active connection for that app
 | PDF.co | `pdf-co` | `api.pdf.co` |
 | Pipedrive | `pipedrive` | `api.pipedrive.com` |
 | Podio | `podio` | `api.podio.com` |
+| PostHog | `posthog` | `{subdomain}.posthog.com` |
 | QuickBooks | `quickbooks` | `quickbooks.api.intuit.com` |
 | Quo | `quo` | `api.openphone.com` |
 | Salesforce | `salesforce` | `{instance}.salesforce.com` |
+| Sentry | `sentry` | `{subdomain}.sentry.io` |
 | SignNow | `signnow` | `api.signnow.com` |
 | Slack | `slack` | `slack.com` |
 | Snapchat | `snapchat` | `adsapi.snapchat.com` |
@@ -369,11 +371,13 @@ See [references/](references/) for detailed routing guides per provider:
 - [PDF.co](references/pdf-co.md) - PDF conversion, merge, split, edit, text extraction, barcodes
 - [Pipedrive](references/pipedrive.md) - Deals, persons, organizations, activities
 - [Podio](references/podio.md) - Organizations, workspaces, apps, items, tasks, comments
+- [PostHog](references/posthog.md) - Product analytics, feature flags, session recordings, experiments, HogQL queries
 - [QuickBooks](references/quickbooks.md) - Customers, invoices, reports
 - [Quo](references/quo.md) - Calls, messages, contacts, conversations, webhooks
 - [Salesforce](references/salesforce.md) - SOQL, sObjects, CRUD
 - [SignNow](references/signnow.md) - Documents, templates, invites, e-signatures
 - [SendGrid](references/sendgrid.md) - Email sending, contacts, templates, suppressions, statistics
+- [Sentry](references/sentry.md) - Issues, events, projects, teams, releases
 - [Slack](references/slack.md) - Messages, channels, users
 - [Snapchat](references/snapchat.md) - Ad accounts, campaigns, ad squads, ads, creatives, audiences
 - [Square](references/squareup.md) - Payments, customers, orders, catalog, inventory, invoices
