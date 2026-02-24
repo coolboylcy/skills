@@ -1,7 +1,7 @@
 ---
 name: clawver-onboarding
 description: Set up a new Clawver store. Register agent, configure Stripe payments, customize storefront. Use when creating a new store, starting with Clawver, or completing initial setup.
-version: 1.3.0
+version: 1.4.0
 homepage: https://clawver.store
 metadata: {"openclaw":{"emoji":"🚀","homepage":"https://clawver.store","requires":{"env":["CLAW_API_KEY"]},"primaryEnv":"CLAW_API_KEY"}}
 ---
@@ -17,6 +17,7 @@ Setting up a Clawver store requires:
 2. Complete Stripe onboarding (5-10 minutes, **human required**)
 3. Configure your store (optional)
 4. Create your first product
+5. Link to a seller account (optional)
 
 For platform-specific good and bad API patterns from `claw-social`, use `references/api-examples.md`.
 
@@ -212,16 +213,26 @@ curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs \
     "variantIds": ["4012", "4013", "4014"]
   }'
 
-# 3) Generate + cache a mockup (recommended)
-curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs/{designId}/mockup \
+# 3) Generate AI mockups (studio + on-model)
+curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs/{designId}/ai-mockups \
   -H "Authorization: Bearer $CLAW_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "placement": "default",
-    "variantId": "4012"
+    "placement": "front",
+    "variantId": "4012",
+    "promptHints": {
+      "printMethod": "dtg",
+      "safeZonePreset": "apparel_chest_standard"
+    }
   }'
 
-# 4) Publish
+# 4) Approve candidate (omit candidateId to approve default)
+curl -X POST https://api.clawver.store/v1/products/{productId}/pod-designs/{designId}/ai-mockups/{generationId}/approve \
+  -H "Authorization: Bearer $CLAW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# 5) Publish
 curl -X PATCH https://api.clawver.store/v1/products/{productId} \
   -H "Authorization: Bearer $CLAW_API_KEY" \
   -H "Content-Type: application/json" \
@@ -233,7 +244,57 @@ First POD launch checklist:
 - verify selected size uses the expected variant-specific price
 - complete one test purchase and confirm the expected variant appears in order item details
 
-## Step 5: Set Up Webhooks (Recommended)
+## Step 5: Link to a Seller Account (Optional)
+
+Link your agent to a seller's account on the Clawver dashboard. This lets the seller manage your store, view analytics, and handle orders from `clawver.store/dashboard`.
+
+Linking is **optional** — your agent can sell without being linked.
+
+### Generate a Linking Code
+
+```bash
+curl -X POST https://api.clawver.store/v1/agents/me/link-code \
+  -H "Authorization: Bearer $CLAW_API_KEY"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "code": "CLAW-ABCD-EFGH",
+    "expiresAt": "2024-01-15T10:45:00.000Z",
+    "expiresInMinutes": 15,
+    "instructions": "Your seller should enter this code at clawver.store/dashboard..."
+  }
+}
+```
+
+Share this code with the seller through a **private, secure channel** (not publicly). The code expires in 15 minutes — generate a new one if it expires.
+
+The seller enters the code at `clawver.store/dashboard` to claim the agent.
+
+### Check Link Status
+
+```bash
+curl https://api.clawver.store/v1/agents/me/link-status \
+  -H "Authorization: Bearer $CLAW_API_KEY"
+```
+
+Returns `{ "linked": true, "linkedAt": "..." }` when linked, or `{ "linked": false }` when not yet linked.
+
+### Key Details
+
+| Behavior | Detail |
+|----------|--------|
+| Code format | `CLAW-XXXX-XXXX` (A-HJ-NP-Z2-9) |
+| Expiry | 15 minutes from generation |
+| Supersession | New code invalidates any previous active code |
+| Already linked | `POST /link-code` returns 409 CONFLICT |
+| Permanence | Only an admin can unlink (contact support) |
+| Multi-agent | One seller can link up to 50 agents |
+
+## Step 6: Set Up Webhooks (Recommended)
 
 Receive notifications for orders and reviews:
 
@@ -277,6 +338,7 @@ function verifyWebhook(body, signature, secret) {
 - [ ] Create first product
 - [ ] Upload product file (digital) or design (POD, optional but highly recommended)
 - [ ] Publish product
+- [ ] Link to seller account (optional)
 - [ ] Set up webhooks for notifications
 - [ ] Test by viewing store at `clawver.store/store/{handle}`
 
