@@ -1,58 +1,128 @@
-# MLX Local Inference Stack
+<p align="center">
+  <h1 align="center">🧠 MLX Local Inference Stack</h1>
+  <p align="center">
+    Give your Apple Silicon Mac the power to hear, see, read, speak, think — all locally.
+  </p>
+  <p align="center">
+    <a href="https://clawhub.ai/skills/mlx-local-inference"><img src="https://img.shields.io/badge/ClawHub-mlx--local--inference-FF5A36?style=flat-square" alt="ClawHub"></a>
+    <a href="#"><img src="https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-000?style=flat-square&logo=apple&logoColor=white" alt="Platform"></a>
+    <a href="#"><img src="https://img.shields.io/badge/runtime-MLX-blue?style=flat-square" alt="MLX"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
+  </p>
+  <p align="center">
+    <a href="README_CN.md"><b>中文</b></a> · English
+  </p>
+</p>
 
-在 Apple Silicon Mac 上运行完整的本地 AI 推理服务，无需云端 API。
+---
 
-## 功能
+## One-Line Install
 
-| 能力 | 模型 | 说明 |
-|------|------|------|
-| **LLM 推理** | Qwen3-14B, Gemma3-12B | 中英双语对话、代码生成、深度推理 |
-| **语音识别** | Qwen3-ASR, Whisper-v3-turbo | 粤语/普通话 + 99语言 |
-| **文本向量化** | Qwen3-Embedding 0.6B/4B | RAG、语义搜索、文档索引 |
-| **OCR** | PaddleOCR-VL-1.5 | 中英文场景文字、票据、文档 |
-| **语音合成** | Qwen3-TTS-1.7B | 支持自定义音色克隆 |
-| **自动转录** | ASR + LLM 联合 | 文件监听、自动转录+智能纠错 |
+If you're running [OpenClaw](https://github.com/openclaw/openclaw) (or any agent with ClawHub support), just say:
 
-所有模型通过 [MLX](https://github.com/ml-explore/mlx) 在本机 GPU 运行。延迟低、完全离线、零成本。
+> **"Install the mlx-local-inference skill"**
 
-## 前置条件
+Your agent will run `clawhub install mlx-local-inference` and pick it up on the next session. That's it — your Mac gains local AI superpowers.
 
-- Apple Silicon Mac（M1/M2/M3/M4）
-- macOS 14+
-- Python 3.10+
-- 推荐 32GB+ 内存
-
-## 安装
+Or install manually:
 
 ```bash
-# 安装 OpenClaw skill
 clawhub install mlx-local-inference
-
-# 安装 Python 依赖
-pip install mlx mlx-lm mlx-audio mlx-vlm openai
 ```
 
-## 服务端口
+Or clone directly:
 
-| 服务 | 默认端口 | 监听范围 | 包含模型 |
-|------|----------|----------|----------|
-| 主服务 | 8787 | 可配置 | LLM, Whisper, Embedding |
-| ASR 服务 | 8788 | localhost | Qwen3-ASR, TTS |
+```bash
+git clone https://github.com/bendusy/mlx-local-inference.git
+```
 
-所有 API 均为 OpenAI 兼容格式，`api_key` 随意填写即可。
+## Why This Exists
 
-## 使用示例
+Your M-series Mac has a powerful Neural Engine and unified memory sitting right there — yet most AI workflows still send every request to the cloud. That's wasteful, slow, and unnecessary for a huge number of tasks.
 
-### LLM 对话
+**MLX Local Inference Stack** turns your Mac into a fully self-contained AI workstation. We've tested and curated the best-performing MLX models across every modality — speech recognition, text generation, OCR, text-to-speech, and embeddings — so you don't have to. One install, and your Mac can **hear, see, read, speak, and think**, entirely offline.
+
+This is especially useful when paired with AI agents like [OpenClaw](https://github.com/openclaw/openclaw). Instead of routing every tool call through cloud APIs, the agent can leverage your local hardware for transcription, text correction, document reading, voice output, and semantic search — making interactions faster, cheaper, and more private.
+
+## What Your Mac Gains
+
+| Ability | What It Does | Curated Model |
+|:--------|:-------------|:--------------|
+| 👂 **Hear** | Transcribe speech — Cantonese, Mandarin, English, or any mix; 99 languages total | Qwen3-ASR-1.7B · Whisper-v3-turbo |
+| 👁️ **See** | Extract text from photos, screenshots, receipts, documents | PaddleOCR-VL-1.5 |
+| 🧠 **Think** | Chat, reason, write code, translate, summarize | Qwen3-14B · Gemma3-12B |
+| 🗣️ **Speak** | Generate natural speech with custom voice cloning | Qwen3-TTS-1.7B |
+| 📐 **Understand** | Vectorize text for semantic search, RAG, and document indexing | Qwen3-Embedding 0.6B · 4B |
+| 📝 **Transcribe** | Drop an audio file, get corrected transcripts automatically | ASR + LLM correction pipeline |
+
+Every model was selected through hands-on testing for quality, speed, and memory efficiency on Apple Silicon. They're packaged together as one coherent stack — not a collection of random tools, but an integrated local AI runtime.
+
+## How It Fits Together
+
+```
+                        ┌─────────────────┐
+                        │   Your Agent    │
+                        │  (OpenClaw etc) │
+                        └────────┬────────┘
+                                 │ OpenAI-compatible API
+                 ┌───────────────┼───────────────┐
+                 ▼               ▼               ▼
+          ┌────────────┐  ┌───────────┐  ┌────────────┐
+          │  Port 8787 │  │ Port 8788 │  │    CLI     │
+          │  always-on │  │ on-demand │  │  on-demand │
+          │            │  │           │  │            │
+          │ · LLM      │  │ · ASR     │  │ · OCR      │
+          │ · Whisper  │  │ · TTS     │  │            │
+          │ · Embed    │  │           │  │            │
+          └────────────┘  └───────────┘  └────────────┘
+                 │               │               │
+                 └───────────────┴───────────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │   Apple Silicon (MLX)   │
+                    │   Unified Memory GPU    │
+                    └─────────────────────────┘
+```
+
+### Keep-Alive & On-Demand Loading
+
+Not everything needs to run all the time. The stack uses a hybrid strategy:
+
+- **Always-on (Port 8787):** The main service stays resident as a launchd daemon. LLM and Whisper models are kept warm in memory for instant response. This is where your agent sends most requests.
+- **On-demand (Port 8788):** Qwen3-ASR and TTS models load into memory only when called, then can be unloaded to free RAM. This is ideal for models you use less frequently.
+- **CLI-only:** OCR runs as a one-shot Python command — no daemon, no memory cost when idle.
+
+The transcription daemon coordinates this intelligently: it loads ASR for transcription, unloads it when done, then loads the LLM for correction — avoiding memory contention on 16 GB machines.
+
+You can unload any on-demand model manually:
+
+```bash
+# Free ASR model memory
+curl -X DELETE "http://localhost:8788/models?model_name=mlx-community/Qwen3-ASR-1.7B-8bit"
+```
+
+## Requirements
+
+- Apple Silicon Mac (M1 / M2 / M3 / M4)
+- macOS 14+
+- Python 3.10+
+- 32 GB+ RAM recommended (16 GB works with keep-alive/on-demand strategy)
+
+## Usage
+
+### 🧠 Think — LLM Chat
 
 ```bash
 curl http://localhost:8787/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "qwen3-14b",
-    "messages": [{"role": "user", "content": "用一句话解释量子计算"}]
+    "messages": [{"role": "user", "content": "Explain quantum computing briefly"}]
   }'
 ```
+
+<details>
+<summary>Python</summary>
 
 ```python
 from openai import OpenAI
@@ -60,151 +130,136 @@ from openai import OpenAI
 client = OpenAI(base_url="http://localhost:8787/v1", api_key="unused")
 r = client.chat.completions.create(
     model="qwen3-14b",
-    messages=[{"role": "user", "content": "Hello"}]
+    messages=[{"role": "user", "content": "Hello"}],
 )
 print(r.choices[0].message.content)
 ```
 
-Qwen3 会输出 `<think>...</think>` 思维链标签，按需过滤：
+</details>
 
-```python
-import re
-text = re.sub(r'<think>.*?</think>\s*', '', text, flags=re.DOTALL)
-```
+Two LLMs are included: **Qwen3-14B** (strongest Chinese + reasoning with built-in chain-of-thought) and **Gemma3-12B** (fast English + code). Pick based on your task.
 
-### 语音识别
+### 👂 Hear — Speech Recognition
 
 ```bash
-# Qwen3-ASR（粤语/普通话首选）
+# Cantonese / Mandarin / Chinese-English mix → Qwen3-ASR
 curl http://localhost:8788/v1/audio/transcriptions \
-  -F file=@audio.wav \
-  -F model=mlx-community/Qwen3-ASR-1.7B-8bit \
-  -F language=zh
+  -F file=@audio.wav -F model=mlx-community/Qwen3-ASR-1.7B-8bit -F language=zh
 
-# Whisper（多语言）
+# English or any of 99 languages → Whisper
 curl http://localhost:8787/v1/audio/transcriptions \
-  -F file=@audio.wav \
-  -F model=whisper-large-v3-turbo
+  -F file=@audio.wav -F model=whisper-large-v3-turbo
 ```
 
-支持格式：wav, mp3, m4a, flac, ogg, webm
+**Multi-language support:** Real conversations aren't monolingual. If you mix Cantonese, English, and Mandarin in the same audio (as many people do), Qwen3-ASR handles it natively. For pure non-Chinese audio, Whisper covers 99 languages. Set the `language` parameter to guide recognition, or omit it for auto-detection.
 
-长音频先切分为 10 分钟片段：
+Supported formats: `wav`, `mp3`, `m4a`, `flac`, `ogg`, `webm`
 
-```bash
-ffmpeg -y -ss 0 -t 600 -i long.wav -ar 16000 -ac 1 chunk_000.wav
-```
-
-### 文本向量化
-
-```bash
-curl http://localhost:8787/v1/embeddings \
-  -H "Content-Type: application/json" \
-  -d '{"model": "qwen3-embedding-0.6b", "input": "要向量化的文本"}'
-
-# 批量
-curl http://localhost:8787/v1/embeddings \
-  -H "Content-Type: application/json" \
-  -d '{"model": "qwen3-embedding-4b", "input": ["文本一", "文本二"]}'
-```
-
-### OCR 文字识别
+### 👁️ See — OCR
 
 ```bash
 python -m mlx_vlm.generate \
   --model mlx-community/PaddleOCR-VL-1.5-6bit \
-  --image photo.jpg \
-  --prompt "OCR:" \
-  --max-tokens 512 \
-  --temp 0.0
+  --image document.jpg --prompt "OCR:" --max-tokens 512 --temp 0.0
 ```
 
-注意：Prompt 必须为 `OCR:`，temperature 设 0 以确保确定性输出。
-
-### 语音合成
+### 🗣️ Speak — Text-to-Speech
 
 ```bash
 curl http://localhost:8788/v1/audio/speech \
   -H "Content-Type: application/json" \
-  -d '{"model":"mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit","input":"你好世界"}' \
+  -d '{"model":"mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit","input":"Hello world"}' \
   -o speech.wav
 ```
 
-### 自动转录守护进程
-
-将音频文件放入 `~/transcribe/` 目录，守护进程自动处理：
-
-1. Qwen3-ASR 转录 → `文件名_raw.md`
-2. Qwen3-14B 智能校对 → `文件名_corrected.md`
-3. 结果移入 `~/transcribe/done/`
-
-校对规则：修正同音字、保留粤语用字（嘅/唔/咁/喺）、补全标点、去除语气词。
-
-## 模型选型
-
-### LLM
-
-| 场景 | 推荐模型 |
-|------|----------|
-| 中文 / 粤语任务 | qwen3-14b |
-| 英文 / 代码生成 | gemma-3-12b |
-| 需要深度推理 | qwen3-14b（think 模式） |
-| 快速问答 | gemma-3-12b |
-
-### ASR
-
-| 场景 | 推荐模型 |
-|------|----------|
-| 粤语 / 普通话 | Qwen3-ASR |
-| 多语言（99 种） | Whisper |
-
-### Embedding
-
-| 场景 | 推荐模型 |
-|------|----------|
-| 快速检索 / 低延迟 | qwen3-embedding-0.6b |
-| 高精度语义匹配 | qwen3-embedding-4b |
-
-## 架构
-
-```
-┌──────────────────────────────────────────┐
-│         Apple Silicon Mac (MLX)          │
-├────────────────┬─────────────────────────┤
-│   Port 8787    │      Port 8788          │
-│   (主服务)      │      (ASR 服务)         │
-│                │                         │
-│  · Qwen3-14B  │  · Qwen3-ASR            │
-│  · Gemma3-12B │  · Qwen3-TTS            │
-│  · Whisper    │                         │
-│  · Embedding  │                         │
-├────────────────┴─────────────────────────┤
-│  OCR: PaddleOCR-VL (CLI, 按需调用)       │
-│  转录守护进程 (文件监听, ASR→LLM 校对)    │
-└──────────────────────────────────────────┘
-```
-
-## 服务管理
+### 📐 Understand — Embeddings
 
 ```bash
-# 主服务（LLM + Whisper + Embedding）
+curl http://localhost:8787/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{"model": "qwen3-embedding-0.6b", "input": ["document 1", "document 2"]}'
+```
+
+Two sizes: **0.6B** for fast retrieval, **4B** for high-accuracy semantic matching.
+
+### 📝 Transcribe — Auto Pipeline
+
+Drop audio files into `~/transcribe/` and walk away:
+
+1. Qwen3-ASR transcribes → `filename_raw.md`
+2. Qwen3-14B corrects errors, adds punctuation → `filename_corrected.md`
+3. Results archived to `~/transcribe/done/`
+
+The correction LLM adapts to the source language — it preserves Cantonese characters (嘅/唔/咁/喺) when the audio is Cantonese, uses standard Mandarin for Mandarin input, and handles mixed-language content naturally. You can customize the correction prompt in the daemon script to match your language preferences.
+
+## Model Selection
+
+Every model was chosen for the best balance of quality and efficiency on Apple Silicon:
+
+| Modality | Model | Why This One |
+|:---------|:------|:-------------|
+| LLM (Chinese) | Qwen3-14B 4bit | Best bilingual performance at this size; native chain-of-thought |
+| LLM (English) | Gemma3-12B 4bit | Fast, strong code generation, lean memory footprint |
+| ASR (Chinese) | Qwen3-ASR-1.7B 8bit | Superior Cantonese/Mandarin/mixed accuracy, on-demand loading |
+| ASR (Multi) | Whisper-v3-turbo | 99 languages, always loaded, battle-tested |
+| Embedding (Fast) | Qwen3-Embedding-0.6B 4bit | Low latency, good enough for most retrieval |
+| Embedding (Accurate) | Qwen3-Embedding-4B 4bit | High-precision semantic matching |
+| OCR | PaddleOCR-VL-1.5 6bit | ~185 tokens/s, 3.3 GB, best accuracy-to-speed ratio |
+| TTS | Qwen3-TTS-1.7B 8bit | Custom voice cloning, ~2 GB |
+
+## Upgrading Models
+
+The MLX ecosystem moves fast — new and better quantized models appear regularly. When you want to swap in a newer model:
+
+1. **Download the new model:**
+   ```bash
+   huggingface-cli download mlx-community/<new-model-name>
+   ```
+
+2. **Update the server config** (`~/.mlx-server/config.yaml`):
+   ```yaml
+   models:
+     - model: mlx-community/<new-model-name>
+       model_id: qwen3-14b  # keep the same alias for compatibility
+   ```
+
+3. **Restart the service:**
+   ```bash
+   launchctl kickstart -k gui/$(id -u)/com.mlx-server
+   ```
+
+Your agent and all API calls continue using the same model ID — zero client-side changes. The `references/` docs in this repo list the exact models we've tested; check [mlx-community](https://huggingface.co/mlx-community) on Hugging Face for newer releases.
+
+**Tip:** When a major new model drops (e.g., Qwen4, Gemma4), we'll publish an updated version of this skill via ClawHub. Update with:
+
+```bash
+clawhub update mlx-local-inference
+```
+
+Or just tell your agent: **"Update the mlx-local-inference skill."**
+
+## Service Management
+
+```bash
+# Main service (LLM + Whisper + Embedding) — always-on
 launchctl kickstart -k gui/$(id -u)/com.mlx-server
 
-# ASR + TTS 服务
+# ASR + TTS service — on-demand models
 launchctl kickstart -k gui/$(id -u)/com.mlx-audio-server
 
-# 转录守护进程
+# Auto-transcription daemon
 launchctl kickstart gui/$(id -u)/com.mlx-transcribe-daemon
 ```
 
-## 目录结构
+## Project Structure
 
 ```
 mlx-local-inference/
-├── SKILL.md              # OpenClaw skill 定义
-├── README.md             # 说明文档
-├── LICENSE               # MIT
-└── references/           # 各模型详细参考
+├── SKILL.md              # OpenClaw skill definition
+├── README.md             # English (this file)
+├── README_CN.md          # 中文
+├── LICENSE
+└── references/           # Detailed per-model documentation
     ├── asr-qwen3.md
     ├── asr-whisper.md
     ├── embedding-qwen3.md
@@ -216,6 +271,10 @@ mlx-local-inference/
     └── tts-qwen3.md
 ```
 
+## Contributing
+
+Issues and PRs welcome. See `references/` for detailed technical documentation on each model.
+
 ## License
 
-MIT
+[MIT](LICENSE)
