@@ -3,9 +3,15 @@
   "slug": "tide-watch",
   "displayName": "Tide Watch",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1771993031034,
-    "commit": "https://github.com/openclaw/skills/commit/5753b8ab6d788dc1dc2c72eab5561a19b3775c68"
+    "version": "1.0.3",
+    "publishedAt": 1771993271631,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1771993031034,
+      "commit": "https://github.com/openclaw/skills/commit/5753b8ab6d788dc1dc2c72eab5561a19b3775c68"
+    }
+  ]
 }
