@@ -3,11 +3,16 @@
   "slug": "memory-pill",
   "displayName": "Memory Pill",
   "latest": {
-    "version": "0.7.9",
-    "publishedAt": 1771649431219,
-    "commit": "https://github.com/openclaw/skills/commit/6af7cd79f98da0c6d679048cc4c4bf0cdf8168d9"
+    "version": "0.8.0",
+    "publishedAt": 1771964265939,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.7.9",
+      "publishedAt": 1771649431219,
+      "commit": "https://github.com/openclaw/skills/commit/6af7cd79f98da0c6d679048cc4c4bf0cdf8168d9"
+    },
     {
       "version": "0.7.5",
       "publishedAt": 1771646823668,
