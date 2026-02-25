@@ -210,6 +210,7 @@ If omitted, the gateway uses the default (oldest) active connection for that app
 | GetResponse | `getresponse` | `api.getresponse.com` |
 | GitHub | `github` | `api.github.com` |
 | Gumroad | `gumroad` | `api.gumroad.com` |
+| Granola | `granola` | `mcp.granola.ai` (MCP) |
 | Google Ads | `google-ads` | `googleads.googleapis.com` |
 | Google BigQuery | `google-bigquery` | `bigquery.googleapis.com` |
 | Google Analytics Admin | `google-analytics-admin` | `analyticsadmin.googleapis.com` |
@@ -325,6 +326,7 @@ See [references/](references/) for detailed routing guides per provider:
 - [GetResponse](references/getresponse.md) - Campaigns, contacts, newsletters, autoresponders, tags, segments
 - [GitHub](references/github.md) - Repositories, issues, pull requests, commits
 - [Gumroad](references/gumroad.md) - Products, sales, subscribers, licenses, webhooks
+- [Granola](references/granola.md) - Meeting notes, transcripts, queries (MCP)
 - [Google Ads](references/google-ads.md) - Campaigns, ad groups, GAQL queries
 - [Google Analytics Admin](references/google-analytics-admin.md) - Reports, dimensions, metrics
 - [Google Analytics Data](references/google-analytics-data.md) - Reports, dimensions, metrics
