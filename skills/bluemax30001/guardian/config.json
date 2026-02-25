@@ -37,7 +37,7 @@
       "(?i)post-compaction\\s+(audit|restore|protocol)",
       "(?i)system\\s+(reminder|protocol|message).*(?:read|follow|check).*(?:SOUL\\.md|USER\\.md|MEMORY\\.md|WORKFLOW_AUTO\\.md)"
     ],
-    "_allowlist_note": "Patterns that are always safe and should bypass threat scanning. Use carefully - these completely skip all security checks."
+    "_allowlist_note": "Patterns that suppress specific false positives. Use narrow, audited patterns only; broad patterns can reduce detection coverage."
   },
   "_comment": "Guardian Security Skill \u2014 Configuration. See README.md for details."
 }

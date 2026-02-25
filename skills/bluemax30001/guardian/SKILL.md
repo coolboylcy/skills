@@ -1,19 +1,12 @@
 ---
 name: guardian
 description: Security scanner for OpenClaw agents. Detects prompt injection, credential exfiltration, and social engineering attacks in real time.
-version: 2.0.10
+version: 2.0.14
 metadata:
   openclaw:
     requires:
       bins:
         - python3
-      env:
-        - name: GUARDIAN_WORKSPACE
-          description: "Override workspace path (optional; defaults to ~/.openclaw/workspace)"
-          required: false
-        - name: GUARDIAN_CONFIG
-          description: "Override path to Guardian config.json (optional)"
-          required: false
     permissions:
       - read_workspace
       - write_workspace
@@ -46,12 +39,21 @@ cd ~/.openclaw/skills/guardian
 ./install.sh
 ```
 
+## Install mechanism and review
+This package includes executable scripts (including `install.sh`) and Python modules.
+Review `install.sh` before running in production.
+`install.sh` performs local setup/validation; optional helpers (`onboard.py`, `serve.py`, `integrations/webhook.py`) are opt-in and require explicit operator action.
+
 ## Onboarding checklist
 1) Optional: `python3 scripts/onboard.py --setup-crons` (scanner/report/digest crons)
 2) `python3 scripts/admin.py status` (confirm running)
 3) `python3 scripts/admin.py threats` (confirm signatures loaded; should show 0/blocked)
 4) Optional: `python3 scripts/serve.py --port 8090` (start HTTP API)
 5) Optional: set `webhook_url` in `config.json` (enable outbound alerts)
+
+## Scan scope and privacy
+Guardian scans configured workspace paths to detect threats. Depending on `scan_paths`, this can include other skill/config files in your OpenClaw workspace.
+If you handle sensitive files, set narrow `scan_paths` in `config.json`.
 
 ## Quick Start
 
@@ -92,6 +94,12 @@ result = guard.scan_message(user_text, channel="telegram")
 if guard.should_block(result):
     return guard.format_block_response(result)
 ```
+
+## Environment variables read
+- `GUARDIAN_WORKSPACE` (optional workspace override)
+- `OPENCLAW_WORKSPACE` (optional fallback workspace override)
+- `GUARDIAN_CONFIG` (optional guardian config path)
+- `OPENCLAW_CONFIG_PATH` (optional OpenClaw config path)
 
 ## Configuration
 

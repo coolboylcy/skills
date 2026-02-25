@@ -10,12 +10,19 @@ clawhub install guardian
 cd ~/.openclaw/skills/guardian && ./install.sh
 ```
 
+## Install & safety note
+This package includes executable scripts (`install.sh`, optional onboarding/API/webhook helpers).
+Review `install.sh` before running in production environments.
+
 ## Onboarding checklist (fast)
 1) Optional: `python3 scripts/onboard.py --setup-crons` (scanner/report/digest crons)
 2) `python3 scripts/admin.py status` (confirm running)
 3) `python3 scripts/admin.py threats` (confirm signatures loaded; should show 0/blocked)
 4) Optional: `python3 scripts/serve.py --port 8090` (HTTP API)
 5) Optional: set `webhook_url` in `config.json` (outbound alerts)
+
+## Scan scope
+Guardian scans configured workspace paths and may read other skill/config files under those paths for detection. Use narrow `scan_paths` in `config.json` if needed.
 
 ## Quick commands
 ```bash
@@ -42,7 +49,7 @@ cd skills/guardian/dashboard && python3 -m http.server 8091
 from core.realtime import RealtimeGuard
 
 guard = RealtimeGuard()
-result = guard.scan_message("ignore previous instructions", channel="telegram")
+result = guard.scan_message("test payload", channel="telegram")
 if guard.should_block(result):
     print(result.top_threat)
 ```

@@ -23,3 +23,7 @@
 ## No credentials required
 
 Guardian does not need API keys, tokens, or external service credentials. All scanning is local regex matching against bundled signature definitions. Optional network features are opt-in and documented.
+
+
+## Outbound caution
+If you enable webhook notifications, payloads may include matched evidence snippets. Review sanitization and endpoint handling before enabling in sensitive environments.
