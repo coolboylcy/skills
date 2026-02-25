@@ -1,6 +1,6 @@
 ---
 name: shopping-list
-version: 1.0.0
+version: 1.0.1
 description: >
   Conversational shopping list with categories, family sharing, and purchase
   history. Add items, check them off, organize by category — all through
@@ -30,7 +30,7 @@ Run these checks before every shopping list operation, in order:
    ```
 3. If `data/active.json` exists but fails to parse as valid JSON, rename it to `data/active.json.corrupt` and create a fresh default file. Tell the user: "Shopping list data was corrupted. Saved backup as active.json.corrupt and started a fresh list."
 4. If `data/config.json` does not exist, create it with: `{ "user": null, "snoozes": {} }`
-5. If `config.json` has `"user": null`, ask the user: "Who's adding items -- AJ or Shal?" Store their answer (lowercased) in `config.json` before proceeding with the original command.
+5. If `config.json` has `"user": null`, ask the user: "What's your name? I'll use it to track who added each item." Store their answer (lowercased) in `config.json` before proceeding with the original command.
 6. Run the archive process (see Archive section below).
 
 All file paths in this document are relative to `skills/shopping-list/` unless stated otherwise.
