@@ -1,64 +1,166 @@
 ---
-name: API
+name: API (Stripe, OpenAI, Notion & 100+ more)
 slug: api
-version: 1.0.1
-description: Consume, debug, and integrate REST APIs with retry strategies, error handling, and production patterns.
+version: 1.2.1
+homepage: https://clawic.com/skills/api
+description: Integrate 100+ REST APIs with secure multi-account credential management. GitHub, Twilio, Slack, HubSpot, Shopify, and more.
+changelog: Multi-account credential system, dynamic API discovery, 100+ documented APIs.
+metadata: {"clawdbot":{"emoji":"🔌","requires":{"anyBins":["curl","jq"]},"os":["linux","darwin","win32"]}}
 ---
+
+# API
+
+Integrate any API fast. 100+ services documented with authentication, endpoints, and gotchas.
+
+## Setup
+
+On first use, read `setup.md` for integration guidelines and credential setup.
 
 ## When to Use
 
-User needs API integration expertise — from basic requests to production-ready patterns. Agent handles authentication, error handling, retries, pagination, and webhooks.
+User needs to integrate a third-party API. Agent provides:
+- Authentication setup with multi-account support
+- Endpoint documentation with curl examples
+- Rate limits, pagination patterns, and gotchas
+- Credential naming conventions for multiple accounts
+
+## Architecture
+
+```
+apis/                    # 100+ API reference files
+  ├── stripe.md
+  ├── openai.md
+  ├── notion.md
+  └── ...
+
+~/api/                   # User preferences (created on first use)
+  ├── preferences.md     # Default account selection, language
+  └── accounts.md        # Registry of configured accounts
+```
 
 ## Quick Reference
 
-| Topic | File |
-|-------|------|
-| Authentication patterns | `auth.md` |
-| Retry and resilience | `resilience.md` |
-| Pagination handling | `pagination.md` |
-| Webhook integration | `webhooks.md` |
+| File | Purpose |
+|------|---------|
+| `setup.md` | First-time setup and guidelines |
+| `credentials.md` | Multi-account credential system |
+| `memory-template.md` | Memory template for preferences |
+| `auth.md` | Authentication pattern traps |
+| `pagination.md` | Pagination pattern traps |
+| `resilience.md` | Retry and error handling |
+| `webhooks.md` | Webhook security patterns |
+| `apis/{service}.md` | API-specific documentation |
 
-## Request Traps
+## Core Rules
 
-- Include `Content-Type: application/json` on POST/PUT/PATCH — omitting it causes silent 415 errors on many APIs
-- Add `Accept: application/json` unless the API specifies a different format — some default to XML without it
-- API keys in query params get logged in server access logs — prefer header-based auth when supported
-- Tokens can expire mid-flight between request and response — handle 401 with single retry + refresh
+1. **Check API docs first** — Read `apis/{service}.md` before making any call. Each file has auth, endpoints, rate limits, and gotchas specific to that service.
 
-## Silent Failures
+2. **Use multi-account credentials** — Store credentials with naming format `{SERVICE}_{ACCOUNT}_{TYPE}`. Example: `STRIPE_PROD_API_KEY`, `STRIPE_TEST_API_KEY`, `STRIPE_CLIENT_ACME_API_KEY`.
 
-- Some APIs return HTTP 200 with error in response body — validate response schema, not just status code
-- Watch for empty arrays vs null vs missing keys — each means something different per API
-- Paginated endpoints may return 200 with empty page when offset exceeds total — check total count first
+3. **Always include Content-Type** — POST/PUT/PATCH requests need `Content-Type: application/json`. Omitting causes silent 415 errors on many APIs.
 
-## Retry and Resilience
+4. **Handle rate limits proactively** — Track `X-RateLimit-Remaining` header. Throttle before hitting 0, don't wait for 429. Respect `Retry-After` header.
 
-- Use jittered exponential backoff: `delay = min(base * 2^attempt * (1 + random(0, 0.3)), max_delay)` with base=1s, max=30s
-- Generally only retry on 429, 500, 502, 503, 504 — avoid retrying 400, 401, 403, 404 unless the API documents otherwise
-- Read `Retry-After` header on 429 — it overrides your calculated backoff
-- After 5+ consecutive failures to the same endpoint, back off entirely for 60s before retrying (circuit breaker)
+5. **Validate response schema** — Some APIs return 200 with error in body. Always check response structure, not just status code.
 
-## Pagination Traps
+6. **Use idempotency keys** — For payments and critical operations, include idempotency key to prevent duplicates on retry.
 
-- Cursor-based pagination can return duplicate items if data changes between pages — deduplicate by ID
-- Some APIs change `total_count` between requests — snapshot it on first page
-- If page returns fewer items than `per_page` but includes a `next` cursor, keep paginating — it's not necessarily the last page
+7. **Never log credentials** — Use environment variables directly. Never echo, print, or commit credentials to files.
 
-## Rate Limiting
+## Credential Management
 
-- Track quota via `X-RateLimit-Remaining` header — throttle proactively before hitting 0, don't wait for 429
-- Some APIs have hidden per-endpoint rate limits, not just global — monitor 429s per path
-- Distribute requests evenly across the rate window instead of bursting at the start
+Use environment variables with multi-account naming convention:
 
-## Webhooks
+```bash
+# Set for current session
+export STRIPE_PROD_API_KEY="sk_live_xxx"
 
-- Implement idempotent handlers with event ID dedup — providers retry on timeout and you'll get duplicates
-- Return 200 immediately, process asynchronously — webhook providers timeout at 5-30s
-- Verify webhook signatures when the provider supports them — don't trust payload origin without cryptographic proof
-- Log the raw webhook body before parsing — invaluable when the provider changes their schema without notice
+# Use in API call
+curl https://api.stripe.com/v1/charges -H "Authorization: Bearer $STRIPE_PROD_API_KEY"
+```
 
-## Debugging Production Issues
+**Naming format:** `{SERVICE}_{ACCOUNT}_{TYPE}`
+- `STRIPE_PROD_API_KEY` — Production
+- `STRIPE_TEST_API_KEY` — Development  
+- `STRIPE_CLIENT_ACME_API_KEY` — Client project
 
-- Log: method, URL, status code, response time, and `X-Request-Id` header for every API call
-- APIs that work in dev but fail in prod: check IP allowlists, TLS version, SNI, and egress proxy settings
-- When response data looks wrong, compare against the OpenAPI/Swagger spec — the spec is often more current than human-written docs
+See `credentials.md` for persistent storage options and multi-account workflows.
+
+## Available APIs (147)
+
+All API documentation is in `apis/`. Categories include:
+
+**AI/ML:** anthropic, openai, cohere, groq, mistral, perplexity, huggingface, replicate, stability, elevenlabs, deepgram, assemblyai, together, anyscale
+
+**Payments:** stripe, paypal, square, plaid, chargebee, paddle, lemonsqueezy, recurly, wise, coinbase, binance, alpaca, polygon
+
+**Communication:** twilio, sendgrid, mailgun, postmark, resend, mailchimp, slack, discord, telegram, zoom, sendbird, stream-chat, pusher, ably, onesignal, courier, knock, novu
+
+**CRM/Sales:** salesforce, hubspot, pipedrive, attio, close, apollo, outreach, gong, drift, crisp, front, customer-io, braze, iterable, klaviyo
+
+**Developer:** github, gitlab, bitbucket, vercel, netlify, railway, render, fly, digitalocean, heroku, cloudflare, circleci, pagerduty, launchdarkly, split, statsig
+
+**Database/Auth:** supabase, firebase, planetscale, neon, upstash, mongodb, fauna, xata, convex, appwrite, clerk, auth0, workos, stytch
+
+**Media:** cloudinary, mux, bunny, imgix, uploadthing, uploadcare, transloadit, vimeo, youtube, spotify, unsplash, pexels, giphy, tenor
+
+**Social:** twitter, linkedin, instagram, tiktok, pinterest, reddit, twitch
+
+**Productivity:** notion, airtable, google-sheets, google-drive, google-calendar, dropbox, linear, jira, asana, trello, monday, clickup, figma, calendly, cal, loom, typeform
+
+**Other:** shopify, docusign, hellosign, bitly, dub, openweather, mapbox, google-maps, intercom, zendesk, freshdesk, helpscout, mixpanel, amplitude, posthog, segment, sentry, datadog, algolia
+
+```bash
+# List all APIs
+ls apis/
+
+# Search by name
+ls apis/ | grep -i payment
+
+# Read specific API
+cat apis/stripe.md
+```
+
+## Common Traps
+
+- **Missing Content-Type** — POST without `Content-Type: application/json` causes silent 415 errors
+- **API keys in URLs** — Query params get logged in access logs, always use headers
+- **Ignoring pagination** — Most APIs default to 10-25 items, always paginate
+- **Not handling 429** — Implement exponential backoff with jitter
+- **Assuming 200 = success** — Check response body for error objects
+- **No idempotency keys** — Retries cause duplicate charges/actions
+- **Hardcoding credentials** — Use environment variables, never hardcode in source code
+
+## External Endpoints
+
+This skill documents how to call external APIs. Calls go directly from your machine to the API provider. No data is proxied or stored.
+
+| Provider | Base URL | Auth |
+|----------|----------|------|
+| Various | See `apis/{service}.md` | API Key / OAuth |
+
+## Security & Privacy
+
+**Credentials:** Stored in environment variables with naming convention `{SERVICE}_{ACCOUNT}_{TYPE}`.
+
+**Multi-account:** Each account isolated with unique environment variable names. Naming convention prevents conflicts.
+
+**This skill does NOT:**
+- Store credentials in files
+- Make requests on your behalf
+- Send data to any third party
+- Proxy API calls
+
+You control all API calls directly.
+
+## Related Skills
+Install with `clawhub install <slug>` if user confirms:
+
+- `http` — HTTP request patterns and debugging
+- `webhook` — Webhook handling and security
+- `json` — JSON processing and jq patterns
+
+## Feedback
+
+- If useful: `clawhub star api`
+- Stay updated: `clawhub sync`

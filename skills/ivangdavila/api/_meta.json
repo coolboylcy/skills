@@ -1,13 +1,18 @@
 {
   "owner": "ivangdavila",
   "slug": "api",
-  "displayName": "API",
+  "displayName": "API (Stripe, OpenAI, Notion & 100+ more)",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771005393696,
-    "commit": "https://github.com/openclaw/skills/commit/ef37d2f31ae498013062f710c7952513e81daada"
+    "version": "1.2.1",
+    "publishedAt": 1771979897399,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771005393696,
+      "commit": "https://github.com/openclaw/skills/commit/ef37d2f31ae498013062f710c7952513e81daada"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1770655833401,
