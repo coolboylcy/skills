@@ -1,0 +1,11 @@
+{
+  "owner": "sounderliu",
+  "slug": "gpu-cluster-monitor",
+  "displayName": "gpu-cluster-monitor",
+  "latest": {
+    "version": "1.0.2",
+    "publishedAt": 1771920990499,
+    "commit": null
+  },
+  "history": []
+}
