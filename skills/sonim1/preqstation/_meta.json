@@ -3,9 +3,15 @@
   "slug": "preqstation",
   "displayName": "Preqstation",
   "latest": {
-    "version": "0.1.2",
-    "publishedAt": 1771696961137,
-    "commit": "https://github.com/openclaw/skills/commit/1d1d1f5155f46562619616dbfc84eefaa20fa3d1"
+    "version": "0.1.3",
+    "publishedAt": 1771991481077,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.1.2",
+      "publishedAt": 1771696961137,
+      "commit": "https://github.com/openclaw/skills/commit/1d1d1f5155f46562619616dbfc84eefaa20fa3d1"
+    }
+  ]
 }
