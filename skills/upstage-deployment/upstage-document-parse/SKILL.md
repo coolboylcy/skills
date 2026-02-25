@@ -16,7 +16,7 @@ PDF (up to 1000 pages with async), PNG, JPG, JPEG, TIFF, BMP, GIF, WEBP, DOCX, P
 ## Installation
 
 ```bash
-openclaw install upstage-document-parse
+clawhub install upstage-document-parse
 ```
 
 ## API Key Setup

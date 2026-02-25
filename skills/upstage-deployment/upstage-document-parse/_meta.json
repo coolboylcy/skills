@@ -3,11 +3,16 @@
   "slug": "upstage-document-parse",
   "displayName": "upstage-document-parse",
   "latest": {
-    "version": "1.0.3",
-    "publishedAt": 1770680069630,
-    "commit": "https://github.com/openclaw/skills/commit/b491193893647a05e7188fe1380f75e925e3ed5b"
+    "version": "1.0.4",
+    "publishedAt": 1772011807233,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.3",
+      "publishedAt": 1770680069630,
+      "commit": "https://github.com/openclaw/skills/commit/b491193893647a05e7188fe1380f75e925e3ed5b"
+    },
     {
       "version": "1.0.2",
       "publishedAt": 1770047698218,
