@@ -1,0 +1,11 @@
+{
+  "owner": "jame-mei-ltp",
+  "slug": "sre-agent",
+  "displayName": "Sre Agent",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771991920022,
+    "commit": null
+  },
+  "history": []
+}
