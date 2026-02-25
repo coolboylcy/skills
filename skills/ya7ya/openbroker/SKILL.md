@@ -1,11 +1,11 @@
 ---
 name: openbroker
-description: Hyperliquid trading CLI. Execute market orders, limit orders, manage positions, view funding rates, and run trading strategies. Use for any Hyperliquid perp trading task.
+description: Hyperliquid trading plugin with background position monitoring. Execute market orders, limit orders, manage positions, view funding rates, and run trading strategies with automatic alerts for PnL changes and liquidation risk.
 license: MIT
 compatibility: Requires Node.js 22+, network access to api.hyperliquid.xyz
 homepage: https://www.npmjs.com/package/openbroker
-metadata: {"author": "monemetrics", "version": "1.0.39", "openclaw": {"requires": {"bins": ["openbroker"], "env": ["HYPERLIQUID_PRIVATE_KEY"]}, "primaryEnv": "HYPERLIQUID_PRIVATE_KEY", "install": [{"id": "node", "kind": "node", "package": "openbroker", "bins": ["openbroker"], "label": "Install openbroker (npm)"}]}}
-allowed-tools: Bash(openbroker:*) Bash(npm:*) Read
+metadata: {"author": "monemetrics", "version": "1.0.44", "openclaw": {"requires": {"bins": ["openbroker"], "env": ["HYPERLIQUID_PRIVATE_KEY"]}, "primaryEnv": "HYPERLIQUID_PRIVATE_KEY", "install": [{"id": "node", "kind": "node", "package": "openbroker", "bins": ["openbroker"], "label": "Install openbroker (npm)"}]}}
+allowed-tools: ob_account ob_positions ob_funding ob_markets ob_search ob_spot ob_fills ob_orders ob_order_status ob_fees ob_candles ob_funding_history ob_trades ob_rate_limit ob_buy ob_sell ob_limit ob_trigger ob_tpsl ob_cancel ob_twap ob_bracket ob_chase ob_watcher_status Bash(openbroker:*)
 ---
 
 # Open Broker - Hyperliquid Trading CLI
@@ -39,10 +39,33 @@ openbroker setup              # One-command setup (wallet + config + builder app
 openbroker approve-builder --check  # Check builder fee status (for troubleshooting)
 ```
 
-The `setup` command handles everything:
-1. Generate new wallet or use existing private key
-2. Save config to `~/.openbroker/.env`
-3. Automatically approve builder fee (required for trading)
+The `setup` command offers three modes:
+1. **Import existing key** — use a private key you already have (master wallet)
+2. **Generate new wallet** — create a fresh master wallet
+3. **Generate API wallet** (recommended for agents) — creates a restricted wallet that can trade but cannot withdraw
+
+For options 1 and 2, setup saves config and approves the builder fee automatically.
+For option 3 (API wallet), see the API Wallet Setup section below.
+
+### API Wallet Setup (Recommended for Agents)
+
+API wallets can place trades on behalf of a master account but **cannot withdraw funds**. This is the safest option for automated agents.
+
+**Flow:**
+1. Run `openbroker setup` and choose option 3 ("Generate API wallet")
+2. The CLI generates a keypair and prints an approval URL (e.g. `https://openbroker.dev/approve?agent=0xABC...`)
+3. The agent owner opens the URL in a browser and connects their master wallet (MetaMask etc.)
+4. The master wallet signs two transactions: `ApproveAgent` (authorizes the API wallet) and `ApproveBuilderFee` (approves the 1 bps fee)
+5. The CLI detects the approval automatically and saves the config
+
+**After setup, the config will contain:**
+```
+HYPERLIQUID_PRIVATE_KEY=0x...        # API wallet private key
+HYPERLIQUID_ACCOUNT_ADDRESS=0x...    # Master account address
+HYPERLIQUID_NETWORK=mainnet
+```
+
+**Important for agents:** When using an API wallet, pass the approval URL to the agent owner (the human who controls the master wallet). The owner must approve in a browser before the agent can trade. The CLI waits up to 10 minutes for the approval. If it times out, re-run `openbroker setup`.
 
 ### Account Info
 ```bash
@@ -86,6 +109,55 @@ openbroker spot                   # Show all spot markets
 openbroker spot --coin PURR       # Show PURR market info
 openbroker spot --balances        # Show your spot balances
 openbroker spot --top 20          # Top 20 by volume
+```
+
+### Trade Fills
+```bash
+openbroker fills                          # Recent fills
+openbroker fills --coin ETH               # ETH fills only
+openbroker fills --coin BTC --side buy --top 50
+```
+
+### Order History
+```bash
+openbroker orders                         # Recent orders (all statuses)
+openbroker orders --coin ETH --status filled
+openbroker orders --top 50
+```
+
+### Order Status
+```bash
+openbroker order-status --oid 123456789   # Check specific order
+openbroker order-status --oid 0x1234...   # By client order ID
+```
+
+### Fee Schedule
+```bash
+openbroker fees                           # Fee tier, rates, and volume
+```
+
+### Candle Data (OHLCV)
+```bash
+openbroker candles --coin ETH                           # 24 hourly candles
+openbroker candles --coin BTC --interval 4h --bars 48   # 48 four-hour bars
+openbroker candles --coin SOL --interval 1d --bars 30   # 30 daily bars
+```
+
+### Funding History
+```bash
+openbroker funding-history --coin ETH              # Last 24h
+openbroker funding-history --coin BTC --hours 168  # Last 7 days
+```
+
+### Recent Trades (Tape)
+```bash
+openbroker trades --coin ETH              # Last 30 trades
+openbroker trades --coin BTC --top 50     # Last 50 trades
+```
+
+### Rate Limit
+```bash
+openbroker rate-limit                     # API usage and capacity
 ```
 
 ## Trading Commands
@@ -294,7 +366,56 @@ Run `openbroker setup` to create the global config interactively.
 |----------|----------|-------------|
 | `HYPERLIQUID_PRIVATE_KEY` | Yes | Wallet private key (0x...) |
 | `HYPERLIQUID_NETWORK` | No | `mainnet` (default) or `testnet` |
-| `HYPERLIQUID_ACCOUNT_ADDRESS` | No | For API wallets |
+| `HYPERLIQUID_ACCOUNT_ADDRESS` | No | Master account address (required for API wallets) |
+
+The builder fee (1 bps / 0.01%) is hardcoded and not configurable.
+
+## OpenClaw Plugin (Optional)
+
+This skill works standalone via Bash — every command above runs through the `openbroker` CLI. For enhanced features, the same `openbroker` npm package also ships as an **OpenClaw plugin** that you can enable alongside this skill.
+
+### What the plugin adds
+
+- **Structured agent tools** (`ob_account`, `ob_buy`, `ob_limit`, etc.) — typed tool calls with proper input schemas instead of Bash strings. The agent gets structured JSON responses.
+- **Background position watcher** — polls your Hyperliquid account every 30s and sends webhook alerts when positions open/close, PnL moves significantly, or margin usage gets dangerous.
+- **CLI commands** — `openclaw ob status` and `openclaw ob watch` for inspecting the watcher.
+
+### Enable the plugin
+
+The plugin is bundled in the same `openbroker` npm package. To enable it in your OpenClaw config:
+
+```yaml
+plugins:
+  entries:
+    openbroker:
+      enabled: true
+      config:
+        hooksToken: "your-hooks-secret"   # Required for watcher alerts
+        watcher:
+          enabled: true
+          pollIntervalMs: 30000
+          pnlChangeThresholdPct: 5
+          marginUsageWarningPct: 80
+```
+
+The plugin reads wallet credentials from `~/.openbroker/.env` (set up by `openbroker setup`), so you don't need to duplicate `privateKey` in the plugin config unless you want to override.
+
+### Webhook setup for watcher alerts
+
+For position alerts to reach the agent, enable hooks in your gateway config:
+
+```yaml
+hooks:
+  enabled: true
+  token: "your-hooks-secret"   # Must match hooksToken above
+```
+
+Without hooks, the watcher still runs and tracks state (accessible via `ob_watcher_status`), but it can't wake the agent.
+
+### Using with or without the plugin
+
+- **Skill only (no plugin):** Use Bash commands (`openbroker buy --coin ETH --size 0.1`). No background monitoring.
+- **Skill + plugin:** The agent prefers the `ob_*` tools when available (structured data), falls back to Bash for commands not covered by tools (strategies, scale). Background watcher sends alerts automatically.
 
 ## Risk Warning
 

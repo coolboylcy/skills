@@ -3,11 +3,16 @@
   "slug": "openbroker",
   "displayName": "Open-broker",
   "latest": {
-    "version": "1.0.39",
-    "publishedAt": 1771065643517,
-    "commit": "https://github.com/openclaw/skills/commit/e17821c9c19b763f66327abd67ffa616fb931b88"
+    "version": "1.0.44",
+    "publishedAt": 1772033797050,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.39",
+      "publishedAt": 1771065643517,
+      "commit": "https://github.com/openclaw/skills/commit/e17821c9c19b763f66327abd67ffa616fb931b88"
+    },
     {
       "version": "1.0.37",
       "publishedAt": 1770561464905,
