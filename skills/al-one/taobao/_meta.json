@@ -1,11 +1,17 @@
 {
   "owner": "al-one",
   "slug": "taobao",
-  "displayName": "淘宝/京东/拼多多比价技能",
+  "displayName": "🛍️ 淘宝/京东/拼多多比价技能",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1771837657980,
-    "commit": "https://github.com/openclaw/skills/commit/c526ea6e70c986178894e85e445f44a53776e799"
+    "version": "1.0.2",
+    "publishedAt": 1771905443827,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1771837657980,
+      "commit": "https://github.com/openclaw/skills/commit/c526ea6e70c986178894e85e445f44a53776e799"
+    }
+  ]
 }
