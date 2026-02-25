@@ -1,6 +1,24 @@
 ---
 name: torah-scholar
 description: Search and explore Jewish texts (Torah, Tanach, Talmud, Midrash, commentaries) via Sefaria API. Use when researching Torah sources, looking up verses, finding commentaries, cross-references, or preparing divrei Torah. Supports Hebrew and English. Handles references like "Genesis 1:1", "Berakhot 2a", "Mishnah Avot 1:1".
+keywords:
+  - torah
+  - jewish
+  - judaism
+  - sefaria
+  - talmud
+  - bible
+  - hebrew
+  - tanach
+  - mishnah
+  - midrash
+  - dvar torah
+  - parsha
+  - rabbi
+  - yeshiva
+  - study
+  - religious
+  - scripture
 ---
 
 # Torah Scholar
