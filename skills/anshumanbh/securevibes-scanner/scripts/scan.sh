@@ -26,14 +26,14 @@ fi
 # Check securevibes is installed
 if ! command -v securevibes &>/dev/null; then
     echo "❌ securevibes not found. Install with: pip install securevibes"
-    echo "   https://pypi.org/project/securevibes/"
+    echo "  https://pypi.org/project/securevibes/"
     exit 1
 fi
 
-# Check API key
+# Check API key (optional if authenticated via Anthropic Max/Pro OAuth)
 if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-    echo "❌ ANTHROPIC_API_KEY not set. Required for Claude-powered analysis."
-    exit 1
+    echo "ℹ️  ANTHROPIC_API_KEY not set — using Anthropic OAuth (Max/Pro subscription)."
+    echo "   If auth fails, set ANTHROPIC_API_KEY or run: claude login"
 fi
 
 echo "🛡️  SecureVibes Scanner"
