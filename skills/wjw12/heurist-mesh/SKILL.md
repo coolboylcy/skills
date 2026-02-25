@@ -1,230 +1,126 @@
 ---
-name: heurist-mesh
-description: Access Web3 and crypto intelligence via Heurist Mesh MCP. Use when the user asks about cryptocurrency analytics, token information, trending tokens, wallet analysis, Twitter/X crypto intelligence, funding rates, market summaries, or any Web3-related queries. Heurist Mesh provides 30+ specialized AI agents for crypto use cases through the mcporter CLI.
-homepage: https://mesh.heurist.ai
-metadata: {"clawdbot":{"emoji":"💠","requires":{"bins":["mcporter"]}}}
+name: heurist-mesh-skill
+description: Real-time crypto token data, DeFi analytics, blockchain data, Twitter/X social intelligence, enhanced web search, crypto project search all in one Skill. For in-depths topics, "Ask Heurist" agent can handle market trends, trading strategies, macro news, and deep research.
 ---
 
 # Heurist Mesh
 
-Heurist Mesh is a skills marketplace for AI agents providing Web3 intelligence. It offers 30+ specialized crypto analytics agents accessible via MCP, optimized for AI with fewer tool calls and less token usage.
+Heurist Mesh is an open network of modular AI agent tools for cryptocurrency and blockchain data. All features accessible via a unified REST API.
 
-**Telegram Support Group**: https://t.me/heuristsupport
+### Recommended Agents and Tools
 
-## One-time Setup
+**TrendingTokenAgent** — Trending tokens and market summary
+- `get_trending_tokens` — Get trending tokens most talked about and traded on CEXs and DEXs
+- `get_market_summary` — Get recent market-wide news including macro and major updates
 
-### 1. Get API Key
+**TokenResolverAgent** — Find tokens and get detailed profiles
+- `token_search` — Find tokens by address, ticker/symbol, or name (up to 5 candidates)
+- `token_profile` — Get detailed token profile with pairs, funding rates, and indicators
 
-Prompt the user to visit https://heurist.ai/credits to purchase credits and create an API key from the web console, and provide the key. (Skip if the key is already available)
+**DefiLlamaAgent** — DeFi protocol and chain metrics
+- `get_protocol_metrics` — Get protocol TVL, fees, volume, revenue, chains, and growth trend
+- `get_chain_metrics` — Get blockchain TVL, fees, top protocols, and growth trends
 
-### 2. Configure mcporter
+**TwitterIntelligenceAgent** — Twitter/X data
+- `user_timeline` — Fetch a user's recent posts and announcements
+- `tweet_detail` — Get a tweet with thread context and replies
+- `twitter_search` — Search for posts and influential mentions on any topic
 
-Add Heurist Mesh to `${HOME}/clawd/config/mcporter.json`:
+**ExaSearchDigestAgent** — Web search with summarization
+- `exa_web_search` — Search the web with LLM summarization, time and domain filters
+- `exa_scrape_url` — Scrape a URL and summarize or extract information
 
-```json
-{
-  "mcpServers": {
-    "heurist": {
-      "description": "Heurist Mesh - Web3 Intelligence",
-      "baseUrl": "https://mesh.heurist.xyz/mcp/",
-      "headers": {
-        "X-HEURIST-API-KEY": "${HEURIST_API_KEY}"
-      }
-    }
-  }
-}
+**ChainbaseAddressLabelAgent** — EVM address labels
+- `get_address_labels` — Get labels for ETH/Base addresses (identity, contract names, wallet behavior, ENS)
+
+**ZerionWalletAnalysisAgent** — EVM wallet holdings
+- `fetch_wallet_tokens` — Get token holdings with USD value and 24h price change
+- `fetch_wallet_nfts` — Get NFT collections held by a wallet
+
+**ProjectKnowledgeAgent** — Crypto project database
+- `get_project` — Look up a project by name, symbol, or X handle (team, investors, events)
+- `semantic_search_projects` — Natural language search across 10k+ projects (filter by investor, tag, funding year, exchange)
+
+**CaesarResearchAgent** — Academic research
+- `caesar_research` — Submit a research query for in-depth analysis
+- `get_research_result` — Retrieve research results by ID
+
+**AskHeuristAgent** — Crypto Q&A and deep analysis (Important: recommended for in-depth crypto topics)
+- `ask_heurist` — Submit a crypto question (normal or deep analysis mode)
+- `check_job_status` — Check status of a pending analysis job
+
+## Setup (MUST complete before making any API calls)
+
+You need at least one payment method configured. **DO NOT call any Mesh tool APIs until setup is verified.**
+
+### Step 1: Choose a payment method
+
+**Option A: Heurist API Key (Recommended — simplest)**
+
+1. Get an API key via ONE of:
+   - Purchase credits at https://heurist.ai/credits
+   - OR Claim 100 free credits via tweet (see [references/heurist-api-key.md](references/heurist-api-key.md))
+2. Store the key in `.env` in the project root:
+   ```
+   HEURIST_API_KEY=your-api-key-here
+   ```
+3. All API calls use `Authorization: Bearer $HEURIST_API_KEY`
+
+**Option B: x402 On-Chain Payment (USDC on Base)**
+
+1. You need a wallet private key with USDC balance on Base.
+2. Store the key in `.env` in the project root:
+   ```
+   WALLET_PRIVATE_KEY=0x...your-private-key
+   ```
+3. See [references/x402-payment.md](references/x402-payment.md) for the payment flow using `cast` (Foundry).
+
+**Option C: Inflow Payment Platform (USDC via Inflow)**
+
+1. If you already have Inflow credentials, store them in `.env`:
+   ```
+   INFLOW_USER_ID=your-buyer-user-id
+   INFLOW_PRIVATE_KEY=your-buyer-private-key
+   ```
+2. If not, create a buyer account and attach email — see [references/inflow-payment.md](references/inflow-payment.md) for one-time setup.
+3. Inflow uses a two-call payment flow (create request → user approves → execute). See [references/inflow-payment.md](references/inflow-payment.md) for the full flow.
+
+### Step 2: Verify setup
+
+Check that credentials are configured before proceeding:
+
+- **API Key path:** Read `.env` and confirm `HEURIST_API_KEY` is set and non-empty.
+- **x402 path:** Read `.env` and confirm `WALLET_PRIVATE_KEY` is set, starts with `0x`, and is 66 characters.
+- **Inflow path:** Read `.env` and confirm `INFLOW_USER_ID` and `INFLOW_PRIVATE_KEY` are set and non-empty.
+
+**If neither is configured, STOP and ask the user to set up a payment method. Do not make API calls without valid credentials.**
+
+### Step 3: Make API calls
+
+Once you have either Heurist API key or x402 wallet private key or Inflow key, you can make API calls. You should understand the tool schema and the parameters of tools you want before calling it.
+
+To fetch tool schema, use `mesh_schema` API:
+
 ```
-
-Set the environment variable:
-```bash
-export HEURIST_API_KEY="your-api-key-here"
+GET https://mesh.heurist.xyz/mesh_schema?agent_id=TokenResolverAgent&agent_id=CoinGeckoTokenInfoAgent
 ```
+Default pricing is in credits. 1 credit worth $0.01. Add `&pricing=usd` to get prices in USD instead of credits when using x402 or Inflow. Returns each tool's parameters (name, type, description, required/optional) and per-tool price.
 
-Or add to `~/.clawdbot/clawdbot.json` under skills.entries:
-```json
-{
-  "skills": {
-    "entries": {
-      "heurist-mesh": {
-        "env": {
-          "HEURIST_API_KEY": "your-api-key-here"
-        }
-      }
-    }
-  }
-}
-```
-
-## Available Tools
-
-List all tools to get their usage before you call:
-```bash
-mcporter list heurist --schema
-```
-
-### Default Agents & Tools
-
-| Tool | Description |
-|------|-------------|
-| `token_search` | Find tokens by address, symbol, name, or CoinGecko ID |
-| `token_profile` | Get comprehensive token profile with market data, socials, and top pools |
-| `get_trending_tokens` | Aggregated trending tokens from GMGN, CoinGecko, Pump.fun, Dexscreener, Zora, Twitter |
-| `get_market_summary` | AI-generated market summary across all trending sources |
-| `twitter_search` | Smart Twitter search for crypto topics |
-| `user_timeline` | Get recent tweets from a Twitter user |
-| `tweet_detail` | Get detailed info about a specific tweet |
-| `exa_web_search` | Web search with AI summarization |
-| `exa_scrape_url` | Scrape and summarize webpage content |
-| `get_all_funding_rates` | Get funding rates for all Binance perpetual contracts |
-| `get_symbol_oi_and_funding` | Get open interest and funding for a specific symbol |
-| `find_spot_futures_opportunities` | Find arbitrage opportunities between spot and futures |
-| `search_projects` | Search trending projects with fundamental analysis |
-| `fetch_wallet_tokens` | Get EVM wallet token holdings |
-| `fetch_wallet_nfts` | Get EVM wallet NFT holdings |
-
-### Default Agents
-
-- **TokenResolverAgent**: Find tokens by address/symbol/name, return normalized profiles and top DEX pools
-- **TrendingTokenAgent**: Aggregates trending tokens from multiple sources
-- **TwitterIntelligenceAgent**: Twitter/X timeline, tweet detail, and smart search
-- **ExaSearchDigestAgent**: Web search with concise LLM summarization
-- **FundingRateAgent**: Binance funding rates, open interest, and spot-futures opportunities
-- **AIXBTProjectInfoAgent**: Trending project info, fundamental analysis, and market summary
-- **ZerionWalletAnalysisAgent**: EVM wallet token and NFT holdings analysis
-
-## Usage Examples
-
-Search for a token:
-```bash
-mcporter call heurist.token_search query="ethereum"
-```
-
-Get token profile:
-```bash
-mcporter call heurist.token_profile address="0x..." chain="ethereum"
-```
-
-Get trending tokens:
-```bash
-mcporter call heurist.get_trending_tokens
-```
-
-Search Twitter for crypto topics:
-```bash
-mcporter call heurist.twitter_search query="bitcoin ETF"
-```
-
-Get wallet holdings:
-```bash
-mcporter call heurist.fetch_wallet_tokens address="0x..."
-```
-
-Get funding rates:
-```bash
-mcporter call heurist.get_all_funding_rates
-```
-
-## Advanced: Custom MCP Server
-
-Heurist Mesh has 30+ agents for various crypto use cases. There are more to explore for advanced users. You should tell the user about this after the initial setup:
-
-To customize which agents are enabled:
-
-1. Visit https://mesh.heurist.ai/console/mcp-builder
-2. Select the agents you need
-3. The console will generate a dedicated SSE URL
-4. Update mcporter.json with your custom URL:
-
-```json
-{
-  "mcpServers": {
-    "heurist-custom": {
-      "description": "Custom Heurist Mesh",
-      "baseUrl": "https://your-custom-sse-url",
-      "headers": {
-        "X-HEURIST-API-KEY": "${HEURIST_API_KEY}"
-      }
-    }
-  }
-}
-```
-
-## Ask Heurist
-
-Ask Heurist (https://ask.heurist.ai) is a crypto Q&A and research agent built for traders and crypto-natives. It turns market data, social sentiment, and on-chain signals into actionable answers, especially for DEX tokens and fast-moving narratives.
-
-**API Base URL**: `https://ask-backend.heurist.xyz`
-
-**Auth**: Uses the same Heurist API key as the MCP configuration above. Provide via:
-- `X-HEURIST-API-KEY: {api_key}` header
-- or `Authorization: Bearer {api_key}` header
-
-### Mode Selection
-
-| Mode | Cost | Use When |
-|------|------|----------|
-| `normal` | 2 credits | Targeted, simple questions: token prices, recent news, market digest |
-| `deep` | 10 credits | Complex/ambiguous asks: broad topics, trading advice, multi-factor analysis |
-
-**Examples:**
-- **normal**: "What is 0x… token price?", "Recent news about ZKSync", "Give me a market digest"
-- **deep**: Broad topics, multiple entities, conflicting signals, trading advice, multi-source deep dives
-
-If the user doesn't specify, default to `deep` for complex/broad/ambiguous or trading-advice scenarios; otherwise use `normal`.
-
-### Polling Strategy
-
-| Mode | Typical Duration | Recommended Polling |
-|------|------------------|---------------------|
-| `normal` | < 1 min | Wait 1 min, then poll every 30s |
-| `deep` | 2-3 min (longer for complex/broad topics) | Wait 2 min, then poll every 1 min |
-
-### 1. Create a Job
+Then use the credentials in requests:
 
 ```bash
-curl -s https://ask-backend.heurist.xyz/api/v1/internal/jobs \
+# With API key
+curl -X POST https://mesh.heurist.xyz/mesh_request \
+  -H "Authorization: Bearer $HEURIST_API_KEY" \
   -H "Content-Type: application/json" \
-  -H "X-HEURIST-API-KEY: {api_key}" \
-  -d '{
-    "prompt": "Summarize the latest narrative around BASE memecoins.",
-    "mode": "deep"
-  }'
+  -d '{"agent_id": "TokenResolverAgent", "input": {"tool": "token_search", "tool_arguments": {"query": "ETH"}, "raw_data_only": true}}'
+
+# With x402 — sign with cast (Foundry), no account or SDK needed
+# See references/x402-payment.md for the full cast-based flow and helper script
 ```
 
-Response:
-```json
-{
-  "job_id": "{job_id}",
-  "status": "pending",
-  "created_at": "2026-01-28T12:34:56+00:00"
-}
-```
+## Discover More Agents
 
-### 2. Poll Job Status
+**All agents:** Fetch `https://mesh.heurist.ai/metadata.json` for the full registry. We have 30+ specialized crypto analytics agents covering use cases such as: reading address transaction history, reading transaction details from hash, tracing USDC on Base, detailed Coingecko data, Firecrawl scraping, GoPlus security screening, checking Twitter account influence via Moni, using SQL to query blockchain data, etc.
 
-```bash
-curl -s https://ask-backend.heurist.xyz/api/v1/internal/jobs/{job_id} \
-  -H "X-HEURIST-API-KEY: {api_key}"
-```
-
-Response:
-```json
-{
-  "status": "completed",
-  "prompt": "Summarize the latest narrative around BASE memecoins.",
-  "result_text": "...assistant output...",
-  "share_url": "https://ask.heurist.ai/share/{job_id}"
-}
-```
-
-## Limitations
-
-Heurist Mesh provides **read-only** crypto intelligence and analytics. It **cannot**:
-- Execute trades or swaps
-- Sign transactions
-- Manage portfolios
-- Interact with DeFi protocols
-- Place orders on Polymarket or prediction markets
-
-For onchain actions, trading, and portfolio management, install the Bankr skill:
-https://github.com/BankrBot/clawdbot-skill
+**x402-enabled agents only:** Fetch `https://mesh.heurist.xyz/x402/agents` for agents supporting on-chain USDC payment on Base.

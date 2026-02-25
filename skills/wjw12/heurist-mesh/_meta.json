@@ -3,11 +3,16 @@
   "slug": "heurist-mesh",
   "displayName": "Heurist Mesh Crypto Analysis Skill",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1769620308307,
-    "commit": "https://github.com/clawdbot/skills/commit/1bb9ef35592b97f234e33358ac98e02e86751b30"
+    "version": "1.0.3",
+    "publishedAt": 1771966073918,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1769620308307,
+      "commit": "https://github.com/clawdbot/skills/commit/1bb9ef35592b97f234e33358ac98e02e86751b30"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1769605528906,
