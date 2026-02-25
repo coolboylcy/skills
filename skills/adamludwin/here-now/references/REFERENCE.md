@@ -298,9 +298,9 @@ Asset paths work naturally from the subdomain root:
 ### Serving rules
 
 1. If `index.html` exists at root → serve it as the document.
-2. Else if exactly one file at root → serve an auto-viewer page (images, PDF, video, audio get rich viewers; everything else gets a download page).
+2. Else if exactly one file in the entire publish → serve an auto-viewer page (images, PDF, video, audio get rich viewers; everything else gets a download page).
 3. Else if an `index.html` exists in any subdirectory → serve the first one found.
-4. Else → 404.
+4. Otherwise → serve an auto-generated directory listing. Folders are clickable, images render as a gallery, and other files are listed with sizes. No `index.html` required.
 
 Direct file paths always work: `https://<slug>.here.now/report.pdf`
 

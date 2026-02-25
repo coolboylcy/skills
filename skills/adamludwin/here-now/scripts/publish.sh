@@ -4,6 +4,7 @@ set -euo pipefail
 BASE_URL="https://here.now"
 CREDENTIALS_FILE="$HOME/.herenow/credentials"
 API_KEY="${HERENOW_API_KEY:-}"
+ALLOW_NON_HERENOW_BASE_URL=0
 SLUG=""
 CLAIM_TOKEN=""
 TITLE=""
@@ -23,6 +24,8 @@ Options:
   --description <text>    Viewer description
   --ttl <seconds>         Expiry (authenticated only)
   --base-url <url>        API base (default: https://here.now)
+  --allow-nonherenow-base-url
+                         Allow auth requests to non-default API base URL
 USAGE
   exit 1
 }
@@ -54,6 +57,7 @@ while [[ $# -gt 0 ]]; do
     --description)  DESCRIPTION="$2"; shift 2 ;;
     --ttl)          TTL="$2"; shift 2 ;;
     --base-url)     BASE_URL="$2"; shift 2 ;;
+    --allow-nonherenow-base-url) ALLOW_NON_HERENOW_BASE_URL=1; shift ;;
     --help|-h)      usage ;;
     -*)             die "unknown option: $1" ;;
     *)              [[ -z "$TARGET" ]] && TARGET="$1" || die "unexpected argument: $1"; shift ;;
@@ -71,6 +75,11 @@ fi
 BASE_URL="${BASE_URL%/}"
 STATE_DIR=".herenow"
 STATE_FILE="$STATE_DIR/state.json"
+
+# Safety guard: avoid accidentally sending bearer auth to arbitrary endpoints.
+if [[ -n "$API_KEY" && "$BASE_URL" != "https://here.now" && "$ALLOW_NON_HERENOW_BASE_URL" -ne 1 ]]; then
+  die "refusing to send API key to non-default base URL; pass --allow-nonherenow-base-url to override"
+fi
 
 # Auto-load claim token from state file for anonymous updates
 if [[ -n "$SLUG" && -z "$CLAIM_TOKEN" && -z "$API_KEY" && -f "$STATE_FILE" ]]; then

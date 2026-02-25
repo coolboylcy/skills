@@ -8,11 +8,21 @@ description: >
 
 # here.now
 
-**Skill version: 1.6**
+**Skill version: 1.6.2**
 
 Publish any file or folder to the web and get a live URL back. Static hosting only.
 
-To install or update: `curl -fsSL https://here.now/install.sh | bash`
+To install or update (recommended): `npx skills add heredotnow/skill --skill here-now -g`
+
+For repo-pinned/project-local installs, run the same command without `-g`.
+
+If npm is unavailable, see fallback install docs: https://here.now/docs#install-skill
+
+## Requirements
+
+- Required binaries: `curl`, `file`, `jq`
+- Optional environment variable: `$HERENOW_API_KEY`
+- Optional credentials file: `~/.herenow/credentials`
 
 ## Publish
 
@@ -25,7 +35,9 @@ Outputs the live URL (e.g. `https://bright-canvas-a7k2.here.now/`).
 Without an API key this creates an **anonymous publish** that expires in 24 hours.
 With a saved API key, the publish is permanent.
 
-**File structure:** Place `index.html` at the root of the directory you publish, not inside a subdirectory. The directory's contents become the site root. For example, publish `my-site/` where `my-site/index.html` exists — don't publish a parent folder that contains `my-site/`.
+**File structure:** For HTML sites, place `index.html` at the root of the directory you publish, not inside a subdirectory. The directory's contents become the site root. For example, publish `my-site/` where `my-site/index.html` exists — don't publish a parent folder that contains `my-site/`.
+
+You can also publish raw files without any HTML. Single files get a rich auto-viewer (images, PDF, video, audio). Multiple files get an auto-generated directory listing with folder navigation and an image gallery.
 
 ## Update an existing publish
 
@@ -52,6 +64,8 @@ mkdir -p ~/.herenow && echo "<API_KEY>" > ~/.herenow/credentials && chmod 600 ~/
 ```
 
 **IMPORTANT**: Never pass the API key directly in shell commands. Always write it to `~/.herenow/credentials` using the command above. This keeps the key out of terminal history and logs.
+
+Never commit credentials or local state files (`~/.herenow/credentials`, `.herenow/state.json`) to source control.
 
 ## State file
 
@@ -117,6 +131,7 @@ mkdir -p ~/.herenow && echo "<API_KEY>" > ~/.herenow/credentials && chmod 600 ~/
 | `--description <text>` | Viewer description                            |
 | `--ttl <seconds>`      | Set expiry (authenticated only)               |
 | `--base-url <url>`     | API base URL (default: `https://here.now`)    |
+| `--allow-nonherenow-base-url` | Allow sending auth to non-default `--base-url` |
 | `--api-key <key>`      | API key override (prefer credentials file)    |
 
 ## Beyond the script
