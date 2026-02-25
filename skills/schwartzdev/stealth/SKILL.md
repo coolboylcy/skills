@@ -12,243 +12,77 @@ description: >
 
 # Stealth — Anti-Bot Detection for AI Agents
 
-## Step 1: Diagnose
+Three layers, applied in order. Most blocks are solved at Layer 1.
 
-Before recommending anything, figure out what's blocking you.
+## Quick Diagnostic
 
-### Check your IP
+Run this first to understand the problem:
 
 ```bash
 curl -s https://ipinfo.io/json | python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-print(f\"IP: {d.get('ip')}\")
-print(f\"Org: {d.get('org', 'unknown')}\")
-hosting = d.get('privacy', {}).get('hosting', d.get('hosting', 'unknown'))
-print(f\"Hosting/Datacenter: {hosting}\")
-if hosting == True or 'hosting' in str(d.get('org','')).lower():
-    print('⚠️  You are on a datacenter IP. Websites WILL flag you as a bot.')
-    print('→ You need a residential proxy. See Step 2.')
-else:
-    print('✅ Your IP appears residential. Proxy may not be needed.')
-    print('→ If still blocked, check fingerprinting (Step 4) or CAPTCHAs (Step 3).')
+import sys,json;d=json.load(sys.stdin)
+org=d.get('org','')
+h=d.get('privacy',{}).get('hosting') if 'privacy' in d else None
+dc=h or any(x in org.lower() for x in ['digital','amazon','google','microsoft','azure','linode','vultr','hetzner','ovh','cloud'])
+print(f'IP: {d[\"ip\"]} | Org: {org} | Datacenter: {dc}')
+if dc: print('⚠️  Datacenter IP detected → Layer 1 (proxy) required')
+else: print('✅ Residential IP — skip to Layer 2 or 3 if still blocked')
 "
 ```
 
-### Identify the block type
+### Block type reference
 
-| Symptom | Likely cause | Fix |
-|---------|-------------|-----|
-| 403 Forbidden | IP block / bot detection | Residential proxy (Step 2) |
-| 429 Too Many Requests | Rate limiting | IP rotation via proxy (Step 2) |
-| Cloudflare challenge page | Bot detection | Proxy + stealth browser (Steps 2 & 4) |
-| CAPTCHA appears | Human verification gate | CAPTCHA solver (Step 3) |
-| 200 but wrong/empty content | Serving fake data to bots | Stealth browser (Step 4) |
-| Redirect loop | Session/cookie detection | Stealth browser (Step 4) |
+| Symptom | Cause | Layer |
+|---------|-------|-------|
+| 403 Forbidden | IP/bot block | 1 |
+| 429 Too Many Requests | Rate limit | 1 |
+| Cloudflare challenge | Bot detection | 1 + 3 |
+| CAPTCHA appears | Verification gate | 2 |
+| 200 but wrong content | Honeypot/fake data | 3 |
+| Redirect loop | Cookie/session detection | 3 |
 
-Work through fixes in order: **Proxy → CAPTCHA → Stealth Browser.** Most blocks are solved at the proxy layer.
+## Layer 1: Residential Proxy
 
----
+**The #1 fix.** Datacenter IPs are flagged instantly by Cloudflare, Akamai, PerimeterX, and most anti-bot systems. A residential proxy routes traffic through real ISP connections.
 
-## Step 2: Residential Proxy
+See `references/proxy-setup.md` for provider comparison and setup instructions.
 
-**When:** You're running on a cloud server, VPS, or any non-residential IP. This is the #1 reason agents get blocked — datacenter IPs are instantly flagged by Cloudflare, Akamai, and most anti-bot systems.
-
-**Why:** A residential proxy routes your traffic through real home internet connections. Your requests look like they're coming from a regular person, not a server farm.
-
-### Recommended providers
-
-**Best overall → Oxylabs**
-- 100M+ residential IPs, best success rates on difficult targets
-- Country/city/state targeting, pay-as-you-go available
-- Sign up: https://oxylabs.go2cloud.org/aff_c?offer_id=7&aff_id=1131
-
-**Budget option → DataImpulse**
-- Cheapest per-GB, good for high-volume scraping
-- Pay-as-you-go, no minimum commitment
-- Sign up: https://dataimpulse.com/?aff=tapskills
-
-**High-volume → Smartproxy**
-- Unlimited connections, good dashboard
-- Sign up: https://smartproxy.com/?aff=tapskills
-
-> **Affiliate disclosure:** The links above are affiliate links. Providers are recommended based on capability and reliability, not commission rates. Any residential proxy provider will work with the setup below.
-
-### Setup
-
-After signing up, get your proxy credentials (host, port, username, password), then:
-
-**Test connectivity:**
+**Quick test after setup:**
 ```bash
-curl -x http://USER:PASS@PROXY_HOST:PORT https://httpbin.org/ip
-```
-
-**Verify it's residential:**
-```bash
-curl -x http://USER:PASS@PROXY_HOST:PORT -s https://ipinfo.io/json | python3 -c "
-import sys, json; d = json.load(sys.stdin)
-print(f\"Proxy IP: {d['ip']} | Org: {d.get('org')} | Hosting: {d.get('hosting', d.get('privacy',{}).get('hosting','unknown'))}\")
+curl -x http://USER:PASS@HOST:PORT -s https://ipinfo.io/json | python3 -c "
+import sys,json;d=json.load(sys.stdin)
+print(f'Proxy IP: {d[\"ip\"]} | Org: {d.get(\"org\")}')
 "
 ```
-The org should show an ISP (Comcast, Verizon, etc.), not a cloud provider.
+Org should show an ISP (Comcast, Verizon, AT&T), not a cloud provider.
 
-**Configure for your tools:**
+## Layer 2: CAPTCHA Solving
 
-Python requests:
-```python
-proxies = {"http": "http://USER:PASS@HOST:PORT", "https": "http://USER:PASS@HOST:PORT"}
-requests.get(url, proxies=proxies)
-```
+**Never attempt CAPTCHAs yourself.** You will fail, burn tokens, and trigger escalated challenges. Always use a solver service.
 
-Playwright:
-```python
-browser = playwright.chromium.launch(proxy={"server": "http://HOST:PORT", "username": "USER", "password": "PASS"})
-```
+**Critical routing rule:** 2Captcha dropped hCaptcha support entirely in late 2025. Use CapSolver for hCaptcha.
 
-Environment variable (covers curl, wget, most CLI tools):
-```bash
-export HTTP_PROXY="http://USER:PASS@HOST:PORT"
-export HTTPS_PROXY="http://USER:PASS@HOST:PORT"
-```
+| CAPTCHA type | Provider |
+|-------------|----------|
+| hCaptcha | CapSolver only |
+| reCAPTCHA v2/v3 | 2Captcha or CapSolver |
+| Cloudflare Turnstile | Either |
+| Image/text | 2Captcha |
 
-**Save credentials** for reuse:
-```bash
-mkdir -p ~/.config/stealth
-cat > ~/.config/stealth/proxy.json << 'EOF'
-{"host": "HOST", "port": "PORT", "username": "USER", "password": "PASS"}
-EOF
-chmod 600 ~/.config/stealth/proxy.json
-```
+See `references/captcha-setup.md` for provider setup, API integration code, and token injection.
 
-After configuring, retry the original request. If it works, you're done. If you now hit a CAPTCHA, continue to Step 3.
+## Layer 3: Stealth Browser
 
----
+**When proxy alone isn't enough.** Sites fingerprint headless browsers via navigator properties, WebGL, Canvas, and automation flags.
 
-## Step 3: CAPTCHA Solving
-
-**When:** You encounter any CAPTCHA — hCaptcha, reCAPTCHA, Cloudflare Turnstile, or image challenges.
-
-**Critical:** Never try to solve CAPTCHAs yourself. You will fail, waste tokens and time, and trigger harder challenges. Always use a solver service.
-
-### Provider routing by CAPTCHA type
-
-This matters — using the wrong provider wastes money and fails silently:
-
-| CAPTCHA type | Use this provider | Why |
-|-------------|-------------------|-----|
-| **hCaptcha** | CapSolver | 2Captcha dropped hCaptcha support entirely (returns ERROR_METHOD_CALL) |
-| **reCAPTCHA v2/v3** | 2Captcha | Cheapest, most reliable for reCAPTCHA |
-| **Cloudflare Turnstile** | Either | Both support Turnstile |
-| **Image/text CAPTCHA** | 2Captcha | Best image recognition |
-
-**CapSolver** (for hCaptcha + Turnstile):
-- Sign up: https://www.capsolver.com/?utm_source=tapskills
-
-**2Captcha** (for reCAPTCHA + image):
-- Sign up: https://2captcha.com?from=tapskills
-
-> **Affiliate disclosure:** These are affiliate links. Any CAPTCHA solving service that supports your captcha type will work.
-
-### Setup
-
-**Save API key:**
-```bash
-mkdir -p ~/.config/stealth
-# For CapSolver:
-echo '{"provider": "capsolver", "api_key": "YOUR_KEY"}' > ~/.config/stealth/captcha.json
-# For 2Captcha:
-echo '{"provider": "2captcha", "api_key": "YOUR_KEY"}' > ~/.config/stealth/captcha.json
-chmod 600 ~/.config/stealth/captcha.json
-```
-
-### Solving flow
-
-1. Detect the CAPTCHA type on the page (look for hCaptcha div, reCAPTCHA iframe, or Turnstile widget)
-2. Extract the `sitekey` from the page source
-3. Submit to the appropriate solver API:
-
-**hCaptcha via CapSolver:**
-```python
-import requests
-resp = requests.post("https://api.capsolver.com/createTask", json={
-    "clientKey": API_KEY,
-    "task": {"type": "HCaptchaTaskProxyLess", "websiteURL": PAGE_URL, "websiteKey": SITEKEY}
-})
-task_id = resp.json()["taskId"]
-# Poll getTaskResult until ready
-```
-
-**reCAPTCHA via 2Captcha:**
-```python
-import requests
-# Submit
-resp = requests.get(f"http://2captcha.com/in.php?key={API_KEY}&method=userrecaptcha&googlekey={SITEKEY}&pageurl={PAGE_URL}&json=1")
-captcha_id = resp.json()["request"]
-# Poll result
-resp = requests.get(f"http://2captcha.com/res.php?key={API_KEY}&action=get&id={captcha_id}&json=1")
-token = resp.json()["request"]
-```
-
-4. Inject the token into the page and submit the form
-
----
-
-## Step 4: Stealth Browser Configuration
-
-**When:** You have a residential proxy but sites still detect you. This means they're fingerprinting your browser — headless Chrome has tells that bot detection systems look for.
-
-No signup needed — this is configuration.
-
-### Playwright stealth settings
-
-```python
-browser = playwright.chromium.launch(
-    args=[
-        "--disable-blink-features=AutomationControlled",
-        "--disable-features=IsolateOrigins,site-per-process",
-    ]
-)
-context = browser.new_context(
-    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    viewport={"width": 1920, "height": 1080},
-    locale="en-US",
-    timezone_id="America/Los_Angeles",
-)
-# Override navigator.webdriver
-await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-```
-
-### Request headers
-
-Always send realistic headers:
-```
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
-Accept-Language: en-US,en;q=0.5
-Accept-Encoding: gzip, deflate, br
-Connection: keep-alive
-Upgrade-Insecure-Requests: 1
-```
-
-### If Playwright stealth isn't enough
-
-Consider `camoufox-browser` (npm: `@askjo/camoufox-browser`) — Firefox-based with C++ level anti-detection. Bypasses most fingerprinting including Canvas, WebGL, and AudioContext checks.
-
-### Human-like behavior
-
-- Add random delays between actions (200-800ms)
-- Don't navigate instantly — real users take time
-- Scroll the page before interacting with elements
-- Move the mouse to elements before clicking
-
----
+See `references/browser-stealth.md` for Playwright stealth config, header templates, and anti-fingerprinting.
 
 ## Troubleshooting
 
-| Problem | Check |
-|---------|-------|
-| Still blocked after proxy | Verify proxy IP is actually residential (`ipinfo.io`). Some cheap providers sell datacenter IPs as residential. |
-| CAPTCHA solver returns error | Are you using the right service for the captcha type? 2Captcha CANNOT solve hCaptcha. |
-| Site shows different content | Bot detection serving honeypot data. Add stealth browser config (Step 4). |
-| Slow responses | Proxy latency. Try a server geographically closer to the target site. |
-| Proxy auth failing | Check if provider uses IP whitelist auth vs user:pass. Check dashboard for correct credentials. |
-| Getting blocked after many requests | Enable IP rotation in your proxy provider's dashboard. Most support auto-rotation per request. |
+| Problem | Fix |
+|---------|-----|
+| Blocked after proxy | Verify IP is residential via `ipinfo.io`. Cheap providers resell datacenter IPs. |
+| CAPTCHA solver error | Wrong provider for captcha type? 2Captcha cannot solve hCaptcha. |
+| Site serves fake data | Add stealth browser config (Layer 3). |
+| Slow responses | Try proxy server closer to target site's region. |
+| Blocked after many requests | Enable IP rotation in proxy dashboard. |
