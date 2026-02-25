@@ -3,11 +3,16 @@
   "slug": "scrapling",
   "displayName": "Scrapling",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771939153321,
-    "commit": "https://github.com/openclaw/skills/commit/3bb3515700afc02dafd62046db93041102d359ab"
+    "version": "1.0.5",
+    "publishedAt": 1772015121902,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771939153321,
+      "commit": "https://github.com/openclaw/skills/commit/3bb3515700afc02dafd62046db93041102d359ab"
+    },
     {
       "version": "1.2.0",
       "publishedAt": 1771872125880,
