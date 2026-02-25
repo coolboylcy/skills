@@ -1,7 +1,7 @@
 ---
 name: OpenClaw Cache Kit
 description: Automatically apply Claude prompt caching optimizations to OpenClaw. Reduces API costs by up to 89% via cacheRetention long, 59-minute heartbeat, cache-ttl pruning, and CRON.md separation strategy.
-version: 1.1.0
+version: 1.1.1
 author: raon
 inspired_by: https://slashpage.com/thomasjeong/36nj8v2wq5zqj25ykq9z
 ---

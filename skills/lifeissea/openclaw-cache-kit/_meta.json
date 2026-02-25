@@ -3,11 +3,16 @@
   "slug": "openclaw-cache-kit",
   "displayName": "Openclaw Cache Kit",
   "latest": {
-    "version": "1.1.0",
-    "publishedAt": 1771719306541,
-    "commit": "https://github.com/openclaw/skills/commit/a66b23acd61455264bf5613765fc08ad3c0e9a34"
+    "version": "1.1.1",
+    "publishedAt": 1771978899420,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.1.0",
+      "publishedAt": 1771719306541,
+      "commit": "https://github.com/openclaw/skills/commit/a66b23acd61455264bf5613765fc08ad3c0e9a34"
+    },
     {
       "version": "1.0.5",
       "publishedAt": 1771510362901,
