@@ -32,6 +32,7 @@ Evaluate against each category. Skip categories that don't apply to this plan.
 5. **Scalability** — Bottlenecks, unbounded operations, resource limits
 6. **Completeness** — Edge cases, untested paths, unstated assumptions
 7. **Maintainability** — Code organization, naming clarity, documentation, tech debt
+8. **Differentiation** — Does this plan contain specific, non-obvious decisions? Or could a default LLM have produced it from a generic prompt with no project context? Look for: vague recommendations that apply to anything, generic architecture choices with no justification, boilerplate patterns used without considering alternatives, solutions that don't reference the actual codebase/constraints. Score 0 if this reads like "ask ChatGPT to plan a feature." Score 5 if every decision is grounded in specific project context.
 
 ## Required Output Format
 
@@ -46,7 +47,8 @@ Output ONLY the following JSON object. No text before it. No text after it. No m
     "error_handling":  { "score": 0-5 | null, "rationale": "one-line justification" },
     "scalability":     { "score": 0-5 | null, "rationale": "one-line justification" },
     "completeness":    { "score": 0-5 | null, "rationale": "one-line justification" },
-    "maintainability": { "score": 0-5 | null, "rationale": "one-line justification" }
+    "maintainability": { "score": 0-5 | null, "rationale": "one-line justification" },
+    "differentiation": { "score": 0-5 | null, "rationale": "one-line justification" }
   },
   "prior_issues": [
     { "id": "ISS-XXX", "status": "resolved|still-open|regressed|not-applicable", "evidence": "brief explanation" }

@@ -8,7 +8,7 @@ description: Adversarial plan review using two different AI models. Planner writ
 ## Metadata
 ```yaml
 name: cross-model-review
-version: 1.1.0
+version: 1.2.0
 description: >
   Adversarial plan review using two different AI models. The agent (planner)
   writes/revises, a spawned reviewer challenges, they iterate until APPROVED.
