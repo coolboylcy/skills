@@ -47,10 +47,16 @@ function loadEnv(customPath) {
 // ---------------------------------------------------------------------------
 function getConfig() {
   return {
-    appId: process.env.INSTAGRAM_APP_ID,
-    appSecret: process.env.INSTAGRAM_APP_SECRET,
-    accessToken: process.env.INSTAGRAM_ACCESS_TOKEN,
-    baseUrl: "https://graph.instagram.com/v24.0",
+    ig: {
+      accessToken: process.env.INSTAGRAM_ACCESS_TOKEN,
+      baseUrl: "https://graph.instagram.com/v24.0",
+    },
+    fb: {
+      appId: process.env.FACEBOOK_APP_ID,
+      appSecret: process.env.FACEBOOK_APP_SECRET,
+      accessToken: process.env.FACEBOOK_USER_ACCESS_TOKEN,
+      baseUrl: "https://graph.facebook.com/v24.0",
+    },
   };
 }
 
@@ -58,10 +64,10 @@ function getConfig() {
 // API
 // ---------------------------------------------------------------------------
 async function apiGet(endpoint, params = {}) {
-  const config = getConfig();
-  params.access_token = config.accessToken;
+  const { ig } = getConfig();
+  params.access_token = ig.accessToken;
   const query = new URLSearchParams(params).toString();
-  const url = `${config.baseUrl}${endpoint}?${query}`;
+  const url = `${ig.baseUrl}${endpoint}?${query}`;
 
   const res = await fetch(url);
   const data = await res.json();
@@ -73,10 +79,10 @@ async function apiGet(endpoint, params = {}) {
 }
 
 async function apiPost(endpoint, body = {}) {
-  const config = getConfig();
-  body.access_token = config.accessToken;
+  const { ig } = getConfig();
+  body.access_token = ig.accessToken;
 
-  const res = await fetch(`${config.baseUrl}${endpoint}`, {
+  const res = await fetch(`${ig.baseUrl}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -89,12 +95,57 @@ async function apiPost(endpoint, body = {}) {
   return data;
 }
 
+async function fbApiGet(endpoint, params = {}) {
+  const { fb } = getConfig();
+  if (!fb.accessToken) {
+    throw new Error("FACEBOOK_USER_ACCESS_TOKEN is required for comment operations");
+  }
+  params.access_token = fb.accessToken;
+  const query = new URLSearchParams(params).toString();
+  const url = `${fb.baseUrl}${endpoint}?${query}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data.error) {
+    throw new Error(`Facebook API error: ${data.error.message}`);
+  }
+  return data;
+}
+
+async function fbApiPost(endpoint, body = {}) {
+  const { fb } = getConfig();
+  if (!fb.accessToken) {
+    throw new Error("FACEBOOK_USER_ACCESS_TOKEN is required for comment operations");
+  }
+  body.access_token = fb.accessToken;
+
+  const res = await fetch(`${fb.baseUrl}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+
+  if (data.error) {
+    throw new Error(`Facebook API error: ${data.error.message}`);
+  }
+  return data;
+}
+
 // ---------------------------------------------------------------------------
 // Token
 // ---------------------------------------------------------------------------
-async function refreshToken() {
-  const config = getConfig();
-  const url = `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${config.accessToken}`;
+async function refreshIgToken() {
+  const { ig } = getConfig();
+
+  // Instagram long-lived refresh endpoint only works for IG user tokens (typically IGA...)
+  if (!ig.accessToken || !ig.accessToken.startsWith("IG")) {
+    log("Skipping IG token refresh (non-IG token detected)");
+    return { access_token: ig.accessToken, skipped: true };
+  }
+
+  const url = `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${ig.accessToken}`;
 
   const res = await fetch(url);
   const data = await res.json();
@@ -117,8 +168,58 @@ async function refreshToken() {
   );
   fs.writeFileSync(envPath, envContent);
 
-  log(`Token refreshed (expires in ${expiresInDays} days)`);
+  log(`IG token refreshed (expires in ${expiresInDays} days)`);
   return { access_token: newToken, expires_in: data.expires_in, expires_in_days: expiresInDays };
+}
+
+async function refreshFbToken() {
+  const { fb } = getConfig();
+
+  if (!fb.accessToken) {
+    throw new Error("FACEBOOK_USER_ACCESS_TOKEN is missing");
+  }
+  if (!fb.appId || !fb.appSecret) {
+    throw new Error("FACEBOOK_APP_ID / FACEBOOK_APP_SECRET are required for FB token refresh");
+  }
+
+  const url = `${fb.baseUrl}/oauth/access_token?grant_type=fb_exchange_token&client_id=${encodeURIComponent(fb.appId)}&client_secret=${encodeURIComponent(fb.appSecret)}&fb_exchange_token=${encodeURIComponent(fb.accessToken)}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data.error) {
+    throw new Error(`FB token refresh failed: ${data.error.message}`);
+  }
+
+  const newToken = data.access_token;
+  const expiresInDays = data.expires_in
+    ? Math.floor(Number(data.expires_in) / 86400)
+    : null;
+
+  process.env.FACEBOOK_USER_ACCESS_TOKEN = newToken;
+
+  let envContent = fs.readFileSync(envPath, "utf-8");
+  if (/^FACEBOOK_USER_ACCESS_TOKEN=.*/m.test(envContent)) {
+    envContent = envContent.replace(
+      /^FACEBOOK_USER_ACCESS_TOKEN=.*/m,
+      `FACEBOOK_USER_ACCESS_TOKEN=${newToken}`
+    );
+  } else {
+    envContent = envContent.trimEnd() + `\nFACEBOOK_USER_ACCESS_TOKEN=${newToken}\n`;
+  }
+  fs.writeFileSync(envPath, envContent);
+
+  if (expiresInDays != null) {
+    log(`FB token refreshed (expires in ${expiresInDays} days)`);
+  } else {
+    log("FB token refreshed");
+  }
+
+  return {
+    access_token: newToken,
+    expires_in: data.expires_in,
+    expires_in_days: expiresInDays,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -149,17 +250,70 @@ async function getPost(mediaId) {
 // Comments
 // ---------------------------------------------------------------------------
 async function getComments(mediaId) {
-  return apiGet(`/${mediaId}/comments`, {
-    fields: "id,text,username,timestamp,replies{id,text,username,timestamp}",
+  const commentFields = "id,text,username,timestamp,replies{id,text,username,timestamp}";
+
+  // 1) Primary comments on the target media
+  const primary = await fbApiGet(`/${mediaId}/comments`, {
+    fields: commentFields,
   });
+
+  // 2) For carousel posts, comments can live on child media items.
+  //    If primary is empty, collect child comments as a fallback.
+  if (Array.isArray(primary?.data) && primary.data.length > 0) {
+    return primary;
+  }
+
+  let mediaInfo;
+  try {
+    mediaInfo = await apiGet(`/${mediaId}`, {
+      fields: "id,media_type,children{id}",
+    });
+  } catch {
+    return primary;
+  }
+
+  if (mediaInfo?.media_type !== "CAROUSEL_ALBUM" || !Array.isArray(mediaInfo?.children?.data)) {
+    return primary;
+  }
+
+  const childResults = [];
+
+  for (const child of mediaInfo.children.data) {
+    if (!child?.id) continue;
+    try {
+      const childComments = await fbApiGet(`/${child.id}/comments`, {
+        fields: commentFields,
+      });
+      if (Array.isArray(childComments?.data) && childComments.data.length > 0) {
+        childResults.push({
+          media_id: child.id,
+          comments: childComments.data,
+        });
+      }
+    } catch {
+      // Ignore child-level fetch failures and continue
+    }
+  }
+
+  if (childResults.length === 0) return primary;
+
+  return {
+    data: childResults.flatMap((entry) =>
+      entry.comments.map((comment) => ({ ...comment, media_id: entry.media_id }))
+    ),
+    meta: {
+      source: "carousel-children",
+      children_with_comments: childResults.map((c) => c.media_id),
+    },
+  };
 }
 
 async function postComment(mediaId, text) {
-  return apiPost(`/${mediaId}/comments`, { message: text });
+  return fbApiPost(`/${mediaId}/comments`, { message: text });
 }
 
 async function replyToComment(commentId, text) {
-  return apiPost(`/${commentId}/replies`, { message: text });
+  return fbApiPost(`/${commentId}/replies`, { message: text });
 }
 
 // ---------------------------------------------------------------------------
@@ -620,11 +774,27 @@ async function postLocalVideoCarousel(filePaths, caption) {
 // ---------------------------------------------------------------------------
 // run() — script entrypoint wrapper
 // ---------------------------------------------------------------------------
-async function run(fn) {
+async function run(fn, options = {}) {
   try {
     const { named, positional } = parseArgs();
     loadEnv(named.env);
-    await refreshToken();
+
+    const refreshIg = options.refreshIg !== false;
+    const refreshFb = options.refreshFb === true;
+
+    if (refreshIg) {
+      await refreshIgToken();
+    }
+
+    if (refreshFb && process.env.FACEBOOK_USER_ACCESS_TOKEN) {
+      try {
+        await refreshFbToken();
+      } catch (err) {
+        // Keep running with existing token if refresh endpoint fails temporarily.
+        log(`FB token refresh skipped: ${err.message}`);
+      }
+    }
+
     const result = await fn({ named, positional });
     process.stdout.write(JSON.stringify(result, null, 2) + "\n");
     process.exit(0);
@@ -644,7 +814,8 @@ module.exports = {
   getConfig,
   apiGet,
   apiPost,
-  refreshToken,
+  refreshIgToken,
+  refreshFbToken,
   getProfile,
   getMyPosts,
   getPost,
