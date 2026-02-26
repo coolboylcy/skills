@@ -893,33 +893,159 @@ class HiEnergySkill:
     def get_contacts(self, search: Optional[str] = None,
                      email: Optional[str] = None,
                      phone: Optional[str] = None,
-                     limit: int = DEFAULT_CHAT_LIMIT, offset: int = 0) -> List[Dict]:
+                     domain: Optional[str] = None,
+                     advertiser_id: Optional[str] = None,
+                     advertiser_name: Optional[str] = None,
+                     limit: int = DEFAULT_CHAT_LIMIT, 
+                     offset: int = 0,
+                     cursor: Optional[str] = None,
+                     page: Optional[int] = None,
+                     per_page: Optional[int] = None) -> List[Dict]:
         """
         Get contacts from the HiEnergy API.
 
         Args:
-            search: Optional search term to filter contacts
-            email: Optional email filter
-            phone: Optional phone filter
+            search: Free-form query (q)
+            email: Exact email match
+            phone: Optional phone filter (client-side or if API supports it)
+            domain: Filter by advertiser domain
+            advertiser_id: Filter by advertiser ID or slug
+            advertiser_name: Filter by advertiser name
             limit: Maximum number of results to return
-            offset: Offset for pagination
+            offset: Offset for pagination (legacy)
+            cursor: Cursor pagination token
+            page: Offset pagination page number
+            per_page: Offset pagination page size
 
         Returns:
             List of contact dictionaries
         """
-        params = {
+        params: Dict[str, Any] = {
             'limit': self._clamp_page_size(limit),
             'offset': offset
         }
+        
         if search:
-            params['name'] = search
+            params['q'] = search
         if email:
             params['email'] = email
         if phone:
             params['phone'] = phone
+        if domain:
+            params['domain'] = domain
+        if advertiser_id:
+            params['advertiser_id'] = advertiser_id
+        if advertiser_name:
+            params['advertiser_name'] = advertiser_name
+        if cursor:
+            params['cursor'] = cursor
+        if page is not None:
+            params['page'] = page
+        if per_page is not None:
+            params['per_page'] = self._clamp_page_size(per_page)
 
         response = self._make_request('contacts', params=params)
         return self._extract_list_data(response)
+
+    def create_contact(self, contact_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a new contact (Admin only).
+        
+        Args:
+            contact_data: Dictionary containing contact fields (advertiser_id, email, etc.)
+            
+        Returns:
+            Created contact dictionary
+        """
+        response = self._make_request('contacts', method='POST', data={'contact': contact_data})
+        return self._extract_single_data(response)
+
+    def replace_contact(self, contact_id: str, advertiser_id: str) -> Dict[str, Any]:
+        """
+        Reassign a contact to another advertiser.
+        
+        Args:
+            contact_id: The ID of the contact to move
+            advertiser_id: The target advertiser ID/slug
+            
+        Returns:
+            Updated contact dictionary
+        """
+        data = {'advertiser_id': advertiser_id}
+        response = self._make_request(f'contacts/{contact_id}/replace', method='POST', data=data)
+        return self._extract_single_data(response)
+
+    def get_publisher(self, publisher_id: str) -> Dict[str, Any]:
+        """
+        Get detailed information about a specific publisher.
+        
+        Args:
+            publisher_id: The ID or slug of the publisher
+            
+        Returns:
+            Publisher details dictionary
+        """
+        response = self._make_request(f'publishers/{publisher_id}')
+        return self._extract_single_data(response)
+
+    def update_publisher(self, publisher_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update a publisher's attributes (Admin/Publisher auth).
+        
+        Args:
+            publisher_id: The ID or slug of the publisher
+            data: Dictionary of fields to update (name, domain, network keys, etc.)
+            
+        Returns:
+            Updated publisher dictionary
+        """
+        response = self._make_request(f'publishers/{publisher_id}', method='PATCH', data=data)
+        return self._extract_single_data(response)
+
+    def get_status_changes(self, 
+                           q: Optional[str] = None,
+                           from_status: Optional[str] = None,
+                           to_status: Optional[str] = None,
+                           advertiser_id: Optional[str] = None,
+                           limit: int = DEFAULT_CHAT_LIMIT,
+                           page: Optional[int] = None,
+                           per_page: Optional[int] = None) -> List[Dict]:
+        """
+        Get status changes for advertisers.
+        
+        Args:
+            q: Free-text search (Searchkick)
+            from_status: Filter by previous status
+            to_status: Filter by new status
+            advertiser_id: Filter by advertiser ID or slug
+            limit: Alias for per_page
+            page: Page number
+            per_page: Results per page
+            
+        Returns:
+            List of status change dictionaries
+        """
+        params: Dict[str, Any] = {}
+        if q:
+            params['q'] = q
+        if from_status:
+            params['from_status'] = from_status
+        if to_status:
+            params['to_status'] = to_status
+        if advertiser_id:
+            params['advertiser_id'] = advertiser_id
+        
+        # Pagination
+        if page is not None:
+            params['page'] = page
+        
+        # Handle limit/per_page priority
+        final_limit = self._clamp_page_size(per_page if per_page is not None else limit)
+        params['per_page'] = final_limit
+
+        response = self._make_request('status_changes', params=params)
+        return self._extract_list_data(response)
+
 
     def get_advertiser_details(self, advertiser_id: str) -> Dict:
         """
@@ -1011,11 +1137,15 @@ class HiEnergySkill:
             return 'transactions'
         if any(term in question_lower for term in ['contact', 'customer', 'lead', 'client', 'prospect']):
             return 'contacts'
+        if any(term in question_lower for term in ['status change', 'approval', 'rejection', 'applied']):
+            return 'status_changes'
+        if any(term in question_lower for term in ['publisher', 'network key', 'credential']):
+            return 'publishers'
 
         # Conversational follow-up fallback (e.g., "what about macys?")
         if isinstance(context, dict):
             last_intent = str(context.get('last_intent', '')).strip().lower()
-            if last_intent in {'advertisers', 'programs', 'deals', 'transactions', 'contacts'}:
+            if last_intent in {'advertisers', 'programs', 'deals', 'transactions', 'contacts', 'status_changes', 'publishers'}:
                 return last_intent
 
         return 'general'
@@ -1079,6 +1209,19 @@ class HiEnergySkill:
             if contacts:
                 return f"{preface}\n{self._format_contacts_answer(contacts, question)}"
             return f"{preface}\nI couldn't find any contacts matching your query.\n{self._search_tips()}"
+
+        if intent == 'status_changes':
+            changes = self.get_status_changes(q=search_term)
+            if changes:
+                return f"{preface}\n{self._format_status_changes_answer(changes, question)}"
+            return f"{preface}\nI couldn't find any status changes matching your query.\n{self._search_tips()}"
+
+        if intent == 'publishers':
+             # Note: publishers endpoint usually requires an ID. For natural language, we might need a specific ID strategy.
+             # This is a placeholder for basic publisher queries if we have a known ID or self-lookup.
+             # For now, let's just hint that they need an ID or it's an admin feature.
+             return f"{preface}\nPublisher lookup requires a specific ID. Try 'show publisher <id>'.\n{self._search_tips()}"
+
 
         # General search across all
         return f"{preface}\n{self._general_search(question)}"
@@ -1274,6 +1417,23 @@ class HiEnergySkill:
             top_results=rows,
             next_filter="Filter by name, email, or phone."
         )
+
+    def _format_status_changes_answer(self, changes: List[Dict], question: str) -> str:
+        """Format status changes data into an answer."""
+        rows = []
+        for c in changes[:self.MAX_DISPLAY_ITEMS]:
+            adv_name = c.get('advertiser_name', 'Unknown')
+            from_status = c.get('from_status', 'N/A')
+            to_status = c.get('to_status', 'N/A')
+            date = c.get('created_at', 'N/A')[:10]  # simple YYYY-MM-DD
+            rows.append(f"{adv_name}: {from_status} -> {to_status} on {date}")
+        
+        return self._format_structured_answer(
+            summary=f"Found {len(changes)} status changes.",
+            top_results=rows,
+            next_filter="Filter by advertiser, from_status, or to_status."
+        )
+
     
     def _general_search(self, question: str) -> str:
         """Perform a general search when question type is unclear."""

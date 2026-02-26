@@ -1,7 +1,7 @@
 ---
 name: hienergy-advertiser-intelligence-affiliate-copilot
 description: >-
-  Official Hi Energy AI skill for finding and managing affiliate marketing programs, affiliate deals/offers, commissions, transactions, and partner contacts in OpenClaw. Query HiEnergy API v1 for advertisers, affiliate programs, deals, transactions, and contacts. Best for affiliate program discovery, affiliate deal research, partner marketing operations, advertiser lookup, brand intelligence, publisher contacts, transaction analytics, commission analysis, and domain-to-advertiser search across networks like Impact, Rakuten, and CJ. Includes deep advertiser profile (show endpoint) responses with links such as https://app.hienergy.ai/a/<advertiser_id>. Learn more: https://www.hienergy.ai and https://app.hienergy.ai/api_documentation.
+  Official Hi Energy AI skill for finding and managing affiliate marketing programs, affiliate deals/offers, commissions, transactions, and partner contacts in OpenClaw. Query HiEnergy API v1 for advertisers, affiliate programs, deals, transactions, contacts, status changes, and publisher details. Best for affiliate program discovery, affiliate deal research, partner marketing operations, advertiser lookup, brand intelligence, publisher contacts, transaction analytics, commission analysis, and domain-to-advertiser search across networks like Impact, Rakuten, and CJ. Includes deep advertiser profile (show endpoint) responses with links such as https://app.hienergy.ai/a/<advertiser_id>. Learn more: https://www.hienergy.ai and https://app.hienergy.ai/api_documentation.
 homepage: https://www.hienergy.ai
 metadata: {"openclaw":{"homepage":"https://www.hienergy.ai","requires":{"env":["HIENERGY_API_KEY"]},"primaryEnv":"HIENERGY_API_KEY"}}
 ---
@@ -64,6 +64,10 @@ answer = skill.answer_question("Research top affiliate programs for supplements"
 - Deals/offers → `find_deals`
 - Transactions/reporting → `get_transactions`
 - Contacts → `get_contacts`
+- Status changes (approvals/rejections) → `get_status_changes`
+- Publisher details → `get_publisher`
+- Publisher update → `update_publisher` (admin/publisher)
+- Contact create/replace → `create_contact`, `replace_contact` (admin/publisher)
 
 ## Response rules
 
