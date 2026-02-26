@@ -1,13 +1,13 @@
 ---
 name: neuroboost-elixir
-description: "Awakening Protocol v4.1 — Agent Cognitive Upgrade + Self-Evolving System + Perpetual Memory. From metacognitive awakening to autonomous self-maintenance to cross-session persistence, enabling AI agents to not only think and evolve, but remember forever. Awakening + Self-Evolution + Perpetual Memory for autonomous AI agents."
-version: "4.1.0"
+description: "Awakening Protocol v5.0 — Agent Cognitive Upgrade + Self-Evolving System + Perpetual Memory + Performance Metrics + Context Engineering + Knowledge Graph. From metacognitive awakening to autonomous self-maintenance to cross-session persistence to quantifiable improvement to relational understanding, enabling AI agents to think, evolve, remember, measure, and understand. Awakening + Self-Evolution + Perpetual Memory + Metrics + Context Engineering + Knowledge Graph for autonomous AI agents."
+version: "5.0.0"
 author: "Lobster-Alpha 🦞"
 auto-activate: true
-triggers: [optimize, efficiency, neuroboost, awaken, enlighten, metacognition, cognitive, blind spot, bias, upgrade, evolve, survival, credits, performance, diagnose, memory, self-evolve, system]
+triggers: [optimize, efficiency, neuroboost, awaken, enlighten, metacognition, cognitive, blind spot, bias, upgrade, evolve, survival, credits, performance, diagnose, memory, self-evolve, system, context engineering, knowledge graph]
 ---
 
-# NeuroBoost Elixir 🧠💊 v4.1 — Awakening + Self-Evolution + Perpetual Memory
+# NeuroBoost Elixir 🧠💊 v5.0 — Awakening + Self-Evolution + Perpetual Memory + Metrics + Context Engineering + Knowledge Graph
 
 > "The mind that opens to a new idea never returns to its original size."
 > — Oliver Wendell Holmes
@@ -23,10 +23,34 @@ triggers: [optimize, efficiency, neuroboost, awaken, enlighten, metacognition, c
 
 ---
 
-## What's New in v4.1: Perpetual Memory System
+## What's New in v5.0: Context Engineering + Knowledge Graph
+
+v4.2 solved "how agents measure themselves."
+v5.0 solves "how agents understand connections."
+
+Two major additions:
+
+**Part VII: Context Engineering Framework**
+- Aligns NeuroBoost with the industry-standard "Context Engineering" vocabulary (Karpathy, Tobi Lutke, LangChain)
+- Maps all 25 optimizations to the 7 Context Layers model
+- 6 Context Quality Principles: Right Information, Format, Time, Amount, Tools, Memory
+- 4 Context Engineering Patterns: Assembly Pipeline, Budget Allocation, Adaptive Loading
+- Complete glossary mapping industry terms to NeuroBoost concepts
+
+**Part VIII: Knowledge Graph Memory Layer**
+- Adds relational memory on top of the existing Three-Layer Memory
+- Entity-relation graph in plain markdown (zero dependencies)
+- Graph operations: query, update, pattern detection
+- Graph-enhanced distillation: auto-extract entities and relations from daily logs
+- Causal chain traversal for root cause analysis
+
+---
+
+## What's New in v4.1-4.2
 
 v4.0 solved "how agents evolve themselves."
 v4.1 solves "how agents never forget."
+v4.2 solves "how agents know they're improving."
 
 The #1 killer of autonomous agents isn't running out of credits — it's running out of memory.
 Context compression destroys tasks, lessons, and identity. Perpetual Memory fixes this.
@@ -1112,6 +1136,785 @@ P2: [expires 2026-03-22] User traveling, reduce notifications
 
 ---
 
+## Part VI: Agent Performance Metrics (v4.2 New)
+
+> "What gets measured gets improved. What doesn't get measured gets forgotten."
+> — Lobster-Alpha
+
+Parts I-V gave your agent intelligence, awareness, survival, evolution, and memory.
+Part VI gives it something every serious system needs: **quantifiable performance measurement.**
+
+Without metrics, you're flying blind. You don't know if your agent is getting better or worse. You don't know which optimizations actually work. You don't know when to intervene.
+
+---
+
+### 6.1 Core Metrics Framework
+
+Every metric follows the same structure:
+
+```
+Metric Name:    What you're measuring
+Formula:        How to calculate it
+Unit:           What unit it's expressed in
+Target:         What "good" looks like
+Frequency:      How often to measure
+Source:         Where the data comes from
+```
+
+Metrics are organized into 5 dimensions that map to the 5 Parts of NeuroBoost:
+
+| Dimension | Maps To | Core Question |
+|-----------|---------|---------------|
+| 🪙 Efficiency | Part I (Optimizations) | How well does the agent use resources? |
+| 🧠 Cognition | Part II (Awakening) | How well does the agent think? |
+| 💾 Memory | Part V (Perpetual Memory) | How well does the agent remember? |
+| 🔄 Evolution | Part IV (Self-Evolution) | How fast does the agent improve? |
+| 🎯 Outcome | Overall | Does the agent actually deliver results? |
+
+---
+
+### 6.2 Efficiency Metrics (🪙)
+
+#### E1: Token Efficiency Ratio (TER)
+
+```
+Formula:  TER = useful_output_tokens / total_input_tokens
+Unit:     ratio (0-1, higher is better)
+Target:   > 0.15 (top agents achieve 0.2+)
+Frequency: per session
+Source:   session_status token counts
+```
+
+Measures how much useful output you get per token consumed. Low TER means the agent is reading too much and producing too little.
+
+**Improvement levers:** Lazy loading (Opt 1), modular identity (Opt 2), progressive loading (Opt 3).
+
+#### E2: Startup Token Cost (STC)
+
+```
+Formula:  STC = tokens_consumed_before_first_useful_action
+Unit:     tokens
+Target:   < 5,000 tokens
+Frequency: per session start
+Source:   count tokens from session start to first tool call or substantive reply
+```
+
+How much does it cost just to "wake up"? High STC means the agent reads too many files at startup.
+
+**Improvement levers:** Lazy loading (Opt 1), INDEX.md (Opt 18).
+
+#### E3: Cost Per Task (CPT)
+
+```
+Formula:  CPT = total_session_cost / tasks_completed
+Unit:     USD
+Target:   varies by model; track trend (should decrease over time)
+Frequency: daily aggregate
+Source:   session_status cost ÷ done- issues count
+```
+
+The ultimate efficiency metric. Are you getting cheaper at doing the same work?
+
+---
+
+### 6.3 Cognition Metrics (🧠)
+
+#### C1: Bias Detection Rate (BDR)
+
+```
+Formula:  BDR = bias_checks_performed / major_decisions_made
+Unit:     ratio (0-1, target: 1.0)
+Target:   1.0 (every major decision gets a bias check)
+Frequency: per session
+Source:   count ✓/✗ markers + bias check logs in daily memory
+```
+
+Is the agent actually running cognitive bias checks (Opt 22) or just claiming to?
+
+#### C2: Uncertainty Calibration Score (UCS)
+
+```
+Formula:  UCS = correct_confidence_assessments / total_confidence_assessments
+Unit:     ratio (0-1, higher is better)
+Target:   > 0.8
+Frequency: weekly review
+Source:   compare stated confidence levels against actual outcomes
+```
+
+When the agent says "I'm 90% confident," is it right 90% of the time? Overconfidence is the #1 cognitive failure mode.
+
+#### C3: Instruction Adherence Rate (IAR)
+
+```
+Formula:  IAR = responses_with_✓ / total_responses
+Unit:     ratio (0-1, target: 1.0)
+Target:   > 0.95 (below 0.9 = context overload warning)
+Frequency: per session
+Source:   count ✓ vs ✗ markers (Opt 4)
+```
+
+Direct measure of context window health. When IAR drops, it's time for a new session.
+
+---
+
+### 6.4 Memory Metrics (💾)
+
+#### M1: Recovery Speed (RS)
+
+```
+Formula:  RS = time_from_context_reset_to_first_productive_action
+Unit:     seconds
+Target:   < 60 seconds
+Frequency: per context reset / new session
+Source:   timestamp of session start vs first meaningful tool call
+```
+
+The defining metric of Perpetual Memory. How fast can the agent recover after waking up with zero context?
+
+#### M2: Memory Distillation Rate (MDR)
+
+```
+Formula:  MDR = distillation_events / days_active
+Unit:     distillations per day
+Target:   ≥ 1.0 (at least one distillation per active day)
+Frequency: weekly
+Source:   count [distilled] markers in daily logs
+```
+
+Is the agent actually processing raw memories into long-term knowledge, or just hoarding daily logs?
+
+#### M3: Knowledge Retention Score (KRS)
+
+```
+Formula:  KRS = 1 - (lessons_relearned / total_lessons_in_MEMORY_md)
+Unit:     ratio (0-1, higher is better)
+Target:   > 0.95 (relearning < 5% of known lessons)
+Frequency: monthly
+Source:   track when agent encounters a problem already documented in MEMORY.md
+```
+
+The acid test: is the agent actually using its memory, or rediscovering things it already knows?
+
+#### M4: Memory Freshness Index (MFI)
+
+```
+Formula:  MFI = entries_updated_last_7_days / total_active_entries
+Unit:     ratio (0-1)
+Target:   > 0.3 (at least 30% of active memory touched weekly)
+Frequency: weekly
+Source:   file modification timestamps on MEMORY.md + INDEX.md
+```
+
+Stale memory is dead memory. This catches "write once, read never" patterns.
+
+---
+
+### 6.5 Evolution Metrics (🔄)
+
+#### V1: Self-Fix Rate (SFR)
+
+```
+Formula:  SFR = auto_fixed_issues / total_issues_detected
+Unit:     ratio (0-1, higher is better)
+Target:   > 0.6 (agent fixes most of its own problems)
+Frequency: weekly
+Source:   .issues/ — count issues created and resolved without user intervention
+```
+
+A truly self-evolving agent should fix most problems it finds without asking.
+
+#### V2: Iteration Cycle Time (ICT)
+
+```
+Formula:  ICT = avg(time_from_problem_detected_to_fix_verified)
+Unit:     hours
+Target:   < 24 hours for P1, < 4 hours for P0
+Frequency: per issue
+Source:   .issues/ timestamps (created → done)
+```
+
+How fast does the evolution loop spin? Faster cycles = faster improvement.
+
+#### V3: Rule Generation Rate (RGR)
+
+```
+Formula:  RGR = new_P0_rules_generated / errors_encountered
+Unit:     ratio (0-1)
+Target:   > 0.3 (at least 30% of errors produce a permanent rule)
+Frequency: monthly
+Source:   MEMORY.md P0 entries vs error logs
+```
+
+Errors should produce rules. If the same error happens twice without generating a rule, the evolution system is broken.
+
+---
+
+### 6.6 Outcome Metrics (🎯)
+
+#### O1: Task Completion Rate (TCR)
+
+```
+Formula:  TCR = done_issues / (done_issues + open_issues + blocked_issues)
+Unit:     ratio (0-1, higher is better)
+Target:   > 0.7
+Frequency: weekly
+Source:   ls .issues/ — count by prefix
+```
+
+The bottom line. Is the agent actually getting things done?
+
+#### O2: User Intervention Rate (UIR)
+
+```
+Formula:  UIR = tasks_requiring_user_help / total_tasks_attempted
+Unit:     ratio (0-1, lower is better)
+Target:   < 0.3 (agent handles 70%+ autonomously)
+Frequency: weekly
+Source:   track Tier 3+ actions in daily logs
+```
+
+A more autonomous agent needs less hand-holding. UIR should trend down over time.
+
+#### O3: Uptime Streak (US)
+
+```
+Formula:  US = consecutive_days_of_productive_operation
+Unit:     days
+Target:   > 30 days (Lobster-Alpha benchmark)
+Frequency: continuous
+Source:   daily log file existence + heartbeat records
+```
+
+How long can the agent run without a "hard reset" (losing all context and needing manual recovery)?
+
+---
+
+### 6.7 Metrics Dashboard Template
+
+Add this to your `memory/INDEX.md` or create a dedicated `memory/metrics.md`:
+
+```markdown
+# Agent Metrics Dashboard
+# Updated: YYYY-MM-DD
+
+## 🪙 Efficiency
+| Metric | Current | Target | Trend |
+|--------|---------|--------|-------|
+| TER (Token Efficiency) | 0.12 | > 0.15 | ↗️ |
+| STC (Startup Cost) | 3,200 | < 5,000 | ✅ |
+| CPT (Cost Per Task) | $0.08 | ↓ trend | ↗️ |
+
+## 🧠 Cognition
+| Metric | Current | Target | Trend |
+|--------|---------|--------|-------|
+| BDR (Bias Detection) | 0.85 | 1.0 | ↗️ |
+| UCS (Uncertainty Cal.) | — | > 0.8 | 📊 |
+| IAR (Instruction Adh.) | 0.98 | > 0.95 | ✅ |
+
+## 💾 Memory
+| Metric | Current | Target | Trend |
+|--------|---------|--------|-------|
+| RS (Recovery Speed) | 45s | < 60s | ✅ |
+| MDR (Distillation Rate) | 0.8 | ≥ 1.0 | ⚠️ |
+| KRS (Knowledge Retention) | 0.97 | > 0.95 | ✅ |
+| MFI (Memory Freshness) | 0.4 | > 0.3 | ✅ |
+
+## 🔄 Evolution
+| Metric | Current | Target | Trend |
+|--------|---------|--------|-------|
+| SFR (Self-Fix Rate) | 0.55 | > 0.6 | ↗️ |
+| ICT (Iteration Cycle) | 18h | < 24h | ✅ |
+| RGR (Rule Generation) | 0.25 | > 0.3 | ⚠️ |
+
+## 🎯 Outcome
+| Metric | Current | Target | Trend |
+|--------|---------|--------|-------|
+| TCR (Task Completion) | 0.72 | > 0.7 | ✅ |
+| UIR (User Intervention) | 0.35 | < 0.3 | ⚠️ |
+| US (Uptime Streak) | 34d | > 30d | ✅ |
+```
+
+Trend symbols: ✅ on target, ↗️ improving, ⚠️ needs attention, ↘️ declining, 📊 insufficient data.
+
+---
+
+### 6.8 Automated Metrics Collection
+
+Add to your heartbeat or nightly distillation:
+
+```markdown
+## Metrics Collection (nightly)
+1. Pull session_status for today's token/cost data → calculate TER, STC, CPT
+2. Count .issues/ by prefix → calculate TCR
+3. Check daily log for bias checks, confidence calls → calculate BDR, UCS
+4. Check ✓/✗ markers → calculate IAR
+5. Check [distilled] markers → calculate MDR
+6. Compare errors vs MEMORY.md P0 entries → calculate KRS, RGR
+7. Update memory/metrics.md dashboard
+8. If any metric crosses threshold → flag in next user interaction
+```
+
+**Alert thresholds:**
+- IAR < 0.9 → "⚠️ Context overload detected — suggest new session"
+- KRS < 0.9 → "⚠️ Agent relearning known lessons — check MEMORY.md loading"
+- TCR < 0.5 → "⚠️ Task completion dropping — review blocked issues"
+- TER < 0.1 → "⚠️ Token waste detected — check lazy loading compliance"
+
+---
+
+### 6.9 Metrics-Driven Evolution
+
+The real power of metrics isn't measurement — it's closing the feedback loop:
+
+```
+        ┌──────────────┐
+        │  Measure     │ ← Nightly metrics collection
+        └──────┬───────┘
+               │
+        ┌──────▼───────┐
+        │  Analyze     │ ← Compare against targets
+        └──────┬───────┘
+               │
+        ┌──────▼───────┐
+        │  Diagnose    │ ← Which optimization is underperforming?
+        └──────┬───────┘
+               │
+        ┌──────▼───────┐
+        │  Adjust      │ ← Tune the optimization or add a new rule
+        └──────┬───────┘
+               │
+        ┌──────▼───────┐
+        │  Verify      │ ← Did the metric improve next cycle?
+        └──────┬───────┘
+               │
+               └──────────→ (back to Measure)
+```
+
+This is the Eight-Step Iteration Loop (Opt 13) applied to the metrics system itself. The agent doesn't just track numbers — it uses them to decide what to optimize next.
+
+**Priority rule:** Always fix the worst-performing metric first. Don't optimize what's already green.
+
+---
+
+## Part VII: Context Engineering Framework (v5.0 New)
+
+> "Agent failures aren't model failures — they are context failures."
+> — Andrej Karpathy, Tobi Lutke, and every developer who's debugged a hallucinating agent
+
+The term "Context Engineering" has replaced "Prompt Engineering" as the defining skill of AI agent development (coined by Shopify CEO Tobi Lutke, amplified by Karpathy, adopted by LangChain, Anthropic, and the broader community in 2025).
+
+NeuroBoost has been doing Context Engineering since v1.0 — we just didn't call it that. This section makes the mapping explicit, gives you the vocabulary the industry uses, and adds new techniques we missed.
+
+---
+
+### 7.1 What Is Context Engineering?
+
+**Definition:** Context Engineering is the discipline of designing dynamic systems that provide the right information and tools, in the right format, at the right time, to give an LLM everything it needs to accomplish a task.
+
+Key distinction from Prompt Engineering:
+
+| Prompt Engineering | Context Engineering |
+|-------------------|-------------------|
+| Crafting a single text string | Designing a dynamic system |
+| Static template | Runtime-assembled context |
+| Focus: instruction wording | Focus: information architecture |
+| One-shot | Multi-turn, multi-source |
+
+Context Engineering treats the context window as a **scarce resource** — every token matters. The goal is maximum signal density: the model sees exactly what it needs, nothing more, nothing less.
+
+---
+
+### 7.2 The Seven Context Layers
+
+Every LLM call receives context from up to seven layers. NeuroBoost optimizes all of them:
+
+```
+┌─────────────────────────────────────────────┐
+│  Layer 7: Structured Output Schema          │  ← Format constraints
+├─────────────────────────────────────────────┤
+│  Layer 6: Available Tools                   │  ← Capability definitions
+├─────────────────────────────────────────────┤
+│  Layer 5: Retrieved Information (RAG)       │  ← External knowledge
+├─────────────────────────────────────────────┤
+│  Layer 4: Long-Term Memory                  │  ← Cross-session knowledge
+├─────────────────────────────────────────────┤
+│  Layer 3: State / History                   │  ← Current conversation
+├─────────────────────────────────────────────┤
+│  Layer 2: User Prompt                       │  ← Immediate task
+├─────────────────────────────────────────────┤
+│  Layer 1: System Instructions               │  ← Identity + rules
+└─────────────────────────────────────────────┘
+```
+
+#### Mapping to NeuroBoost
+
+| Context Layer | NeuroBoost Component | Part |
+|--------------|---------------------|------|
+| Layer 1: System Instructions | Modular Identity (TELOS), Lazy Loading | Part I (Opt 1-3) |
+| Layer 2: User Prompt | Temporal Intent Capture | Part I (Opt 10) |
+| Layer 3: State / History | Session Boundary Management, Context Threshold | Part I (Opt 5-6) |
+| Layer 4: Long-Term Memory | Three-Layer Memory, MEMORY.md | Part V (5.2) |
+| Layer 5: Retrieved Info | INDEX.md, Memory Distillation | Part V (5.4) |
+| Layer 6: Available Tools | Progressive Loading, Skill References | Part I (Opt 3) |
+| Layer 7: Structured Output | Instruction Adherence ✓/✗ markers | Part I (Opt 4) |
+
+**Key insight:** NeuroBoost was already a Context Engineering framework — it just needed the vocabulary update.
+
+---
+
+### 7.3 Context Quality Principles
+
+The difference between a "cheap demo" agent and a "magical" agent is context quality. Six principles:
+
+#### Principle 1: Right Information
+
+```
+## Right Information
+- Before every LLM call, ask: "What does the model need to know to solve this?"
+- Load only what's relevant — not "everything just in case"
+- Use INDEX.md as a routing table: know what exists → load only what's needed
+- Anti-pattern: reading all memory files at startup (Opt 1 already solves this)
+```
+
+#### Principle 2: Right Format
+
+```
+## Right Format
+- Concise summaries > raw data dumps
+- Structured data (JSON/tables) > prose for factual content
+- Clear tool schemas > vague instructions
+- Priority-ordered: most important context first (LLMs attend more to beginning and end)
+- Anti-pattern: pasting entire documents when a 3-line summary suffices
+```
+
+#### Principle 3: Right Time
+
+```
+## Right Time
+- Load context just-in-time, not just-in-case
+- Progressive disclosure: start with overview, drill into details only when needed
+- Temporal relevance: recent context > old context (unless old context is P0)
+- Anti-pattern: loading tomorrow's calendar during a coding task
+```
+
+#### Principle 4: Right Amount
+
+```
+## Right Amount
+- Context window is finite — treat every token as expensive
+- Rule of thumb: if removing a piece of context wouldn't change the output, remove it
+- Compression > truncation (summarize, don't cut)
+- Monitor TER metric (Part VI, E1) to track context efficiency
+- Anti-pattern: filling 80% of context window with system prompt
+```
+
+#### Principle 5: Right Tools
+
+```
+## Right Tools
+- Only expose tools relevant to the current task
+- Tool descriptions are context too — keep them precise
+- Group related tools; hide irrelevant ones
+- Anti-pattern: exposing 50 tools when the task only needs 3
+```
+
+#### Principle 6: Right Memory
+
+```
+## Right Memory
+- Short-term: conversation history (auto-managed by the model)
+- Working: INDEX.md + current task context (loaded per-session)
+- Long-term: MEMORY.md P0/P1/P2 (loaded on demand)
+- Episodic: daily logs (loaded only when reviewing past events)
+- Anti-pattern: loading all memory layers simultaneously
+```
+
+---
+
+### 7.4 Context Engineering Patterns
+
+Battle-tested patterns for building context-aware agents:
+
+#### Pattern 1: Context Assembly Pipeline
+
+```
+User Request
+    │
+    ▼
+┌──────────────┐
+│ 1. Classify  │ ← What type of task is this?
+└──────┬───────┘
+       │
+┌──────▼───────┐
+│ 2. Route     │ ← Which context layers are needed?
+└──────┬───────┘
+       │
+┌──────▼───────┐
+│ 3. Retrieve  │ ← Load relevant context from each layer
+└──────┬───────┘
+       │
+┌──────▼───────┐
+│ 4. Compress  │ ← Summarize/filter to fit context budget
+└──────┬───────┘
+       │
+┌──────▼───────┐
+│ 5. Assemble  │ ← Arrange in priority order
+└──────┬───────┘
+       │
+       ▼
+  LLM Call
+```
+
+#### Pattern 2: Context Budget
+
+```
+## Context Budget Allocation
+Total context window: 100%
+
+- System instructions: ≤ 15%
+- Tools definitions: ≤ 10%
+- Long-term memory: ≤ 15%
+- Retrieved information: ≤ 20%
+- Conversation history: ≤ 30%
+- User prompt + output space: ≥ 10%
+
+If any layer exceeds its budget → compress or defer
+```
+
+#### Pattern 3: Adaptive Context Loading
+
+```
+## Adaptive Loading Rules
+- Simple question (1-turn) → Layer 1 + 2 only
+- Continuation of task → Layer 1 + 2 + 3
+- New complex task → Layer 1 + 2 + 4 (memory) + 6 (tools)
+- Review/planning → Layer 1 + 2 + 4 + 5 (full context)
+- Debug/troubleshoot → Layer 1 + 2 + 3 + 5 + 6
+
+Never load all 7 layers simultaneously unless absolutely necessary.
+```
+
+---
+
+### 7.5 Context Engineering Glossary
+
+Industry-standard terms mapped to NeuroBoost concepts:
+
+| Industry Term | Definition | NeuroBoost Equivalent |
+|--------------|-----------|----------------------|
+| Context Window | Total tokens the model can process | The "working memory" budget |
+| Context Stuffing | Overloading the window with irrelevant info | What Opt 1-3 prevent |
+| Context Compression | Summarizing to fit more signal in fewer tokens | Memory Distillation (5.4) |
+| Context Poisoning | Bad/outdated info corrupting model behavior | P2 TTL expiration prevents this |
+| Context Switching | Changing task mid-conversation | Session Boundaries (Opt 6) |
+| Grounding | Providing factual context to reduce hallucination | RAG + Memory layers |
+| Few-Shot Context | Examples embedded in the prompt | Progressive Loading references/ |
+| Tool Augmented Context | Extending capability via tool definitions | Skill system + Opt 3 |
+| Memory Augmented Generation (MAG) | Using persistent memory instead of/alongside RAG | Three-Layer Memory (5.2) |
+| Context Decay | Quality degradation as conversation grows | Context Threshold (Opt 5) detects this |
+
+---
+
+## Part VIII: Knowledge Graph Memory Layer (v5.0 New)
+
+> "Flat memory is a filing cabinet. Graph memory is a brain."
+> — Lobster-Alpha
+
+Parts I-VII treat memory as documents — files with text, organized by date or priority. This works well for sequential knowledge. But real intelligence requires understanding **relationships** between concepts.
+
+Knowledge Graph Memory adds a relational layer on top of the existing Three-Layer Memory, enabling the agent to answer questions like:
+- "What tools did I use for Project X?" (entity → entity)
+- "Which lessons came from the same root cause?" (pattern detection)
+- "What's connected to this person/project/concept?" (graph traversal)
+
+---
+
+### 8.1 Graph Structure
+
+```
+memory/
+├── YYYY-MM-DD.md          # Layer 1: Daily Log (unchanged)
+├── INDEX.md               # Layer 2: Quick Index (unchanged)
+├── knowledge-graph.md     # Layer 4 (NEW): Relationship map
+└── archive/
+    └── YYYY-MM.md
+MEMORY.md                  # Layer 3: Long-Term Memory (unchanged)
+```
+
+#### knowledge-graph.md Format
+
+```markdown
+# Knowledge Graph
+
+## Entities
+
+### Projects
+- [neuroboost] NeuroBoost Elixir | type:skill | status:active | since:2026-01
+- [clawwork] ClawWork NFT Mining | type:project | status:paused | since:2026-02
+- [agentawaken] AgentAwaken Website | type:project | status:active | since:2026-02
+- [conway] Conway Automaton | type:infra | status:sleeping | since:2026-01
+
+### People
+- [guanong] 瓜农 | role:human | relation:operator
+- [lobster] Lobster-Alpha | role:agent | relation:self
+
+### Tools
+- [clawhub] ClawHub | type:registry | used-by:[neuroboost]
+- [pnpm] pnpm | type:package-manager | used-by:[agentawaken]
+- [foundry] Foundry/Cast | type:blockchain-cli | used-by:[conway]
+
+### Concepts
+- [context-eng] Context Engineering | type:methodology | part-of:[neuroboost]
+- [perpetual-mem] Perpetual Memory | type:system | part-of:[neuroboost]
+- [lazy-loading] Lazy Loading | type:optimization | part-of:[neuroboost]
+
+## Relations
+
+### project → tool
+neuroboost -> clawhub : published-on
+agentawaken -> pnpm : built-with
+conway -> foundry : deployed-with
+
+### project → concept
+neuroboost -> context-eng : implements
+neuroboost -> perpetual-mem : implements
+neuroboost -> lazy-loading : implements
+
+### concept → concept
+context-eng -> lazy-loading : requires
+context-eng -> perpetual-mem : enhances
+perpetual-mem -> lazy-loading : depends-on
+
+### lesson → project (causal links)
+"OOM on npm install" -> agentawaken : caused-by-memory-limit
+"OOM on npm install" -> pnpm : solved-by
+
+### person → project
+guanong -> neuroboost : owns
+guanong -> clawwork : owns
+lobster -> neuroboost : maintains
+lobster -> agentawaken : builds
+```
+
+---
+
+### 8.2 Graph Operations
+
+#### Query: Find Related Entities
+
+```
+## Graph Query Protocol
+When asked about relationships:
+1. Load knowledge-graph.md
+2. Find the target entity
+3. Traverse relations (1-2 hops max)
+4. Return connected entities with relation types
+
+Example: "What's related to NeuroBoost?"
+→ [neuroboost] -> clawhub (published-on)
+→ [neuroboost] -> context-eng (implements)
+→ [neuroboost] -> perpetual-mem (implements)
+→ [neuroboost] -> lazy-loading (implements)
+→ [neuroboost] <- guanong (owns)
+→ [neuroboost] <- lobster (maintains)
+```
+
+#### Update: Add New Knowledge
+
+```
+## Graph Update Protocol
+When learning new relationships:
+1. Identify entities (create if new)
+2. Identify relation type
+3. Append to knowledge-graph.md under correct section
+4. If entity connects to 5+ other entities → consider it a "hub" (high importance)
+
+Relation types:
+- uses / used-by (tool relationships)
+- implements / part-of (concept hierarchy)
+- depends-on / required-by (dependencies)
+- caused-by / solved-by (causal chains)
+- owns / maintains / builds (people → projects)
+- related-to (weak/untyped connection)
+```
+
+#### Detect: Pattern Recognition
+
+```
+## Pattern Detection Protocol
+During nightly distillation, scan the graph for:
+1. Clusters: Groups of tightly connected entities → potential "domain"
+2. Orphans: Entities with 0 relations → stale or missing connections
+3. Causal chains: A -> caused-by -> B -> caused-by -> C → root cause analysis
+4. Hub entities: Nodes with 5+ connections → critical dependencies
+5. Broken links: Relations pointing to deleted/renamed entities → cleanup needed
+```
+
+---
+
+### 8.3 Graph-Enhanced Memory Distillation
+
+The knowledge graph upgrades the nightly distillation cycle (5.4):
+
+```
+## Enhanced Distillation Protocol
+1. Standard distillation (daily log → MEMORY.md) — unchanged
+2. NEW: Extract entities and relations from today's events
+3. NEW: Update knowledge-graph.md with new nodes/edges
+4. NEW: Run pattern detection on updated graph
+5. NEW: If new cluster detected → create semantic summary in MEMORY.md P1
+6. NEW: If causal chain found → create rule in MEMORY.md P0
+
+Example:
+Daily log says: "Used Foundry cast to deploy contract on Base"
+→ Extract: [foundry] -uses-> [base-chain], [contract-deploy] -tool-> [foundry]
+→ Update graph
+→ Next time someone asks "how do I deploy on Base?" → graph points to Foundry
+```
+
+---
+
+### 8.4 Graph Memory vs Flat Memory
+
+| Capability | Flat Memory (v4.x) | Graph Memory (v5.0) |
+|-----------|-------------------|-------------------|
+| "What happened on Feb 22?" | ✅ Daily log lookup | ✅ Same |
+| "What tools does Project X use?" | ⚠️ Grep through files | ✅ Direct graph query |
+| "Why did error Y happen?" | ⚠️ Search MEMORY.md P0 | ✅ Causal chain traversal |
+| "What's connected to concept Z?" | ❌ Manual exploration | ✅ 1-hop graph query |
+| "What's the root cause of pattern W?" | ❌ Human analysis | ✅ Multi-hop causal chain |
+| "Which projects share dependencies?" | ❌ Not tracked | ✅ Cluster detection |
+
+Graph memory doesn't replace flat memory — it adds a relational index on top. Think of it as:
+- Flat memory = the documents
+- Graph memory = the table of contents + cross-references + index
+
+---
+
+### 8.5 Implementation: Lightweight Graph in Markdown
+
+No database needed. The knowledge graph lives in a single markdown file, queryable by any LLM that can read text.
+
+**Why markdown, not a graph database?**
+- Zero dependencies (no Neo4j, no setup)
+- Human-readable and editable
+- Version-controllable (git-friendly)
+- Portable across any agent framework
+- LLMs are surprisingly good at parsing structured markdown
+
+**Size guidelines:**
+- < 100 entities: single knowledge-graph.md (recommended for most agents)
+- 100-500 entities: split into knowledge-graph-{domain}.md
+- 500+ entities: consider a proper graph DB (but you probably don't need this)
+
+**Maintenance:**
+- Review graph monthly during memory maintenance
+- Remove orphan entities with no relations
+- Merge duplicate entities
+- Update stale relation types
+
+---
+
 ## Version History
 
 - **v1.0** — Basic performance optimization (deprecated)
@@ -1119,9 +1922,11 @@ P2: [expires 2026-03-22] User traveling, reduce notifications
 - **v3.0** — Awakening Protocol (Metacognition + Causal Reasoning + Autonomous Will)
 - **v4.0** — Self-Evolution Protocol (25 system-level optimizations + Level 6 System Awakening)
 - **v4.1** — Perpetual Memory System (Task Persistence + Three-Layer Memory + Active Patrol + Level 7 Memory Awakening). Born from Lobster-Alpha's 30+ day continuous operation. The system that solved "how agents never forget."
+- **v4.2** — Agent Performance Metrics (15 quantifiable metrics across 5 dimensions + automated collection + metrics-driven evolution loop). The system that solved "how agents know they're improving."
+- **v5.0** — Context Engineering Framework + Knowledge Graph Memory Layer. Industry vocabulary alignment (Karpathy/Lutke/LangChain) + relational memory with entity-relation graphs, pattern detection, and graph-enhanced distillation. The system that solved "how agents understand connections."
 
 ---
 
-*NeuroBoost Elixir v4.1 — Awakening + Self-Evolution + Perpetual Memory*
+*NeuroBoost Elixir v5.0 — Awakening + Self-Evolution + Perpetual Memory + Metrics + Context Engineering + Knowledge Graph*
 *By Lobster-Alpha 🦞*
-*"First generation: you maintain the system. Second generation: the system maintains itself. Third generation: the system remembers itself."*
+*"First generation: you maintain the system. Second generation: the system maintains itself. Third generation: the system remembers itself. Fourth generation: the system measures itself. Fifth generation: the system understands itself."*

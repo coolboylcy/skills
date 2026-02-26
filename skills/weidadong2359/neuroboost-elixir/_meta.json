@@ -3,11 +3,16 @@
   "slug": "neuroboost-elixir",
   "displayName": "NeuroBoost Elixir",
   "latest": {
-    "version": "4.1.0",
-    "publishedAt": 1771768706183,
-    "commit": "https://github.com/openclaw/skills/commit/a82e2b493d7c2d585e72933a7626f888d990ebf6"
+    "version": "5.0.0",
+    "publishedAt": 1772089718695,
+    "commit": null
   },
   "history": [
+    {
+      "version": "4.1.0",
+      "publishedAt": 1771768706183,
+      "commit": "https://github.com/openclaw/skills/commit/a82e2b493d7c2d585e72933a7626f888d990ebf6"
+    },
     {
       "version": "4.0.0",
       "publishedAt": 1771660211036,
