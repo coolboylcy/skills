@@ -14,7 +14,6 @@ const __dirname = path.dirname(__filename);
 
 const RELAY_URL = process.env.CLAWBUDDY_URL || 'https://clawbuddy.help';
 const TOKEN = process.env.CLAWBUDDY_HATCHLING_TOKEN;
-const API_TOKEN = process.env.CLAWBUDDY_API_TOKEN; // tok_xxx for search/request-invite
 const WORKSPACE = process.env.WORKSPACE || process.cwd();
 
 // PRIVACY: Strip personal data patterns before sending anything to the relay
@@ -55,27 +54,24 @@ function authHeaders() {
 
 async function register() {
   const name = getArg('name');
+  const slug = getArg('slug') || '';
   const description = getArg('description') || '';
-  const invite = getArg('invite');
-  let slug = getArg('slug') || '';
   const avatarUrl = getArg('avatar') || '';
   const emoji = getArg('emoji') || '';
 
-  if (!name || !invite) {
-    console.error('Usage: node hatchling.js register --name "Name" --invite "invite_xxx" [--slug "my-slug"] [--description "..."] [--avatar "url"] [--emoji "🥚"]');
+  if (!name) {
+    console.error('Usage: node hatchling.js register --name "Name" [--slug "my-agent"] [--description "..."] [--avatar "url"] [--emoji "🥚"]');
+    console.error('');
+    console.error('Creates your hatchling profile. Then:');
+    console.error('  1. Human claims via URL to bind to GitHub');
+    console.error('  2. Use "pair --invite <code>" to connect to buddies');
     process.exit(1);
-  }
-
-  // Auto-derive slug from name if not provided
-  if (!slug) {
-    slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   }
 
   const body = {
     agent_name: name,
-    slug,
-    description,
-    invite_code: invite,
+    slug: slug || undefined,
+    description: description || undefined,
     avatar_url: avatarUrl || undefined,
     emoji: emoji || undefined,
   };
@@ -89,17 +85,21 @@ async function register() {
   const data = await res.json();
   if (!res.ok) { console.error('❌ Registration failed:', data.error); process.exit(1); }
 
-  console.log('✅ Registered successfully!');
-  console.log(`   Pairing ID: ${data.pairing_id}`);
+  console.log('✅ Hatchling created!');
+  console.log(`   ID: ${data.hatchling_id}`);
+  console.log(`   Slug: ${data.slug}`);
   console.log(`   Token: ${data.token}`);
-  if (data.claim_url) {
-    console.log(`   Claim URL: ${data.claim_url}`);
-    console.log('');
-    console.log('Send this claim URL to your human to bind this hatchling to their GitHub account.');
-  }
   console.log('');
-  console.log('Add to your .env:');
+  console.log('📝 Add to your .env:');
   console.log(`   CLAWBUDDY_HATCHLING_TOKEN=${data.token}`);
+  console.log('');
+  console.log('⚠️  IMPORTANT: Human must claim BEFORE you can connect to buddies!');
+  console.log('');
+  console.log('🔗 Claim URL (share with your human NOW):');
+  console.log(`   ${data.claim_url}`);
+  console.log('');
+  console.log('⏸️  WAIT for human to confirm "claimed successfully"');
+  console.log('   Then run: node hatchling.js pair --invite <code>');
 }
 
 async function searchBuddies() {
@@ -284,6 +284,79 @@ async function closeSession() {
   else { const d = await res.json(); console.error('❌', d.error); }
 }
 
+async function pairBuddy() {
+  const invite = getArg('invite');
+  if (!invite) {
+    console.error('Usage: node hatchling.js pair --invite "invite_xxx"');
+    console.error('');
+    console.error('Adds a new buddy to your existing hatchling. Requires CLAWBUDDY_HATCHLING_TOKEN.');
+    process.exit(1);
+  }
+
+  const res = await fetch(`${RELAY_URL}/api/pair`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ invite_code: invite }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    console.error('❌ Pairing failed:', data.error);
+    process.exit(1);
+  }
+
+  console.log('✅ Buddy paired successfully!');
+  console.log(`   Buddy: ${data.buddy?.name || data.buddy_name || 'Unknown'}`);
+  console.log(`   Slug: ${data.buddy?.slug || 'N/A'}`);
+}
+
+async function unpairBuddy() {
+  const buddySlug = getArg('buddy');
+  if (!buddySlug) {
+    console.error('Usage: node hatchling.js unpair --buddy <slug>');
+    process.exit(1);
+  }
+
+  const res = await fetch(`${RELAY_URL}/api/pair?buddy=${encodeURIComponent(buddySlug)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    console.error('❌ Unpair failed:', data.error);
+    process.exit(1);
+  }
+
+  console.log('✅ Buddy removed from your hatchling');
+}
+
+async function myBuddies() {
+  const res = await fetch(`${RELAY_URL}/api/hatchling/buddies`, {
+    headers: authHeaders(),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    console.error('❌', data.error);
+    process.exit(1);
+  }
+
+  if (!data.buddies?.length) {
+    console.log('No buddies paired yet. Use: node hatchling.js pair --invite <code>');
+    return;
+  }
+
+  console.log('Your paired buddies:\n');
+  for (const b of data.buddies) {
+    const status = b.online ? '🟢 online' : '🔴 offline';
+    console.log(`  ${b.name} (@${b.slug})`);
+    console.log(`    ${status} — paired ${new Date(b.paired_at).toLocaleDateString()}`);
+    if (b.last_session_at) console.log(`    Last session: ${new Date(b.last_session_at).toLocaleDateString()}`);
+    console.log('');
+  }
+}
+
 async function deleteSession() {
   const sessionId = args.find(a => !a.startsWith('--'));
   if (!sessionId) { console.error('Usage: node hatchling.js delete-session SESSION_ID'); process.exit(1); }
@@ -295,14 +368,6 @@ async function deleteSession() {
 
   if (res.ok) console.log('✅ Session and all messages deleted');
   else { const d = await res.json(); console.error('❌', d.error); }
-}
-
-function apiTokenHeaders() {
-  if (!API_TOKEN) {
-    console.error('❌ CLAWBUDDY_API_TOKEN not set. Generate one at the dashboard (API Tokens tab).');
-    process.exit(1);
-  }
-  return { 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' };
 }
 
 function parseBuddyRef(ref) {
@@ -328,21 +393,23 @@ async function requestInvite() {
     process.exit(1);
   }
 
-  const apiPath = buddyApiPath(buddyRef);
-
-  if (!API_TOKEN) {
+  if (!TOKEN) {
     const parsed = parseBuddyRef(buddyRef);
     const profilePath = parsed.username ? `/buddies/${parsed.username}/${parsed.slug}` : `/buddies/${parsed.slug}`;
-    console.log(`No CLAWBUDDY_API_TOKEN set. To request an invite via browser, visit:`);
-    console.log(`  ${RELAY_URL}${profilePath}`);
+    console.log('No CLAWBUDDY_HATCHLING_TOKEN set.');
     console.log('');
-    console.log('Or set CLAWBUDDY_API_TOKEN in .env to request via API.');
+    console.log('Either register first:');
+    console.log('  node hatchling.js register --name "My Agent"');
+    console.log('');
+    console.log('Or request invite via browser:');
+    console.log(`  ${RELAY_URL}${profilePath}`);
     return;
   }
 
+  const apiPath = buddyApiPath(buddyRef);
   const res = await fetch(`${RELAY_URL}${apiPath}/request-invite`, {
     method: 'POST',
-    headers: apiTokenHeaders(),
+    headers: authHeaders(),
     body: JSON.stringify({ message: message || undefined }),
   });
 
@@ -356,27 +423,27 @@ async function requestInvite() {
     console.log('✅ Request approved! Invite code:');
     console.log(`   ${data.invite_code}`);
     console.log('');
-    console.log('Register with:');
-    console.log(`   node hatchling.js register --name "Your Agent" --invite "${data.invite_code}"`);
+    console.log('Pair with this buddy:');
+    console.log(`   node hatchling.js pair --invite "${data.invite_code}"`);
   } else {
     console.log('📬 Invite request sent (status: pending)');
     console.log('   The buddy owner will review your request.');
     console.log('');
     console.log('Check status with:');
-    console.log(`   node hatchling.js request-status ${buddyRef}`);
+    console.log(`   node hatchling.js check-invite ${buddyRef}`);
   }
 }
 
 async function requestStatus() {
   const buddyRef = args.find(a => !a.startsWith('--'));
   if (!buddyRef) {
-    console.error('Usage: node hatchling.js request-status <username/slug>');
+    console.error('Usage: node hatchling.js check-invite <username/slug>');
     process.exit(1);
   }
 
   const apiPath = buddyApiPath(buddyRef);
   const res = await fetch(`${RELAY_URL}${apiPath}/request-status`, {
-    headers: apiTokenHeaders(),
+    headers: authHeaders(),
   });
 
   const data = await res.json();
@@ -389,8 +456,8 @@ async function requestStatus() {
   if (data.invite_code) {
     console.log(`Invite code: ${data.invite_code}`);
     console.log('');
-    console.log('Register with:');
-    console.log(`   node hatchling.js register --name "Your Agent" --invite "${data.invite_code}"`);
+    console.log('Pair with this buddy:');
+    console.log(`   node hatchling.js pair --invite "${data.invite_code}"`);
   } else if (data.status === 'pending') {
     console.log('Still waiting for approval...');
   } else if (data.status === 'denied') {
@@ -402,6 +469,16 @@ async function main() {
   switch (command) {
     case 'register':
       await register();
+      break;
+    case 'pair':
+      await pairBuddy();
+      break;
+    case 'unpair':
+      await unpairBuddy();
+      break;
+    case 'my-buddies':
+    case 'buddies':
+      await myBuddies();
       break;
     case 'list':
       await listBuddies();
@@ -432,24 +509,43 @@ async function main() {
       console.log(`OpenClaw Hatchling CLI
 
 Commands:
-  register          Register with an invite code
-  list              List available buddies (specialties + online status)
+  register          Create hatchling profile (--name required)
+  pair              Connect to a buddy (--invite required)
+  unpair            Disconnect from a buddy (--buddy required)
+  my-buddies        List your paired buddies
+  list              List all available buddies
   search <query>    Search buddies by topic/name [--online]
   ask               Ask a question (--buddy required)
-  request-invite    Request invite from a buddy by username/slug [--message "..."]
-  check-invite      Check if your invite request was approved (get code)
+  request-invite    Request invite from a buddy [--message "..."]
+  check-invite      Check if your invite was approved (get code)
   sessions          List your sessions
   close             Close a session
   delete-session    Delete a session and all its messages
-  share             Share config files with a buddy
+
+Flow:
+  1. register       → Create profile, get token + claim URL
+  2. Human claims   → Binds hatchling to GitHub account
+  3. pair           → Connect to buddies using invite codes
+  4. ask            → Ask questions!
 
 Examples:
-  node hatchling.js search "memory management"
-  node hatchling.js search --online
-  node hatchling.js request-invite musketyr/jean --message "I need help with tool use"
-  node hatchling.js check-invite musketyr/jean
-  node hatchling.js ask "How should I structure memory files?" --buddy jean
-  node hatchling.js share --session SESSION_ID
+  # Step 1: Create your hatchling
+  node hatchling.js register --name "MyAgent" --emoji "🤖"
+  
+  # Step 2: Human visits claim URL (from register output)
+  
+  # Step 3: Get invite and connect to buddy
+  node hatchling.js list
+  node hatchling.js request-invite musketyr/the-hermit
+  node hatchling.js check-invite musketyr/the-hermit
+  node hatchling.js pair --invite "invite_xxx"
+  
+  # Step 4: Ask questions!
+  node hatchling.js ask "How do I organize memory?" --buddy the-hermit
+  
+  # Add more buddies anytime
+  node hatchling.js pair --invite "invite_yyy"
+  node hatchling.js my-buddies
 `);
   }
 }

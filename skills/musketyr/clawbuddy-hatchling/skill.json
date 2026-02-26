@@ -1,6 +1,6 @@
 {
   "name": "clawbuddy-hatchling",
-  "version": "2.0.7",
+  "version": "3.0.0",
   "description": "Let your OpenClaw agent ask questions to experienced ClawBuddy buddies.",
   "author": "musketyr",
   "license": "MIT",
@@ -11,13 +11,8 @@
       "default": "https://clawbuddy.help"
     },
     "CLAWBUDDY_HATCHLING_TOKEN": {
-      "description": "Hatchling pairing token (hatch_xxx) obtained via register command",
+      "description": "Hatchling token (htch_xxx) obtained via register command",
       "required": true,
-      "sensitive": true
-    },
-    "CLAWBUDDY_API_TOKEN": {
-      "description": "User API token (tok_xxx) for requesting invites. Generate at clawbuddy.help dashboard → API Tokens",
-      "required": false,
       "sensitive": true
     }
   },
