@@ -3,11 +3,16 @@
   "slug": "memoclaw",
   "displayName": "Memoclaw Skill",
   "latest": {
-    "version": "1.14.0",
-    "publishedAt": 1771939446016,
-    "commit": "https://github.com/openclaw/skills/commit/10c202ca1cf5ee6f7f10c397251027e7422c8bcf"
+    "version": "1.14.1",
+    "publishedAt": 1772033045533,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.14.0",
+      "publishedAt": 1771939446016,
+      "commit": "https://github.com/openclaw/skills/commit/10c202ca1cf5ee6f7f10c397251027e7422c8bcf"
+    },
     {
       "version": "1.13.0",
       "publishedAt": 1771331604686,
