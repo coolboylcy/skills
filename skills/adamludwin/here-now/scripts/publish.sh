@@ -4,6 +4,10 @@ set -euo pipefail
 BASE_URL="https://here.now"
 CREDENTIALS_FILE="$HOME/.herenow/credentials"
 API_KEY="${HERENOW_API_KEY:-}"
+API_KEY_SOURCE="none"
+if [[ -n "${HERENOW_API_KEY:-}" ]]; then
+  API_KEY_SOURCE="env"
+fi
 ALLOW_NON_HERENOW_BASE_URL=0
 SLUG=""
 CLAIM_TOKEN=""
@@ -50,7 +54,7 @@ done
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --api-key)      API_KEY="$2"; shift 2 ;;
+    --api-key)      API_KEY="$2"; API_KEY_SOURCE="flag"; shift 2 ;;
     --slug)         SLUG="$2"; shift 2 ;;
     --claim-token)  CLAIM_TOKEN="$2"; shift 2 ;;
     --title)        TITLE="$2"; shift 2 ;;
@@ -70,6 +74,7 @@ done
 # Load API key from credentials file if not provided via flag or env
 if [[ -z "$API_KEY" && -f "$CREDENTIALS_FILE" ]]; then
   API_KEY=$(cat "$CREDENTIALS_FILE" | tr -d '[:space:]')
+  [[ -n "$API_KEY" ]] && API_KEY_SOURCE="credentials"
 fi
 
 BASE_URL="${BASE_URL%/}"
@@ -181,6 +186,11 @@ if [[ -n "$API_KEY" ]]; then
   AUTH_ARGS=(-H "authorization: Bearer $API_KEY")
 fi
 
+AUTH_MODE="anonymous"
+if [[ -n "$API_KEY" ]]; then
+  AUTH_MODE="authenticated"
+fi
+
 # Step 1: Create/update publish
 echo "creating publish ($file_count files)..." >&2
 RESPONSE=$(curl -sS -X "$METHOD" "$URL" \
@@ -276,9 +286,32 @@ echo "$STATE" | "$JQ_BIN" '.' > "$STATE_FILE"
 # Output
 echo "$SITE_URL"
 
-if [[ -n "$RESPONSE_CLAIM_TOKEN" ]]; then
-  echo "" >&2
+PERSISTENCE="permanent"
+if [[ "$AUTH_MODE" == "anonymous" ]]; then
+  PERSISTENCE="expires_24h"
+elif [[ -n "$RESPONSE_EXPIRES" ]]; then
+  PERSISTENCE="expires_at"
+fi
+
+SAFE_CLAIM_URL=""
+if [[ -n "$RESPONSE_CLAIM_URL" && "$RESPONSE_CLAIM_URL" == https://* ]]; then
+  SAFE_CLAIM_URL="$RESPONSE_CLAIM_URL"
+fi
+
+echo "" >&2
+echo "publish_result.site_url=$SITE_URL" >&2
+echo "publish_result.auth_mode=$AUTH_MODE" >&2
+echo "publish_result.api_key_source=$API_KEY_SOURCE" >&2
+echo "publish_result.persistence=$PERSISTENCE" >&2
+echo "publish_result.expires_at=$RESPONSE_EXPIRES" >&2
+echo "publish_result.claim_url=$SAFE_CLAIM_URL" >&2
+
+if [[ "$AUTH_MODE" == "anonymous" ]]; then
   echo "anonymous publish (expires in 24h)" >&2
-  echo "claim URL: $RESPONSE_CLAIM_URL" >&2
-  echo "claim token saved to $STATE_FILE" >&2
+  if [[ -n "$SAFE_CLAIM_URL" ]]; then
+    echo "claim URL: $SAFE_CLAIM_URL" >&2
+  fi
+  if [[ -n "$RESPONSE_CLAIM_TOKEN" ]]; then
+    echo "claim token saved to $STATE_FILE" >&2
+  fi
 fi

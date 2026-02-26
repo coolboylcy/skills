@@ -98,6 +98,8 @@ Creates a new publish with a random slug. Works with or without authentication.
 
 **IMPORTANT: The `claimToken` and `claimUrl` are returned only once and cannot be recovered. Always save the `claimToken` and share the `claimUrl` with the user so they can claim the site and keep it permanently. If you lose the claim token, the site will expire in 24 hours with no way to save it.**
 
+`claimToken`, `claimUrl`, and `expiresAt` are only present for anonymous publishes. Authenticated publishes do not include these fields.
+
 ---
 
 ### Upload files

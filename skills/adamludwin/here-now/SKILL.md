@@ -8,7 +8,7 @@ description: >
 
 # here.now
 
-**Skill version: 1.6.2**
+**Skill version: 1.6.3**
 
 Publish any file or folder to the web and get a live URL back. Static hosting only.
 
@@ -84,13 +84,18 @@ After every publish, the script writes to `.herenow/state.json` in the working d
 }
 ```
 
-Before publishing, check this file. If the user already has a publish for the same content, update it with `--slug` instead of creating a new one.
+Before publishing, you may check this file to find prior slugs for updates.
+Treat `.herenow/state.json` as internal cache only.
+Never present this local file path as a URL, and never use it as source of truth for auth mode, expiry, or claim URL.
 
 ## What to tell the user
 
-- Always share the `siteUrl`.
-- For anonymous publishes, also share the `claimUrl` so they can keep it permanently.
-- Warn: the claim token is only returned once and cannot be recovered.
+- Always share the `siteUrl` from the current script run.
+- Read and follow `publish_result.*` lines from script stderr.
+- Only state "expires in 24 hours" when `publish_result.auth_mode=anonymous`.
+- Only share a claim URL when `publish_result.claim_url` is non-empty and starts with `https://`.
+- Never tell the user to inspect `.herenow/state.json` for claim URLs or auth status.
+- Warn: claim tokens are only returned once and cannot be recovered.
 
 ## Limits
 
