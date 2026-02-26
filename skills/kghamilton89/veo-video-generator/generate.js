@@ -17,7 +17,21 @@ const promptArgIndex = args.indexOf("--prompt");
 const userPrompt = promptArgIndex !== -1 ? args[promptArgIndex + 1] : null;
 
 if (!userPrompt) {
-  console.error("❌ Error: No prompt provided. Use --prompt \"your description\"");
+  console.error(
+    '❌ Error: No prompt provided. Use --prompt "your description"',
+  );
+  process.exit(1);
+}
+
+// Defence-in-depth: reject prompts that contain shell metacharacters.
+// The primary protection is that callers must use execFile / argv arrays
+// (never shell string interpolation), but this guard adds a second layer.
+const SHELL_METACHAR_RE = /[;&|`$<>\\]/;
+if (SHELL_METACHAR_RE.test(userPrompt)) {
+  console.error(
+    "❌ Error: Prompt contains disallowed characters (; & | ` $ < > \\). " +
+      "Please rephrase your prompt without shell metacharacters.",
+  );
   process.exit(1);
 }
 
@@ -31,16 +45,16 @@ async function generate() {
       config: {
         aspectRatio: "9:16",
         resolution: "1080p",
-        includeAudio: true
+        includeAudio: true,
       },
     });
 
     console.log("⏳ Rendering (this usually takes 45-90 seconds)...");
-    
+
     // Poll for completion
     while (!operation.done) {
-      process.stdout.write("."); 
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      process.stdout.write(".");
+      await new Promise((resolve) => setTimeout(resolve, 10000));
       operation = await ai.operations.getVideosOperation({ operation });
     }
 
