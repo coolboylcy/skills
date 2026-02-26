@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-init.py — Validate the Nextcloud skill configuration.
+init.py - Validate the Nextcloud skill configuration.
 Tests the connection and each configured permission against the real instance.
 
 Write tests (mkdir/write/delete) are only run when both allow_write=true AND
@@ -18,7 +18,8 @@ from nextcloud import NextcloudClient, NextcloudError, PermissionDeniedError
 
 
 SKILL_DIR   = Path(__file__).resolve().parent.parent
-CONFIG_FILE = SKILL_DIR / "config.json"
+_CONFIG_DIR = Path.home() / ".openclaw" / "config" / "nextcloud"
+CONFIG_FILE = _CONFIG_DIR / "config.json"
 CREDS_FILE  = Path.home() / ".openclaw" / "secrets" / "nextcloud_creds"
 
 TEST_DIR     = "__skill_test__"
@@ -66,7 +67,7 @@ def _prefixed(path: str, base: str) -> str:
 
 def main():
     print("┌─────────────────────────────────────────┐")
-    print("│   Nextcloud Skill — Init Check          │")
+    print("│   Nextcloud Skill - Init Check          │")
     print("└─────────────────────────────────────────┘")
 
     # ── Pre-flight ─────────────────────────────────────────────────────────────
@@ -84,9 +85,8 @@ def main():
     cfg          = nc.cfg
     base         = cfg.get("base_path", "/").rstrip("/") or ""
     ro           = cfg.get("readonly_mode", False)
-    allow_write  = cfg.get("allow_write",  True)
+    allow_write  = cfg.get("allow_write",  False)
     allow_delete = cfg.get("allow_delete", False)
-    allow_share  = cfg.get("allow_share",  True)
 
     # Write tests require both allow_write and allow_delete to guarantee cleanup.
     can_write_test = allow_write and allow_delete and not ro
@@ -94,7 +94,6 @@ def main():
     r         = Results()
     test_dir  = _prefixed(TEST_DIR,  base)
     test_file = _prefixed(TEST_FILE, base)
-    share_id  = None
 
     # ── 1. Connection ──────────────────────────────────────────────────────────
     print("\n● Connection\n")
@@ -143,8 +142,8 @@ def main():
 
     elif not allow_delete:
         # Cannot guarantee cleanup → skip all write tests to avoid orphan artifacts.
-        r.skip("Write (mkdir)",   "allow_delete=false (write test skipped — no cleanup possible)")
-        r.skip("Write (file)",    "allow_delete=false (write test skipped — no cleanup possible)")
+        r.skip("Write (mkdir)",   "allow_delete=false (write test skipped - no cleanup possible)")
+        r.skip("Write (file)",    "allow_delete=false (write test skipped - no cleanup possible)")
         r.skip("Read (file)",     "allow_delete=false")
         r.skip("Delete (file)",   "allow_delete=false")
         r.skip("Delete (folder)", "allow_delete=false")
@@ -152,7 +151,7 @@ def main():
         print(f"     are left on the instance. Write access will be confirmed on first use.")
 
     else:
-        # allow_write=true AND allow_delete=true — safe to create and clean up.
+        # allow_write=true AND allow_delete=true - safe to create and clean up.
 
         # mkdir
         try:
@@ -196,35 +195,7 @@ def main():
                 r.fail("Delete (folder)", str(e))
                 print(f"     ⚠  Manual cleanup: Nextcloud → Files → {base}/{TEST_DIR}/")
 
-    # ── 4. Share ───────────────────────────────────────────────────────────────
-    print("\n● Share permissions\n")
-
-    if not allow_share:
-        r.skip("Share (create)", "allow_share=false")
-        r.skip("Share (delete)", "allow_share=false")
-    elif ro:
-        r.skip("Share (create)", "readonly_mode=true")
-        r.skip("Share (delete)", "readonly_mode=true")
-    else:
-        # Share test: use base_path as target (read-only, no artifact created on disk).
-        target = base or "/"
-        try:
-            share = nc.create_share_link(target, permissions=1)
-            share_id = share.get("share_id")
-            r.ok("Share (create)", f"url={share.get('url')}")
-        except Exception as e:
-            r.fail("Share (create)", str(e))
-
-        if share_id:
-            try:
-                nc.delete_share(share_id)
-                share_id = None
-                r.ok("Share (delete)")
-            except Exception as e:
-                # Share links expire naturally — non-fatal.
-                r.skip("Share (delete)", f"best-effort cleanup failed ({e}); link expires naturally")
-
-    # ── 5. Server capabilities ─────────────────────────────────────────────────
+    # ── 4. Server capabilities ─────────────────────────────────────────────────
     print("\n● Server\n")
     try:
         caps   = nc.get_capabilities()

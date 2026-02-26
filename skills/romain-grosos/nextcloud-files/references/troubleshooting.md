@@ -1,9 +1,9 @@
-# Nextcloud Skill — Troubleshooting
+# Nextcloud Skill - Troubleshooting
 
 ## Credentials missing
 
 ```
-NextcloudError: Credentials missing. Set NC_URL / NC_USER / NC_PASS in
+NextcloudError: Credentials missing. Set NC_URL / NC_USER / NC_APP_KEY in
 ~/.openclaw/secrets/nextcloud_creds or as environment variables.
 ```
 → Run `python3 scripts/setup.py` or create the file manually (see SKILL.md).
@@ -44,7 +44,7 @@ Fixes:
 
 ## 405 Method Not Allowed on MKCOL
 
-Cause: directory already exists (normal — the skill treats 405 as success).
+Cause: directory already exists (normal - the skill treats 405 as success).
 If you see it as an error elsewhere: the WebDAV method may be disabled.
 
 ---
@@ -118,7 +118,7 @@ Fix (not recommended for production):
 ```python
 import urllib3
 urllib3.disable_warnings()
-# or pass verify=False to requests — patch nextcloud.py session if needed
+# or pass verify=False to requests - patch nextcloud.py session if needed
 ```
 Better fix: install a valid certificate (Let's Encrypt).
 

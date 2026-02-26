@@ -1,35 +1,40 @@
 #!/usr/bin/env python3
 """
-nextcloud.py — Nextcloud client (WebDAV + OCS) for OpenClaw
+nextcloud.py - Nextcloud client (WebDAV + OCS) for OpenClaw
 Skill: nextcloud | https://clawhub.ai
 
-Config  : <skill_dir>/config.json
-Secrets : ~/.openclaw/secrets/nextcloud_creds  (NC_URL, NC_USER, NC_PASS)
+Zero external dependencies - stdlib only (urllib, xml, json).
+
+Config  : ~/.openclaw/config/nextcloud/config.json
+Secrets : ~/.openclaw/secrets/nextcloud_creds  (NC_URL, NC_USER, NC_APP_KEY)
 """
 
+import base64
 import json
 import os
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from urllib.parse import quote, urljoin
+from urllib.parse import quote
 
-import requests
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _retry import with_retry
 
 # ─── Paths ─────────────────────────────────────────────────────────────────────
 
-SKILL_DIR   = Path(__file__).resolve().parent.parent   # skills/nextcloud/
-CONFIG_FILE = SKILL_DIR / "config.json"
-CREDS_FILE  = Path.home() / ".openclaw" / "secrets" / "nextcloud_creds"
+SKILL_DIR    = Path(__file__).resolve().parent.parent   # skills/nextcloud/
+_CONFIG_DIR  = Path.home() / ".openclaw" / "config" / "nextcloud"
+CONFIG_FILE  = _CONFIG_DIR / "config.json"
+CREDS_FILE   = Path.home() / ".openclaw" / "secrets" / "nextcloud_creds"
 
 _DEFAULT_CONFIG = {
     "base_path": "/",
-    "allow_write": True,
+    "allow_write": False,
     "allow_delete": False,
-    "allow_share": True,
     "readonly_mode": False,
-    "share_default_permissions": 1,
-    "share_default_expire_days": None,
 }
 
 # ─── Config & credentials ──────────────────────────────────────────────────────
@@ -52,7 +57,7 @@ def _load_creds() -> dict:
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
                 creds[k.strip()] = v.strip()
-    for k in ("NC_URL", "NC_USER", "NC_PASS"):
+    for k in ("NC_URL", "NC_USER", "NC_APP_KEY"):
         if k in os.environ:
             creds[k] = os.environ[k]
     return creds
@@ -61,6 +66,9 @@ def _load_creds() -> dict:
 # ─── Exceptions ────────────────────────────────────────────────────────────────
 
 class NextcloudError(RuntimeError):
+    pass
+
+class NextcloudAPIError(NextcloudError):
     pass
 
 class PermissionDeniedError(NextcloudError):
@@ -73,6 +81,7 @@ class NextcloudClient:
     """
     Full Nextcloud client: WebDAV file ops + OCS sharing/user/tags.
     All write operations respect config.json restrictions.
+    Zero external dependencies - uses urllib (stdlib).
     """
 
     def __init__(self, url: str = None, user: str = None, password: str = None):
@@ -80,23 +89,55 @@ class NextcloudClient:
         self.cfg = _load_config()
         self.base_url  = (url      or creds.get("NC_URL",  "")).rstrip("/")
         self.user      = (user     or creds.get("NC_USER", ""))
-        self.password  = (password or creds.get("NC_PASS", ""))
+        self.password  = (password or creds.get("NC_APP_KEY", ""))
         if not all([self.base_url, self.user, self.password]):
             raise NextcloudError(
-                "Credentials missing. Set NC_URL / NC_USER / NC_PASS in "
+                "Credentials missing. Set NC_URL / NC_USER / NC_APP_KEY in "
                 f"{CREDS_FILE} or as environment variables."
             )
         self.dav_root  = f"{self.base_url}/remote.php/dav/files/{quote(self.user)}"
         self.ocs_root  = f"{self.base_url}/ocs/v2.php"
         self.dav_tags  = f"{self.base_url}/remote.php/dav"
-        self._session  = requests.Session()
-        self._session.auth = (self.user, self.password)
-        self._session.headers.update({
+        # Pre-compute Basic Auth header
+        cred_bytes = f"{self.user}:{self.password}".encode("utf-8")
+        self._auth_header = "Basic " + base64.b64encode(cred_bytes).decode("ascii")
+
+    # ── HTTP transport ──────────────────────────────────────────────────────
+
+    def _request(self, method: str, url: str, data: bytes = None,
+                 headers: dict = None) -> tuple:
+        """
+        Generic HTTP request via urllib. Returns (status_code, headers, body_bytes).
+        Raises NextcloudError on HTTP errors (except expected status codes).
+        """
+        hdrs = {
+            "Authorization": self._auth_header,
             "OCS-APIRequest": "true",
             "Accept": "application/json",
-        })
+        }
+        if headers:
+            hdrs.update(headers)
+        req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
+        try:
+            def _do():
+                with urllib.request.urlopen(req) as resp:
+                    body = resp.read()
+                    return resp.status, dict(resp.headers), body
+            return with_retry(_do)
+        except urllib.error.HTTPError as exc:
+            body = exc.read()
+            return exc.code, dict(exc.headers), body
 
-    # ── Helpers ────────────────────────────────────────────────────────────────
+    def _request_ok(self, method: str, url: str, data: bytes = None,
+                    headers: dict = None, accept: tuple = (200, 201, 204, 207)) -> tuple:
+        """Request that raises on unexpected status codes."""
+        status, resp_headers, body = self._request(method, url, data, headers)
+        if status not in accept:
+            detail = body.decode("utf-8", errors="replace")[:300]
+            raise NextcloudAPIError(f"HTTP {status} {method} {url}: {detail}")
+        return status, resp_headers, body
+
+    # ── Helpers ────────────────────────────────────────────────────────────
 
     def _dav(self, path: str) -> str:
         """Absolute WebDAV URL for a user-relative path."""
@@ -121,7 +162,7 @@ class NextcloudClient:
     def _check_write(self):
         if self.cfg.get("readonly_mode"):
             raise PermissionDeniedError("readonly_mode is enabled in config.json")
-        if not self.cfg.get("allow_write", True):
+        if not self.cfg.get("allow_write", False):
             raise PermissionDeniedError("allow_write is disabled in config.json")
 
     def _check_delete(self):
@@ -130,11 +171,7 @@ class NextcloudClient:
         if not self.cfg.get("allow_delete", False):
             raise PermissionDeniedError("allow_delete is disabled in config.json")
 
-    def _check_share(self):
-        if not self.cfg.get("allow_share", True):
-            raise PermissionDeniedError("allow_share is disabled in config.json")
-
-    # ── Directories ────────────────────────────────────────────────────────────
+    # ── Directories ────────────────────────────────────────────────────────
 
     def mkdir(self, path: str) -> bool:
         """Create directory (MKCOL), recursively creates parents."""
@@ -144,9 +181,9 @@ class NextcloudClient:
         current = ""
         for part in parts:
             current = current + "/" + part
-            r = self._session.request("MKCOL", self._dav(current))
-            if r.status_code not in (201, 405):   # 405 = already exists
-                r.raise_for_status()
+            status, _, _ = self._request("MKCOL", self._dav(current))
+            if status not in (201, 405):   # 405 = already exists
+                raise NextcloudError(f"MKCOL {current} failed with HTTP {status}")
         return True
 
     def rename(self, old_path: str, new_path: str) -> bool:
@@ -154,11 +191,11 @@ class NextcloudClient:
         self._check_write()
         self._enforce_base(old_path)
         dst_url = self._dav(new_path)
-        r = self._session.request(
+        self._request_ok(
             "MOVE", self._dav(old_path),
             headers={"Destination": dst_url, "Overwrite": "T"},
+            accept=(200, 201, 204),
         )
-        r.raise_for_status()
         return True
 
     def copy(self, src_path: str, dst_path: str, overwrite: bool = True) -> bool:
@@ -166,18 +203,18 @@ class NextcloudClient:
         self._check_write()
         self._enforce_base(src_path)
         dst_url = self._dav(dst_path)
-        r = self._session.request(
+        self._request_ok(
             "COPY", self._dav(src_path),
             headers={
                 "Destination": dst_url,
                 "Overwrite": "T" if overwrite else "F",
                 "Depth": "infinity",
             },
+            accept=(200, 201, 204),
         )
-        r.raise_for_status()
         return True
 
-    # ── Files ──────────────────────────────────────────────────────────────────
+    # ── Files ──────────────────────────────────────────────────────────────
 
     def write_file(self, path: str, content, content_type: str = "text/plain; charset=utf-8") -> bool:
         """Create or overwrite a file (PUT). Creates parent dirs if needed."""
@@ -191,37 +228,34 @@ class NextcloudClient:
                 pass
         if isinstance(content, str):
             content = content.encode("utf-8")
-        r = self._session.put(
-            self._dav(path), data=content,
+        self._request_ok(
+            "PUT", self._dav(path), data=content,
             headers={"Content-Type": content_type},
+            accept=(200, 201, 204),
         )
-        r.raise_for_status()
         return True
 
     def read_file(self, path: str) -> str:
         """Read a text file (GET)."""
-        r = self._session.get(self._dav(path))
-        r.raise_for_status()
-        return r.text
+        _, _, body = self._request_ok("GET", self._dav(path))
+        return body.decode("utf-8")
 
     def read_file_bytes(self, path: str) -> bytes:
         """Read a binary file (GET)."""
-        r = self._session.get(self._dav(path))
-        r.raise_for_status()
-        return r.content
+        _, _, body = self._request_ok("GET", self._dav(path))
+        return body
 
     def delete(self, path: str) -> bool:
         """Delete a file or directory (DELETE)."""
         self._check_delete()
         self._enforce_base(path)
-        r = self._session.delete(self._dav(path))
-        r.raise_for_status()
+        self._request_ok("DELETE", self._dav(path), accept=(200, 204))
         return True
 
     def exists(self, path: str) -> bool:
         """Check if a path exists."""
-        r = self._session.request("HEAD", self._dav(path))
-        return r.status_code == 200
+        status, _, _ = self._request("HEAD", self._dav(path))
+        return status == 200
 
     def set_favorite(self, path: str, state: bool = True) -> bool:
         """Toggle favorite flag via PROPPATCH (oc:favorite)."""
@@ -233,11 +267,12 @@ class NextcloudClient:
     <d:prop><oc:favorite>{value}</oc:favorite></d:prop>
   </d:set>
 </d:propertyupdate>'''
-        r = self._session.request(
+        self._request_ok(
             "PROPPATCH", self._dav(path),
-            data=body, headers={"Content-Type": "application/xml"},
+            data=body.encode("utf-8"),
+            headers={"Content-Type": "application/xml"},
+            accept=(200, 207),
         )
-        r.raise_for_status()
         return True
 
     def append_to_file(self, path: str, content: str) -> bool:
@@ -248,7 +283,7 @@ class NextcloudClient:
             existing = ""
         return self.write_file(path, existing + content)
 
-    # ── Directory listing ──────────────────────────────────────────────────────
+    # ── Directory listing ──────────────────────────────────────────────────
 
     def list_dir(self, path: str = "/", depth: int = 1) -> list:
         """List directory contents (PROPFIND). Returns list of dicts."""
@@ -267,12 +302,12 @@ class NextcloudClient:
     <oc:fileid/>
   </d:prop>
 </d:propfind>'''
-        r = self._session.request(
-            "PROPFIND", url, data=body,
+        _, _, resp_body = self._request_ok(
+            "PROPFIND", url, data=body.encode("utf-8"),
             headers={"Depth": str(depth), "Content-Type": "application/xml"},
+            accept=(200, 207),
         )
-        r.raise_for_status()
-        return self._parse_propfind(r.text, path)
+        return self._parse_propfind(resp_body.decode("utf-8"), path)
 
     def _parse_propfind(self, xml_text: str, base_path: str) -> list:
         ns = {
@@ -314,7 +349,7 @@ class NextcloudClient:
             })
         return results
 
-    # ── Search ─────────────────────────────────────────────────────────────────
+    # ── Search ─────────────────────────────────────────────────────────────
 
     def search(self, query: str, path: str = "/", limit: int = 30) -> list:
         """
@@ -352,20 +387,20 @@ class NextcloudClient:
     <d:limit><d:nresults>{limit}</d:nresults></d:limit>
   </d:basicsearch>
 </d:searchrequest>'''
-        r = self._session.request(
+        _, _, resp_body = self._request_ok(
             "SEARCH", f"{self.base_url}/remote.php/dav",
-            data=body, headers={"Content-Type": "application/xml"},
+            data=body.encode("utf-8"),
+            headers={"Content-Type": "application/xml"},
+            accept=(200, 207),
         )
-        r.raise_for_status()
-        return self._parse_propfind(r.text, path)
+        return self._parse_propfind(resp_body.decode("utf-8"), path)
 
-    # ── OCS: User & capabilities ───────────────────────────────────────────────
+    # ── OCS: User & capabilities ───────────────────────────────────────────
 
     def get_user_info(self) -> dict:
         """Return current user's profile (OCS)."""
-        r = self._session.get(f"{self.ocs_root}/cloud/user")
-        r.raise_for_status()
-        return r.json().get("ocs", {}).get("data", {})
+        _, _, body = self._request_ok("GET", f"{self.ocs_root}/cloud/user")
+        return json.loads(body.decode("utf-8")).get("ocs", {}).get("data", {})
 
     def get_quota(self) -> dict:
         """Return storage quota info."""
@@ -374,106 +409,10 @@ class NextcloudClient:
 
     def get_capabilities(self) -> dict:
         """Return server capabilities."""
-        r = self._session.get(f"{self.ocs_root}/cloud/capabilities")
-        r.raise_for_status()
-        return r.json().get("ocs", {}).get("data", {})
+        _, _, body = self._request_ok("GET", f"{self.ocs_root}/cloud/capabilities")
+        return json.loads(body.decode("utf-8")).get("ocs", {}).get("data", {})
 
-    # ── OCS: Sharing ───────────────────────────────────────────────────────────
-
-    def create_share_link(
-        self,
-        path: str,
-        permissions: int = None,
-        password: str = None,
-        expire_date: str = None,    # "YYYY-MM-DD"
-        label: str = None,
-        allow_download: bool = True,
-    ) -> dict:
-        """Create a public share link (OCS shareType=3)."""
-        self._check_share()
-        self._enforce_base(path)
-        if permissions is None:
-            permissions = self.cfg.get("share_default_permissions", 1)
-        if expire_date is None and self.cfg.get("share_default_expire_days"):
-            from datetime import date, timedelta
-            days = self.cfg["share_default_expire_days"]
-            expire_date = (date.today() + timedelta(days=days)).isoformat()
-        data = {
-            "path": path if path.startswith("/") else "/" + path,
-            "shareType": 3,
-            "permissions": permissions,
-        }
-        if password:    data["password"]    = password
-        if expire_date: data["expireDate"]  = expire_date
-        if label:       data["label"]       = label
-        if not allow_download:
-            data["attributes"] = json.dumps(
-                [{"scope": "permissions", "key": "download", "value": False}]
-            )
-        r = self._session.post(
-            f"{self.ocs_root}/apps/files_sharing/api/v1/shares", data=data
-        )
-        r.raise_for_status()
-        resp = r.json()
-        meta = resp.get("ocs", {}).get("meta", {})
-        if meta.get("statuscode") not in (100, 200):
-            raise NextcloudError(
-                f"OCS error {meta.get('statuscode')}: {meta.get('message')}"
-            )
-        d = resp["ocs"]["data"]
-        return {"share_id": d.get("id"), "token": d.get("token"),
-                "url": d.get("url"), "path": d.get("path"),
-                "permissions": d.get("permissions"), "expire_date": d.get("expiration")}
-
-    def create_user_share(self, path: str, share_with: str, permissions: int = 17) -> dict:
-        """Share a file/folder with another Nextcloud user."""
-        self._check_share()
-        self._enforce_base(path)
-        data = {
-            "path": path if path.startswith("/") else "/" + path,
-            "shareType": 0,
-            "shareWith": share_with,
-            "permissions": permissions,
-        }
-        r = self._session.post(
-            f"{self.ocs_root}/apps/files_sharing/api/v1/shares", data=data
-        )
-        r.raise_for_status()
-        d = r.json()["ocs"]["data"]
-        return {"share_id": d.get("id"), "share_with": d.get("share_with"),
-                "url": d.get("url"), "permissions": d.get("permissions")}
-
-    def get_shares(self, path: str = None) -> list:
-        """List shares, optionally filtered by path."""
-        params = {}
-        if path:
-            params["path"] = path if path.startswith("/") else "/" + path
-        r = self._session.get(
-            f"{self.ocs_root}/apps/files_sharing/api/v1/shares", params=params
-        )
-        r.raise_for_status()
-        return r.json().get("ocs", {}).get("data", [])
-
-    def update_share(self, share_id: int, **kwargs) -> bool:
-        """Update an existing share (permissions, password, expireDate, etc.)."""
-        self._check_share()
-        r = self._session.put(
-            f"{self.ocs_root}/apps/files_sharing/api/v1/shares/{share_id}",
-            data=kwargs,
-        )
-        r.raise_for_status()
-        return True
-
-    def delete_share(self, share_id: int) -> bool:
-        """Delete a share."""
-        self._check_share()
-        r = self._session.delete(
-            f"{self.ocs_root}/apps/files_sharing/api/v1/shares/{share_id}"
-        )
-        r.raise_for_status()
-        return True
-
-    # ── OCS: Tags (systemtags) ─────────────────────────────────────────────────
+    # ── OCS: Tags (systemtags) ─────────────────────────────────────────────
 
     def get_tags(self) -> list:
         """List all system tags."""
@@ -486,14 +425,14 @@ class NextcloudClient:
     <oc:user-assignable/>
   </d:prop>
 </d:propfind>'''
-        r = self._session.request(
+        _, _, resp_body = self._request_ok(
             "PROPFIND", f"{self.dav_tags}/systemtags/",
-            data=body,
+            data=body.encode("utf-8"),
             headers={"Depth": "1", "Content-Type": "application/xml"},
+            accept=(200, 207),
         )
-        r.raise_for_status()
         ns = {"d": "DAV:", "oc": "http://owncloud.org/ns"}
-        root = ET.fromstring(r.text)
+        root = ET.fromstring(resp_body.decode("utf-8"))
         tags = []
         for resp in root.findall("d:response", ns):
             props = resp.find(".//d:prop", ns)
@@ -517,38 +456,38 @@ class NextcloudClient:
             "name": name,
             "userVisible": user_visible,
             "userAssignable": user_assignable,
-        })
-        r = self._session.post(
-            f"{self.dav_tags}/systemtags/",
+        }).encode("utf-8")
+        _, resp_headers, _ = self._request_ok(
+            "POST", f"{self.dav_tags}/systemtags/",
             data=payload,
             headers={"Content-Type": "application/json"},
+            accept=(201,),
         )
-        r.raise_for_status()
         # Tag ID is in the Location header
-        location = r.headers.get("Content-Location", r.headers.get("Location", ""))
+        location = resp_headers.get("Content-Location", resp_headers.get("Location", ""))
         tag_id = location.rstrip("/").split("/")[-1] if location else None
         return {"id": tag_id, "name": name}
 
     def assign_tag(self, file_id: str, tag_id: str) -> bool:
         """Assign an existing system tag to a file (by file_id from list_dir)."""
         self._check_write()
-        r = self._session.put(
-            f"{self.dav_tags}/systemtags-relations/files/{file_id}/{tag_id}"
+        status, _, _ = self._request(
+            "PUT", f"{self.dav_tags}/systemtags-relations/files/{file_id}/{tag_id}"
         )
-        if r.status_code not in (201, 409):   # 409 = already assigned
-            r.raise_for_status()
+        if status not in (201, 409):   # 409 = already assigned
+            raise NextcloudError(f"assign_tag failed with HTTP {status}")
         return True
 
     def remove_tag(self, file_id: str, tag_id: str) -> bool:
         """Remove a tag assignment from a file."""
         self._check_delete()
-        r = self._session.delete(
-            f"{self.dav_tags}/systemtags-relations/files/{file_id}/{tag_id}"
+        self._request_ok(
+            "DELETE", f"{self.dav_tags}/systemtags-relations/files/{file_id}/{tag_id}",
+            accept=(200, 204),
         )
-        r.raise_for_status()
         return True
 
-    # ── JSON helpers ───────────────────────────────────────────────────────────
+    # ── JSON helpers ───────────────────────────────────────────────────────
 
     def read_json(self, path: str):
         return json.loads(self.read_file(path))
@@ -567,9 +506,9 @@ def _cli():
     import argparse
 
     p = argparse.ArgumentParser(
-        description="Nextcloud CLI — WebDAV + OCS",
+        description="Nextcloud CLI - WebDAV + OCS",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Credentials: ~/.openclaw/secrets/nextcloud_creds (NC_URL / NC_USER / NC_PASS)"
+        epilog="Credentials: ~/.openclaw/secrets/nextcloud_creds (NC_URL / NC_USER / NC_APP_KEY)"
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -586,13 +525,15 @@ def _cli():
     sp.add_argument("path")
     sp.add_argument("--content", "-c", default=None)
     sp.add_argument("--file",    "-f", default=None)
+    sp.add_argument("--append",  "-a", action="store_true",
+                    help="Append to existing file instead of overwriting")
 
     sp = _add("read",   "Print a file");                     sp.add_argument("path")
 
     sp = _add("ls",     "List a directory")
     sp.add_argument("path", nargs="?", default="/")
     sp.add_argument("--depth",  type=int, default=1)
-    sp.add_argument("--json",   action="store_true")
+    sp.add_argument("--human",  action="store_true", help="Human-readable output (default: JSON)")
 
     sp = _add("search", "Search by filename")
     sp.add_argument("query")
@@ -600,17 +541,6 @@ def _cli():
     sp.add_argument("--limit", type=int, default=30)
 
     sp = _add("favorite",   "Set/unset favorite");  sp.add_argument("path"); sp.add_argument("--off", action="store_true")
-
-    sp = _add("share",  "Create a public share link")
-    sp.add_argument("path")
-    sp.add_argument("--permissions", type=int,  default=None)
-    sp.add_argument("--password",    default=None)
-    sp.add_argument("--expire",      default=None,  metavar="YYYY-MM-DD")
-    sp.add_argument("--label",       default=None)
-    sp.add_argument("--no-download", action="store_true")
-
-    sp = _add("shares",      "List shares");         sp.add_argument("path", nargs="?")
-    sp = _add("share-delete","Delete a share");      sp.add_argument("share_id", type=int)
 
     sp = _add("tags",         "List all system tags")
     sp = _add("tag-create",   "Create a system tag"); sp.add_argument("name")
@@ -629,20 +559,20 @@ def _cli():
         print(json.dumps(obj, ensure_ascii=False, indent=2))
 
     if args.cmd == "mkdir":
-        nc.mkdir(args.path); print(f"✓ {args.path}")
+        nc.mkdir(args.path); jout({"ok": True, "action": "mkdir", "path": args.path})
 
     elif args.cmd == "rename":
-        nc.rename(args.old, args.new); print(f"✓ {args.old} → {args.new}")
+        nc.rename(args.old, args.new); jout({"ok": True, "action": "rename", "old": args.old, "new": args.new})
 
     elif args.cmd == "copy":
-        nc.copy(args.src, args.dst); print(f"✓ {args.src} → {args.dst}")
+        nc.copy(args.src, args.dst); jout({"ok": True, "action": "copy", "src": args.src, "dst": args.dst})
 
     elif args.cmd == "delete":
-        nc.delete(args.path); print(f"✓ deleted {args.path}")
+        nc.delete(args.path); jout({"ok": True, "action": "delete", "path": args.path})
 
     elif args.cmd == "exists":
         ok = nc.exists(args.path)
-        print("✓ exists" if ok else "✗ not found")
+        jout({"exists": ok, "path": args.path})
         sys.exit(0 if ok else 1)
 
     elif args.cmd == "write":
@@ -652,45 +582,33 @@ def _cli():
             content = args.content
         else:
             content = sys.stdin.read()
-        nc.write_file(args.path, content)
-        print(f"✓ written {args.path} ({len(content.encode())} bytes)")
+        if args.append:
+            nc.append_to_file(args.path, content)
+            jout({"ok": True, "action": "append", "path": args.path, "bytes": len(content.encode())})
+        else:
+            nc.write_file(args.path, content)
+            jout({"ok": True, "action": "write", "path": args.path, "bytes": len(content.encode())})
 
     elif args.cmd == "read":
         print(nc.read_file(args.path))
 
     elif args.cmd == "ls":
         items = nc.list_dir(args.path, depth=args.depth)
-        if args.json:
-            jout(items)
-        else:
+        if args.human:
             for item in items:
                 icon = "📁" if item["is_dir"] else "📄"
                 fav  = "★ " if item["favorite"] else "  "
                 size = f"{item['size']:>12,d}" if not item["is_dir"] else "            "
                 print(f"{icon} {fav}{size}  {item['name']}")
+        else:
+            jout(items)
 
     elif args.cmd == "search":
         jout(nc.search(args.query, path=args.path, limit=args.limit))
 
     elif args.cmd == "favorite":
         nc.set_favorite(args.path, state=not args.off)
-        print(f"✓ favorite={'off' if args.off else 'on'} for {args.path}")
-
-    elif args.cmd == "share":
-        jout(nc.create_share_link(
-            args.path,
-            permissions=args.permissions,
-            password=args.password,
-            expire_date=args.expire,
-            label=args.label,
-            allow_download=not args.no_download,
-        ))
-
-    elif args.cmd == "shares":
-        jout(nc.get_shares(args.path))
-
-    elif args.cmd == "share-delete":
-        nc.delete_share(args.share_id); print(f"✓ share {args.share_id} deleted")
+        jout({"ok": True, "action": "favorite", "path": args.path, "state": not args.off})
 
     elif args.cmd == "tags":
         jout(nc.get_tags())
@@ -700,11 +618,11 @@ def _cli():
 
     elif args.cmd == "tag-assign":
         nc.assign_tag(args.file_id, args.tag_id)
-        print(f"✓ tag {args.tag_id} assigned to file {args.file_id}")
+        jout({"ok": True, "action": "tag-assign", "file_id": args.file_id, "tag_id": args.tag_id})
 
     elif args.cmd == "tag-remove":
         nc.remove_tag(args.file_id, args.tag_id)
-        print(f"✓ tag {args.tag_id} removed from file {args.file_id}")
+        jout({"ok": True, "action": "tag-remove", "file_id": args.file_id, "tag_id": args.tag_id})
 
     elif args.cmd == "user":
         jout(nc.get_user_info())

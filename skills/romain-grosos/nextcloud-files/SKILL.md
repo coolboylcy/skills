@@ -1,25 +1,25 @@
 ---
 name: nextcloud
-description: "Nextcloud file and folder management via WebDAV + OCS API. Use when: (1) creating, reading, writing, renaming, moving, copying, or deleting files/folders, (2) listing or searching directory contents, (3) creating public or user share links, (4) toggling favorites or managing system tags, (5) checking storage quota. NOT for: Nextcloud Talk, Calendar/Contacts (use CalDAV), app management (requires admin), or large binary transfers."
+description: "Nextcloud file and folder management via WebDAV + OCS API. Use when: (1) creating, reading, writing, renaming, moving, copying, or deleting files/folders, (2) listing or searching directory contents, (3) toggling favorites or managing system tags, (4) checking storage quota. NOT for: Nextcloud Talk, Calendar/Contacts (use CalDAV), app management (requires admin), large binary transfers, or creating share links (share capability not included by default - see README)."
 homepage: https://github.com/rwx-g/openclaw-skill-nextcloud
-compatibility: Python 3.9+ · requests · network access to Nextcloud instance
+compatibility: Python 3.9+ · no external dependencies · network access to Nextcloud instance
 metadata:
   {
     "openclaw": {
       "emoji": "☁️",
-      "requires": { "env": ["NC_URL", "NC_USER", "NC_PASS"] },
-      "primaryEnv": "NC_PASS"
+      "requires": { "env": ["NC_URL", "NC_USER", "NC_APP_KEY"] },
+      "primaryEnv": "NC_APP_KEY"
     }
   }
 ontology:
-  reads: []
-  writes: [files, folders, shares, tags, favorites]
+  reads: [files, folders, user, quota, capabilities]
+  writes: [files, folders, tags, favorites]
 ---
 
 # Nextcloud Skill
 
-Full Nextcloud client: WebDAV (files/folders) + OCS (sharing, tags, user info).
-Credentials: `~/.openclaw/secrets/nextcloud_creds` · Config: `config.json` in skill dir.
+Full Nextcloud client: WebDAV (files/folders) + OCS (tags, user info). Zero external dependencies - stdlib only (urllib).
+Credentials: `~/.openclaw/secrets/nextcloud_creds` · Config: `~/.openclaw/config/nextcloud/config.json`
 
 ## Trigger phrases
 
@@ -27,7 +27,6 @@ Load this skill immediately when the user says anything like:
 
 - "upload / save / write this file on Nextcloud / NC / cloud"
 - "create a folder on Nextcloud", "mkdir in NC"
-- "share this / create a share link / get a public link for [file or folder]"
 - "list / browse / show what's in [folder] on Nextcloud"
 - "search for [file] in NC", "find [file] on Nextcloud"
 - "read / get / download [file] from Nextcloud"
@@ -46,34 +45,48 @@ python3 scripts/nextcloud.py ls /      # list root directory
 ## Setup
 
 ```bash
-pip install requests           # install dependency first (setup.py does not run pip)
 python3 scripts/setup.py       # interactive: credentials + permissions + connection test
 python3 scripts/init.py        # validate all configured permissions against live instance
 ```
 
-> init.py only runs write/delete tests when both `allow_write=true` and `allow_delete=true`. When `allow_delete=false`, write tests are skipped — no test artifacts are created or left behind.
+> init.py only runs write/delete tests when both `allow_write=true` and `allow_delete=true`. When `allow_delete=false`, write tests are skipped - no test artifacts are created or left behind.
 
-**Manual** — `~/.openclaw/secrets/nextcloud_creds` (chmod 600):
+**Manual** - `~/.openclaw/secrets/nextcloud_creds` (chmod 600):
 ```
 NC_URL=https://cloud.example.com
 NC_USER=username
-NC_PASS=app-password
+NC_APP_KEY=app-password
 ```
 App password: Nextcloud → Settings → Security → App passwords.
 
-**config.json** — behavior restrictions:
+**config.json** - behavior restrictions:
 
 | Key | Default | Effect |
 |-----|---------|--------|
 | `base_path` | `"/"` | Restrict agent to subtree (e.g. `"/Jarvis"`) |
-| `allow_write` | `true` | mkdir, write, rename, copy |
-| `allow_delete` | `false` | delete files and folders (recommended: keep false) |
-| `allow_share` | `true` | create/manage share links |
-| `readonly_mode` | `false` | override: block all writes |
-| `share_default_permissions` | `1` | 1=read-only, 31=full |
-| `share_default_expire_days` | `null` | auto-expire shares (days) |
+| `allow_write` | `false` | mkdir, write, rename, copy (enable explicitly) |
+| `allow_delete` | `false` | delete files and folders (enable explicitly) |
+| `readonly_mode` | `false` | override: block all writes regardless of above |
 
-> **Safe defaults:** `allow_delete` is `false` by default — enable explicitly only when needed. Combine with a restricted `base_path` (e.g. `"/Jarvis"`) to limit the agent's scope.
+> **Safe defaults:** both `allow_write` and `allow_delete` are `false` by default. Enable each explicitly only when needed. Combine with a restricted `base_path` (e.g. `"/Jarvis"`) to limit the agent's scope.
+> **Share capability** is not included by default. See README for instructions on how to restore it if needed.
+
+## Storage & credentials
+
+The skill reads and writes the following paths. All usage is intentional and documented:
+
+| Path | Written by | Purpose |
+|------|-----------|---------|
+| `~/.openclaw/secrets/nextcloud_creds` | `setup.py` | Nextcloud credentials (NC_URL, NC_USER, NC_APP_KEY). chmod 600. Never committed. |
+| `~/.openclaw/config/nextcloud/config.json` | `setup.py` | Behavior restrictions (base_path, allow_write, allow_delete, readonly_mode). No secrets. Not in skill dir - survives clawhub updates. |
+
+Credentials can also be provided via environment variables (`NC_URL`, `NC_USER`, `NC_APP_KEY`) instead of the creds file. The skill checks env vars first.
+
+**Cleanup on uninstall:** `clawhub uninstall nextcloud-files` removes the skill directory. To also remove credentials and config:
+```bash
+python3 scripts/setup.py --cleanup
+```
+On reinstall, any existing config at `~/.openclaw/config/nextcloud/config.json` is picked up automatically.
 
 ## Module usage
 
@@ -82,8 +95,7 @@ from scripts.nextcloud import NextcloudClient
 nc = NextcloudClient()
 nc.write_file("/Jarvis/notes.md", "# Notes\n...")
 nc.mkdir("/Jarvis/Articles")
-link = nc.create_share_link("/Jarvis/report.pdf")
-print(link["url"])
+items = nc.list_dir("/Jarvis")
 ```
 
 ## CLI reference
@@ -93,6 +105,7 @@ print(link["url"])
 python3 scripts/nextcloud.py mkdir /path/folder
 python3 scripts/nextcloud.py write /path/file.md --content "# Title"
 python3 scripts/nextcloud.py write /path/file.md --file local.md
+python3 scripts/nextcloud.py write /path/file.md --content "new entry" --append
 python3 scripts/nextcloud.py read  /path/file.md
 python3 scripts/nextcloud.py rename /old /new
 python3 scripts/nextcloud.py copy   /src /dst
@@ -109,28 +122,12 @@ python3 scripts/nextcloud.py tags
 python3 scripts/nextcloud.py tag-create "research"
 python3 scripts/nextcloud.py tag-assign <file_id> <tag_id>
 
-# Sharing
-python3 scripts/nextcloud.py share /path                     # read-only public link
-python3 scripts/nextcloud.py share /path --permissions 31 --expire 2025-12-31
-python3 scripts/nextcloud.py share /path --password secret --no-download
-python3 scripts/nextcloud.py shares /path                    # list existing shares
-python3 scripts/nextcloud.py share-delete <share_id>
-
 # Account
 python3 scripts/nextcloud.py quota
 python3 scripts/nextcloud.py config
 ```
 
 ## Templates
-
-### Save a report and share it
-```python
-nc = NextcloudClient()
-nc.mkdir("/Reports/2025")
-nc.write_file("/Reports/2025/summary.md", report_content)
-link = nc.create_share_link("/Reports/2025/summary.md", permissions=1)
-# → return link["url"] to the user
-```
 
 ### Structured workspace setup
 ```bash
@@ -159,22 +156,19 @@ nc.assign_tag(file_id, tag_id)
 ```
 
 ## Ideas
-- Sandbox the agent with `base_path: "/Jarvis"` — it can't touch anything else
+- Sandbox the agent with `base_path: "/Jarvis"` - it can't touch anything else
 - Store agent-produced Markdown files and auto-share a read-only link in the reply
 - Use `append_to_file` for rolling logs or changelogs
 - Use `write_json` + `read_json` for persistent state between sessions
 - Auto-tag files by category (research / draft / published)
-
-## Share permissions
-`1`=Read · `2`=Update · `4`=Create · `8`=Delete · `16`=Share · `31`=All
 
 ## Combine with
 
 | Skill | Workflow |
 |-------|----------|
 | **ghost** | Write a post → save Markdown draft to NC → publish to Ghost |
-| **summarize** | Summarize a URL → save summary as `.md` to NC → create share link |
-| **gmail** | Receive an attachment → save to NC → share link back to sender |
+| **summarize** | Summarize a URL → save summary as `.md` to NC |
+| **gmail** | Receive an attachment → save to NC for archiving |
 | **obsidian** | Sync Obsidian vault notes to NC for remote backup |
 | **self-improving-agent** | Log agent learnings to NC for persistent, searchable history |
 
