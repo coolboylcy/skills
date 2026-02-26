@@ -1,13 +1,18 @@
 {
   "owner": "operatingdev",
   "slug": "mintyouragent",
-  "displayName": "Mintyouragent",
+  "displayName": "mintyouragent",
   "latest": {
-    "version": "3.6.2",
-    "publishedAt": 1771031548661,
-    "commit": "https://github.com/openclaw/skills/commit/c3e245738f257da8c411c9470695057584957db9"
+    "version": "3.6.3",
+    "publishedAt": 1771973232565,
+    "commit": null
   },
   "history": [
+    {
+      "version": "3.6.2",
+      "publishedAt": 1771031548661,
+      "commit": "https://github.com/openclaw/skills/commit/c3e245738f257da8c411c9470695057584957db9"
+    },
     {
       "version": "3.6.0",
       "publishedAt": 1770965483358,

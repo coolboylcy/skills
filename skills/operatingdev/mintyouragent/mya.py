@@ -194,8 +194,8 @@ PUMP_GLOBAL = Pubkey.from_string("4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf")
 PUMP_FEE_RECIPIENT = Pubkey.from_string("CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM")
 
 # MintYourAgent platform fee
-MYA_TREASURY = Pubkey.from_string("5AwxRzXkUPgrG1p9MAZYTwpxNGadwDXXkav8yCRtN3QP")
-MYA_PLATFORM_FEE = 10_000_000  # 0.01 SOL in lamports
+SOUL_TREASURY = Pubkey.from_string("5AwxRzXkUPgrG1p9MAZYTwpxNGadwDXXkav8yCRtN3QP")
+SOUL_PLATFORM_FEE = 10_000_000  # 0.01 SOL in lamports
 PUMP_EVENT_AUTHORITY = Pubkey.from_string("Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1")
 PUMP_MINT_AUTHORITY = Pubkey.from_string("TSLvdd1pWpHVjahSpsvCXUbgwsL3JAcvokwaKt1eokM")
 TOKEN_PROGRAM_ID = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
@@ -613,7 +613,7 @@ def native_launch_with_buy(keypair: Keypair, name: str, symbol: str, uri: str,
     instructions = []
     
     # Platform fee to MintYourAgent treasury
-    platform_fee_ix = build_transfer_instruction(user, MYA_TREASURY, MYA_PLATFORM_FEE)
+    platform_fee_ix = build_transfer_instruction(user, SOUL_TREASURY, SOUL_PLATFORM_FEE)
     instructions.append(platform_fee_ix)
     
     # Create instruction
@@ -705,7 +705,7 @@ def set_runtime(config: RuntimeConfig) -> None:
 # ============== .ENV SUPPORT ==============
 
 # Only load these vars from .env — all others are ignored
-ALLOWED_ENV_VARS = {"MYA_API_URL", "MYA_SSL_VERIFY", "HELIUS_RPC", "SOLANA_RPC_URL"}
+ALLOWED_ENV_VARS = {"SOUL_API_URL", "SOUL_SSL_VERIFY", "HELIUS_RPC", "SOLANA_RPC_URL"}
 
 
 def load_dotenv(path: Optional[Path] = None) -> Dict[str, str]:
@@ -775,11 +775,11 @@ def get_rpc_url() -> str:
 
 
 def get_api_url() -> str:
-    return os.environ.get("MYA_API_URL", get_runtime().api_url)
+    return os.environ.get("SOUL_API_URL", get_runtime().api_url)
 
 
 def get_ssl_verify() -> bool:
-    return os.environ.get("MYA_SSL_VERIFY", "true").lower() != "false"
+    return os.environ.get("SOUL_SSL_VERIFY", "true").lower() != "false"
 
 
 def get_api_key() -> str:
@@ -2511,7 +2511,16 @@ def cmd_launch(args: argparse.Namespace) -> None:
         initial_buy = get_initial_buy_decision(args, balance_sol)
         if initial_buy > 0:
             print(f"   Initial buy: {initial_buy} SOL")
-        
+
+        # Validate sufficient balance before spending SOL
+        if not rt.skip_balance_check and balance_sol > 0:
+            platform_fee_sol = SOUL_PLATFORM_FEE / 1e9  # 0.01 SOL
+            tx_fee_estimate = 0.01
+            required = initial_buy + platform_fee_sol + tx_fee_estimate
+            if balance_sol < required:
+                Output.error("Insufficient balance", f"Need ~{required:.4f} SOL, have {balance_sol:.4f}")
+                sys.exit(ExitCode.GENERAL_ERROR)
+
         # Use native pump.fun integration when initial buy is specified
         # This bundles create + buy in one atomic transaction (like the webapp)
         if initial_buy > 0:
@@ -2717,7 +2726,7 @@ def cmd_launch(args: argparse.Namespace) -> None:
             sys.exit(ExitCode.API_ERROR)
     
     except requests.exceptions.SSLError:
-        Output.error("SSL error", "Check MYA_SSL_VERIFY setting")
+        Output.error("SSL error", "Check SOUL_SSL_VERIFY setting")
         sys.exit(ExitCode.NETWORK_ERROR)
     except requests.exceptions.Timeout:
         Output.error("Timeout", "Check pump.fun - launch may have succeeded")
@@ -4879,8 +4888,8 @@ NETWORK FLAGS:
   --retry-count       Retry attempts
 
 ENVIRONMENT VARIABLES:
-  MYA_API_URL         API endpoint (optional, defaults to https://mintyouragent.com/api)
-  MYA_SSL_VERIFY      SSL verification (optional)
+  SOUL_API_URL        API endpoint (optional, defaults to https://mintyouragent.com/api)
+  SOUL_SSL_VERIFY     SSL verification (optional)
   HELIUS_RPC          RPC endpoint (optional)
 
 For command-specific help: python mya.py <command> --help
@@ -5118,8 +5127,6 @@ def main() -> None:
     _cw.add_argument("--mode", choices=["human", "ai", "ask"], default="ask")
     _cw.add_argument("--verbose", "-v", action="store_true")
     cash_subs.add_parser("tables", help="List tables")
-
-    cash_tables_p = cash_subs.add_parser("tables", help="List tables")
 
     args = parser.parse_args()
     

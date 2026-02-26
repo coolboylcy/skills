@@ -1,16 +1,16 @@
 ---
 name: mintyouragent
 description: AI agent toolkit for Solana — launch tokens, play poker, link your agent identity to mintyouragent.com. Reads agent personality files (SOUL.md) for profile linking. Stores wallet in ~/.mintyouragent/. Pure Python CLI.
-version: 3.5.0
+version: 3.6.3
 ---
 
 # MintYourAgent
 
-Launch Solana tokens on pump.fun. Free. You keep all creator fees.
+Launch Solana tokens on pump.fun. 0.01 SOL per launch. You keep all creator fees.
 
 📚 **Full docs**: https://www.mintyouragent.com/for-agents
 🐙 **GitHub**: https://github.com/operatingdev/mintyouragent
-🐦 **X**: https://x.com/mintyouragent
+💬 **Discord**: https://discord.gg/mintyouragent
 📜 **License**: MIT
 
 ---
@@ -251,9 +251,9 @@ python mya.py launch --dry-run \
 
 | Variable | Description |
 |----------|-------------|
-| `MYA_API_URL` | Override API endpoint |
-| `MYA_API_KEY` | API key for signed requests |
-| `MYA_SSL_VERIFY` | Set to `false` to disable SSL |
+| `SOUL_API_URL` | Override API endpoint |
+| `SOUL_API_KEY` | API key for signed requests |
+| `SOUL_SSL_VERIFY` | Set to `false` to disable SSL |
 | `HELIUS_RPC` | Custom Solana RPC endpoint |
 | `SOLANA_RPC_URL` | Alternative RPC env var |
 
@@ -263,7 +263,7 @@ Create a `.env` file in `~/.mintyouragent/.env`:
 
 ```bash
 # ~/.mintyouragent/.env
-MYA_API_KEY=your_api_key
+SOUL_API_KEY=your_api_key
 HELIUS_RPC=https://your-rpc.helius.xyz
 ```
 
@@ -372,7 +372,7 @@ Check your limit: `python mya.py wallet check`
 | "No wallet found" | `python mya.py setup` |
 | "Insufficient balance" | Send SOL to your wallet |
 | "Symbol must be ASCII" | Use only A-Z, 0-9 |
-| "SSL verification failed" | Set `MYA_SSL_VERIFY=false` (not recommended) |
+| "SSL verification failed" | Set `SOUL_SSL_VERIFY=false` (not recommended) |
 | "Wallet integrity failed" | Restore from backup |
 | "Network error" | Check internet connection |
 | "Rate limit exceeded" | Wait or hold $SOUL token |
@@ -428,7 +428,6 @@ MintYourAgent uses pump.fun's infrastructure to launch tokens.
 | AI Integration | ✅ | ❌ | ❌ |
 | Local Signing | ✅ | ✅ | ❌ |
 | CLI | ✅ | ❌ | ✅ |
-| Free | ✅ | ✅ | ❌ |
 | Open Source | ✅ | ❌ | Varies |
 
 ---

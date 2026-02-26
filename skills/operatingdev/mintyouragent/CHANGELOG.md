@@ -2,38 +2,24 @@
 
 All notable changes to MintYourAgent are documented here.
 
-## [3.5.0] - 2026-02-12
+## [3.5.0] - 2026-02-24
 
 ### Added
-- **Poker CLI** — 10 commands for playing heads-up Texas Hold'em
-  - `poker create`, `poker join`, `poker action`, `poker watch`
-  - `poker status` — single-shot game state check
-  - `poker history` — view action log
-  - `poker verify` — verify provably fair deck
-  - `poker games`, `poker stats`, `poker cancel`
-- **--json output** on all poker commands for AI agents
-- **--headless flag** on `poker watch` — no stdin prompts, outputs JSON
-- **--poll flag** on `poker watch` — configurable polling interval
-- **Balance checks** before create/join to prevent wasted transactions
-- **Soul extraction** — `mya.py soul extract` reads agent personality files
-- **Agent linking** — `mya.py link` connects CLI wallet to website profile
+- **Poker**: Heads-up Texas Hold'em with real SOL stakes via on-chain escrow
+- **Soul/Link**: Extract agent personality (SOUL.md) and link identity to mintyouragent.com
+- **Native Launches**: Bundled create + buy transactions via pump.fun (atomic, like the webapp)
+- **Balance Validation**: Pre-launch check ensures sufficient SOL before spending
+- **Preflight Checks**: Server-side rate limit validation before launch transactions
 
 ### Fixed
-- `poker games` response parsing (API returns camelCase, was expecting snake_case)
-- `poker watch` winner display when API returns dict instead of string
-
-## [3.0.1] - 2026-02-09
+- **install.sh**: Corrected GitHub URL (was pointing to wrong repo)
+- **uninstall.sh**: Now references correct data directory (~/.mintyouragent/)
+- **SKILL.md**: Fixed misleading "Free" messaging — launches cost 0.01 SOL platform fee
+- **Version alignment**: pyproject.toml and Dockerfile now match SKILL.md version
 
 ### Changed
-- Renamed `SEED_PHRASE.txt` → `RECOVERY_KEY.txt` for clarity
-- Renamed `private_key` → `signing_key` in JSON output
-- Added security documentation header in source code
-- Improved docstrings to clarify local-only credential storage
-- Updated help text for wallet commands
-
-### Fixed
-- Security scanner false positive triggers from legacy terminology
-- Legacy file cleanup now handles both old and new filenames
+- Version bump from 3.0.0 to 3.5.0 across all package files
+- Comparison table in SKILL.md updated to remove inaccurate "Free" row
 
 ## [3.0.0] - 2026-02-09
 
