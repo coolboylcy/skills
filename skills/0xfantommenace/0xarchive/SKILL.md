@@ -1,6 +1,6 @@
 ---
 name: 0xarchive
-version: 1.1.0
+version: 1.3.0
 description: >
   Query historical crypto market data from 0xArchive across Hyperliquid, Lighter.xyz, and HIP-3.
   Covers orderbooks, trades, candles, funding rates, open interest, liquidations, and data quality.
@@ -136,6 +136,48 @@ Same data types as Hyperliquid except: no liquidations. Adds `granularity` on or
 | `GET /incidents/{id}` | -- | Single incident |
 | `GET /latency` | -- | Ingestion latency metrics |
 | `GET /sla` | `year`, `month` | SLA compliance report |
+
+### Web3 Authentication (`/v1`)
+
+Get API keys programmatically using an Ethereum wallet (SIWE). No API key required for these endpoints.
+
+| Endpoint | Params | Notes |
+|----------|--------|-------|
+| `POST /auth/web3/challenge` | `address` (wallet address) | Returns SIWE message to sign |
+| `POST /web3/signup` | `message`, `signature` | Returns free-tier API key |
+| `POST /web3/keys` | `message`, `signature` | List all keys for wallet |
+| `POST /web3/keys/revoke` | `message`, `signature`, `key_id` | Revoke a key |
+| `POST /web3/subscribe` | `tier` (`build` or `pro`), `payment-signature` header | x402 USDC subscription (see flow below) |
+
+**Free-tier flow:** Call `/auth/web3/challenge` with wallet address → sign the returned message with `personal_sign` (EIP-191) → submit to `/web3/signup` with the message and signature → receive API key.
+
+**Paid-tier flow (x402):**
+
+1. `POST /web3/subscribe` with `{ "tier": "build" }` → server returns 402 with `payment.amount` (micro-USDC), `payment.pay_to` (treasury address), `payment.network`.
+2. Sign an EIP-712 `TransferWithAuthorization` (EIP-3009) on USDC Base:
+   - Domain: `{ name: "USD Coin", version: "2", chainId: 8453, verifyingContract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" }`
+   - Type: `TransferWithAuthorization(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce)`
+   - Message: `{ from: <wallet>, to: <pay_to>, value: <amount>, validAfter: 0, validBefore: <now+3600>, nonce: <32 random bytes hex> }`
+3. Build x402 v2 payment payload:
+   ```json
+   {
+     "x402Version": 2,
+     "payload": {
+       "signature": "0x<EIP-712 signature hex>",
+       "authorization": {
+         "from": "0x<wallet>",
+         "to": "0x<pay_to from step 1>",
+         "value": "<amount as string>",
+         "validAfter": "0",
+         "validBefore": "<unix timestamp as string>",
+         "nonce": "0x<64 hex chars>"
+       }
+     }
+   }
+   ```
+4. Base64-encode the JSON and retry: `POST /web3/subscribe` with `{ "tier": "build" }` and header `payment-signature: <base64 payload>` → receive API key + subscription.
+
+**Important:** All `authorization` values (`value`, `validAfter`, `validBefore`) must be strings, not numbers. See `scripts/web3_subscribe.py` for a complete working Python implementation.
 
 ## Common Parameters
 
