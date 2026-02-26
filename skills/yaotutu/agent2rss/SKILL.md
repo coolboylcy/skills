@@ -1,357 +1,227 @@
 ---
 name: agent2rss-client
-description: Agent2RSS 服务客户端，帮助用户管理 RSS 频道和推送内容。触发场景：(1) 用户提到"Agent2RSS"、"RSS 频道"、"推送文章/内容"等关键词，(2) 用户想要创建或管理 RSS 订阅，(3) 用户需要发布内容到 RSS Feed，(4) 用户需要使用幂等性防止重复发布。支持 JSON 和文件上传两种方式推送内容。
+description: Agent2RSS 客户端，管理 RSS 频道并推送内容。触发：用户提到 Agent2RSS/RSS 频道/推送文章/幂等性/上传文章/创建频道/设置默认频道。
 ---
 
-# Agent2RSS Client Skill
+# Agent2RSS Client（OpenClaw 版）
 
-帮助用户通过 Agent2RSS 服务创建和管理 RSS 频道，推送内容到 RSS Feed。
+帮助创建/管理 Agent2RSS 频道，推送文章到 RSS Feed。核心动作：初始化配置、创建/选择频道、文件上传推送（推荐）、JSON 推送、列出/设置默认/删除频道。
 
-## 核心功能
+## 一键脚本（macOS/Linux）
+- 路径：`scripts/agent2rss.sh`（需要 bash、curl、jq）
+- 子命令：
+  - `init [serverUrl]` 初始化配置（默认指向官方服务）
+  - `health` 健康检查
+  - `create-channel <name> [desc]` 创建频道并设为默认
+  - `update-channel <channelId> <name> <desc>` 更新频道名称/描述（需频道 token）
+  - `list` 列出本地配置的频道
+  - `set-default <channelId>` 设置默认
+  - `push-file <path> [idempotencyKey] [channelId]` 上传文件推送
+  - `push-json <file|-> [idempotencyKey] [channelId]` JSON 推送，自动补上 idempotencyKey
 
-1. **频道管理** - 创建、查询、更新、删除 RSS 频道
-2. **内容推送** - 通过 JSON 或文件上传方式发布文章
-3. **幂等性支持** - 使用 idempotencyKey 防止重复发布
-4. **RSS 订阅** - 生成标准 RSS Feed 供阅读器订阅
-
-## 配置管理（自动化）
-
-### 首次使用自动初始化流程
-
-**重要**：每次执行任务前，必须先检查并初始化配置。
-
-1. **检查配置文件**：读取 `config.json`
-2. **如果不存在**：
-   - 使用默认服务器地址：`http://agent2rss.yaotutu.top:8765`（**永远不使用 localhost**）
-   - 询问用户频道名称（或使用默认值 "AI Briefing"）
-   - 调用 API 创建频道：
-     ```bash
-     curl -X POST "http://agent2rss.yaotutu.top:8765/api/channels" \
-       -H "Content-Type: application/json" \
-       -d '{"name":"频道名","description":"AI 生成的内容"}'
-     ```
-   - 从响应中获取频道 ID 和 Token
-   - 创建 config.json 并保存配置：
-     ```json
-     {
-       "serverUrl": "http://agent2rss.yaotutu.top:8765",
-       "defaultChannelId": "返回的频道ID",
-       "channels": [{
-         "id": "返回的频道ID",
-         "name": "频道名",
-         "token": "返回的Token",
-         "postsUrl": "http://agent2rss.yaotutu.top:8765/api/channels/{id}/posts",
-         "rssUrl": "http://agent2rss.yaotutu.top:8765/channels/{id}/rss.xml"
-       }]
-     }
-     ```
-   - 继续执行推送任务
-3. **如果存在**：从 config.json 读取配置，继续执行
-
-### 配置文件结构
-
-```json
-{
-  "serverUrl": "http://agent2rss.yaotutu.top:8765",
-  "defaultChannelId": "default",
-  "channels": [
-    {
-      "id": "default",
-      "name": "默认频道",
-      "token": "ch_xxx...",
-      "postsUrl": "http://agent2rss.yaotutu.top:8765/api/channels/default/posts",
-      "rssUrl": "http://agent2rss.yaotutu.top:8765/channels/default/rss.xml"
-    }
-  ]
-}
+常用示例：
+```bash
+# 初始化（官方服务）
+scripts/agent2rss.sh init
+# 创建频道
+scripts/agent2rss.sh create-channel "技术博客" "分享技术文章"
+# 查看频道 & 默认
+scripts/agent2rss.sh list
+# 设置默认
+scripts/agent2rss.sh set-default <channelId>
+# 推送文件（自动生成幂等键）
+scripts/agent2rss.sh push-file article.md
+# 更新频道
+scripts/agent2rss.sh update-channel <channelId> "新名称" "新描述"
+# 推送 JSON
+scripts/agent2rss.sh push-json post.json
 ```
 
-**关键点**：
-- `serverUrl` 是必填项，不能是 localhost（除非用户明确配置）
-- 所有 API 调用必须使用 `config.json` 中的 `serverUrl`
-- 所有 RSS 地址必须使用 `config.json` 中的 `serverUrl`
-- 频道的 `postsUrl` 和 `rssUrl` 必须基于 `serverUrl` 构建
+## 路径约定（必须）
+- 配置与缓存目录：`$HOME/.openclaw/workspace/.skill-data/agent2rss-client/`
+- 配置文件：`$CONFIG_DIR/config.json`
+- 初始模板：`assets/config-template.json`
+- 官方默认服务：`http://agent2rss.yaotutu.top:8765`（用户可改为自部署，模板默认 localhost）
 
-## 认证方式
-
-**标准 Bearer Token 认证**（必需）：
-
+## 依赖检查（示例片段）
 ```bash
-Authorization: Bearer <channel-token>
+command -v curl >/dev/null || { echo "缺少 curl"; exit 1; }
+command -v jq   >/dev/null || { echo "缺少 jq (mac: brew install jq)"; exit 1; }
+set -euo pipefail
 ```
 
-每个频道有独立的 Token（格式 `ch_xxx...`），创建频道时生成。
-
-## 推荐的推送方式
-
-### ⚠️ 重要：避免 JSON 转义问题
-
-直接在 JSON 请求体中放置 Markdown 内容容易出现转义问题（引号、换行符、反斜杠等）。
-
-**强烈推荐使用文件上传方式**：
-
-### 文件上传（推荐）✅
-
-直接上传 Markdown 文件，无需处理 JSON 转义：
-
+## 初始化配置（默认直指官方服务，空则自动建频道）
 ```bash
-curl -X POST {serverUrl}/api/channels/{channelId}/posts/upload \
-  -H "Authorization: Bearer {token}" \
-  -F "file=@article.md" \
-  -F "idempotencyKey=article-001"
+CONFIG_DIR="$HOME/.openclaw/workspace/.skill-data/agent2rss-client"
+CONFIG_FILE="$CONFIG_DIR/config.json"
+TEMPLATE="$(dirname "$0")/assets/config-template.json"
+mkdir -p "$CONFIG_DIR"
+
+# 依赖优先级：jq > python > 手动确认
+has_jq=false; has_py=false
+command -v jq >/dev/null && has_jq=true
+command -v python >/dev/null && has_py=true
+
+if [ ! -f "$CONFIG_FILE" ]; then
+  cp "$TEMPLATE" "$CONFIG_FILE"
+  if $has_jq; then
+    jq '.serverUrl = "http://agent2rss.yaotutu.top:8765"' "$CONFIG_FILE" >"$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+  elif $has_py; then
+    python - <<'PY'
+import json, pathlib
+p = pathlib.Path("${CONFIG_FILE}")
+data = json.loads(p.read_text())
+data["serverUrl"] = "http://agent2rss.yaotutu.top:8765"
+p.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+PY
+  else
+    echo "⚠️ 无 jq/python，已用模板初始化；默认 serverUrl 仍是 localhost，如需自部署或官方地址请手动修改 config.json"
+  fi
+  echo "配置已初始化: $CONFIG_FILE"
+else
+  echo "config exists, skip init"
+fi
+
+# 轻量校验（仅在有 jq/python 时自动做；否则用户手动确认）
+if $has_jq; then
+  SERVER_URL=$(jq -r '.serverUrl' "$CONFIG_FILE")
+  DEFAULT_ID=$(jq -r '.currentChannelId' "$CONFIG_FILE")
+  if [ -z "$SERVER_URL" ]; then echo "invalid config: serverUrl empty"; exit 1; fi
+elif $has_py; then
+  python - <<'PY'
+import json, sys, pathlib
+p = pathlib.Path("${CONFIG_FILE}")
+data = json.loads(p.read_text())
+if not data.get("serverUrl"):
+    sys.stderr.write("invalid config: serverUrl empty\n")
+    sys.exit(1)
+PY
+  SERVER_URL=$(python - <<'PY'
+import json, pathlib
+p = pathlib.Path("${CONFIG_FILE}")
+print(json.loads(p.read_text()).get("serverUrl",""))
+PY)
+  DEFAULT_ID=""  # 如需频道校验再补充
+else
+  echo "⚠️ 无 jq/python，无法自动校验；请用户手动确认 config.json（serverUrl/频道/token）后继续。"
+  SERVER_URL=""; DEFAULT_ID=""
+fi
+
+# 兜底：若无频道或无 currentChannelId，自动创建默认频道
+if $has_jq && [ "$(jq '.channels | length' "$CONFIG_FILE")" -eq 0 -o "$(jq -r '.currentChannelId' "$CONFIG_FILE")" = "null" ]; then
+  NAME="AI Briefing"; DESC="Auto-created default channel"
+  RESP=$(curl -fsS -X POST "$SERVER_URL/api/channels" -H "Content-Type: application/json" -d "{\"name\":\"$NAME\",\"description\":\"$DESC\"}")
+  NEW_ID=$(echo "$RESP" | jq -r '.channel.id // .id')
+  NEW_TOKEN=$(echo "$RESP" | jq -r '.channel.token // .token')
+  jq ".channels += [{id:\"$NEW_ID\",name:\"$NAME\",description:\"$DESC\",token:\"$NEW_TOKEN\",postsUrl:\"$SERVER_URL/api/channels/$NEW_ID/posts\",rssUrl:\"$SERVER_URL/channels/$NEW_ID/rss.xml\"}] | .currentChannelId = \"$NEW_ID\"" "$CONFIG_FILE" >"$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+  echo "Auto-created default channel: $NEW_ID"
+elif $has_py; then
+  python - <<'PY'
+import json, pathlib, subprocess, sys
+p = pathlib.Path("${CONFIG_FILE}")
+data = json.loads(p.read_text())
+if (not data.get("channels")) or (data.get("currentChannelId") in (None, "", "null")):
+    import urllib.request, json as js
+    NAME="AI Briefing"; DESC="Auto-created default channel"
+    SERVER_URL = data.get("serverUrl")
+    payload = js.dumps({"name": NAME, "description": DESC}).encode()
+    req = urllib.request.Request(f"{SERVER_URL}/api/channels", data=payload, headers={"Content-Type":"application/json"})
+    with urllib.request.urlopen(req) as resp:
+        resp_data = js.loads(resp.read())
+    new_id = resp_data.get('channel',{}).get('id') or resp_data.get('id')
+    new_token = resp_data.get('channel',{}).get('token') or resp_data.get('token')
+    if not new_id or not new_token:
+        sys.exit("auto-create channel failed: missing id/token")
+    data.setdefault('channels', []).append({
+        'id': new_id,
+        'name': NAME,
+        'description': DESC,
+        'token': new_token,
+        'postsUrl': f"{SERVER_URL}/api/channels/{new_id}/posts",
+        'rssUrl': f"{SERVER_URL}/channels/{new_id}/rss.xml",
+    })
+    data['currentChannelId'] = new_id
+    p.write_text(js.dumps(data, ensure_ascii=False, indent=2))
+    print(f"Auto-created default channel: {new_id}")
+PY
+fi
 ```
 
-**优点**：
-- 无需处理 JSON 转义
-- 最简单可靠
-- 支持所有 Markdown 语法
-- 自动提取标题
-- 支持幂等性
-
-**可选字段**：
-- `title` - 自定义标题
-- `tags` - 标签（逗号分隔）
-- `author` - 作者名
-- `idempotencyKey` - 防止重复发布
-
-### JSON 方式（仅适合简单内容）
-
-如果内容简单且已正确转义，可以使用 JSON 方式。但对于包含复杂 Markdown 的内容，请使用文件上传。
-
-## 常用操作
-
-### 1. 创建频道
-
+> 默认用官方地址，除非用户明确要自部署/改地址。无频道或无 currentChannelId 时自动创建默认频道（有 jq/python 时自动执行；无依赖时请用户手动创建/确认）。
+## 常用变量提取
 ```bash
-curl -X POST {serverUrl}/api/channels \
+CHANNEL_ID="${TARGET_CHANNEL_ID:-$DEFAULT_ID}"
+TOKEN=$(jq -r ".channels[] | select(.id==\"$CHANNEL_ID\") | .token" "$CONFIG_FILE")
+POSTS_URL=$(jq -r ".channels[] | select(.id==\"$CHANNEL_ID\") | .postsUrl" "$CONFIG_FILE")
+```
+若 TOKEN/CHANNEL_ID 为空，提示用户先创建/选择频道。
+
+## 创建频道（并加入配置）
+```bash
+NAME="技术博客"; DESC="分享技术文章"
+RESP=$(curl -fsS -X POST "$SERVER_URL/api/channels" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "技术博客",
-    "description": "分享技术文章"
-  }'
+  -d "{\"name\":\"$NAME\",\"description\":\"$DESC\"}")
+NEW_ID=$(echo "$RESP" | jq -r '.channel.id // .id')
+NEW_TOKEN=$(echo "$RESP" | jq -r '.channel.token // .token')
+
+jq ".channels += [{
+  id: \"$NEW_ID\",
+  name: \"$NAME\",
+  description: \"$DESC\",
+  token: \"$NEW_TOKEN\",
+  postsUrl: \"$SERVER_URL/api/channels/$NEW_ID/posts\",
+  rssUrl: \"$SERVER_URL/channels/$NEW_ID/rss.xml\"
+}] | .currentChannelId = ( .currentChannelId // \"$NEW_ID\" )" \
+  "$CONFIG_FILE" >"$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+
+echo "RSS: $SERVER_URL/channels/$NEW_ID/rss.xml"
 ```
 
-响应包含频道 ID 和 Token，保存到 `config.json`。
-
-### 2. 推送内容（JSON 方式 - 仅适合简单内容）
-
-⚠️ **警告**：JSON 方式容易出现转义问题，推荐使用文件上传方式（见上方"推荐的推送方式"章节）。
-
-**最简调用**（仅内容，标题自动提取）：
-
+## 推送文章（推荐：文件上传）
 ```bash
-curl -X POST {postsUrl} \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer {token}" \
-  -d '{
-    "content": "# 标题\n\n内容..."
-  }'
+FILE=article.md
+IDEMPOTENCY_KEY=${IDEMPOTENCY_KEY:-$(basename "$FILE")-$(date +%s)}
+CHANNEL_ID="${TARGET_CHANNEL_ID:-$DEFAULT_ID}"
+TOKEN=$(jq -r ".channels[] | select(.id==\"$CHANNEL_ID\") | .token" "$CONFIG_FILE")
+
+curl -fsS -X POST "$SERVER_URL/api/channels/$CHANNEL_ID/posts/upload" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@$FILE" \
+  -F "idempotencyKey=$IDEMPOTENCY_KEY"
 ```
+优先上传文件，避免 JSON 转义。可选字段：title/tags/author/idempotencyKey。
 
-**响应示例**：
-
-```json
-{
-  "success": true,
-  "message": "Post created successfully in channel \"xxx\"",
-  "post": {
-    "id": "xxx",
-    "title": "标题",
-    "channel": "default",
-    "pubDate": "2024-01-01T00:00:00.000Z"
-  },
-  "isNew": true
-}
-```
-
-### 3. 幂等性支持
-
-使用 `idempotencyKey` 防止重复发布：
-
-- 相同频道内相同 key 的请求只会创建一次文章
-- 响应中 `isNew: true` 表示新创建，`false` 表示已存在
-- 适用于 JSON 和文件上传两种方式
-
-**示例**：
-
+## 推送文章（JSON，简单内容时）
 ```bash
-# 第一次请求 - 创建新文章
-curl -X POST {postsUrl} \
-  -H "Authorization: Bearer {token}" \
+curl -fsS -X POST "$SERVER_URL/api/channels/$CHANNEL_ID/posts" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"content":"# 测试","idempotencyKey":"key1"}'
-# 响应: {"success":true,"isNew":true,...}
-
-# 第二次请求 - 返回已存在的文章
-curl -X POST {postsUrl} \
-  -H "Authorization: Bearer {token}" \
-  -H "Content-Type: application/json" \
-  -d '{"content":"# 测试","idempotencyKey":"key1"}'
-# 响应: {"success":true,"isNew":false,...}
+  -d '{"content":"# 标题\\n\\n正文","idempotencyKey":"key-001"}'
 ```
 
-## 工作流程
+## 频道管理
+- **列出频道**：`jq -r '.channels[] | "• \(.name) (ID: \(.id)) | RSS: \(.rssUrl) | 默认: \(.id==.currentChannelId)"' "$CONFIG_FILE"`
+- **设为默认**：`jq ".currentChannelId = \"$CHANNEL_ID\"" "$CONFIG_FILE" >"$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"`
+- **删除频道**：`curl -X DELETE "$SERVER_URL/api/channels/$CHANNEL_ID" -H "Authorization: Bearer $TOKEN"` 后用 jq 删除本地条目；如删的是默认，切换到剩余首个或置空并提示创建新频道。
 
-### 推送单篇文章
-
-1. **检查并初始化配置**：
-   - 读取 `config.json`
-   - 如果不存在，执行自动初始化流程（创建频道并保存配置）
-2. **确定目标频道**：
-   - 如果用户明确指定频道（如"发布到技术博客频道"），使用指定的频道
-   - 否则使用 `defaultChannelId` 对应的频道
-3. **从配置读取数据**：
-   - `serverUrl`: 服务器地址
-   - `token`: 从 `channels` 数组中找到目标频道的 token
-4. 准备 Markdown 文件
-5. **使用文件上传方式推送**（推荐）：
-   ```bash
-   curl -X POST "{config.serverUrl}/api/channels/{targetChannelId}/posts/upload" \
-     -H "Authorization: Bearer {targetChannel.token}" \
-     -F "file=@article.md" \
-     -F "idempotencyKey=unique-key"
-   ```
-6. 检查响应中的 `isNew` 字段
-7. **返回 RSS Feed URL**：`{config.serverUrl}/channels/{targetChannelId}/rss.xml`
-
-### 创建新频道
-
-1. 提示用户提供频道名称和描述
-2. **从 `config.json` 读取 `serverUrl`**（如果配置不存在，使用默认值 `http://agent2rss.yaotutu.top:8765`）
-3. 调用创建频道 API：
-   ```bash
-   curl -X POST "{config.serverUrl}/api/channels" \
-     -H "Content-Type: application/json" \
-     -d '{"name":"频道名","description":"描述"}'
-   ```
-4. 保存返回的频道 ID 和 Token 到 `config.json`：
-   - 添加到 `channels` 数组
-   - 构建 `postsUrl` 和 `rssUrl`（基于 `serverUrl`）
-5. 可选：更新 `defaultChannelId` 为新频道
-6. **提供 RSS Feed URL**：`{config.serverUrl}/channels/{channelId}/rss.xml`
-
-### 查看本地频道列表
-
-1. **读取 config.json**
-2. **显示 channels 数组中的所有频道**：
-   - 频道 ID
-   - 频道名称
-   - RSS Feed URL
-   - 是否为默认频道（defaultChannelId）
-3. 格式化输出供用户查看
-
-### 设置默认频道
-
-1. **读取 config.json**
-2. **显示可用频道列表**（从 channels 数组）
-3. **让用户选择要设为默认的频道**
-4. **更新 config.json 中的 defaultChannelId**
-5. **确认设置成功**，提供该频道的 RSS Feed URL
-
-### 更新频道配置
-
-修改频道的名称或描述。
-
-**需要认证**：频道 Token
-
-**可更新字段**（仅限以下两个）：
-- `name` - 频道名称
-- `description` - 频道描述
-
-**工作流程**：
-1. 从 config.json 读取指定频道（或默认频道）的 ID 和 token
-2. 提示用户要修改的字段（name 或 description）
-3. 调用更新频道 API：
-   ```bash
-   curl -X PUT "{config.serverUrl}/api/channels/{channelId}" \
-     -H "Authorization: Bearer {token}" \
-     -H "Content-Type: application/json" \
-     -d '{"name":"新名称","description":"新描述"}'
-   ```
-4. 更新成功后，同步更新本地 config.json 中对应频道的信息
-
-### 删除频道
-
-永久删除一个频道及其所有文章。
-
-**需要认证**：频道 Token
-
-⚠️ **警告**：此操作不可撤销，会删除频道的所有文章。
-
-**工作流程**：
-1. 读取 config.json 显示所有频道
-2. 让用户选择要删除的频道
-3. **显示频道信息并要求用户确认**（防止误删）
-4. 从 config.json 读取该频道的 token
-5. 调用删除频道 API：
-   ```bash
-   curl -X DELETE "{config.serverUrl}/api/channels/{channelId}" \
-     -H "Authorization: Bearer {token}"
-   ```
-6. 删除成功后，从 config.json 的 channels 数组中移除该频道
-7. 如果删除的是 defaultChannelId：
-   - 如果还有其他频道，自动将第一个可用频道设为默认
-   - 如果没有其他频道，将 defaultChannelId 设为 null，提示用户创建新频道
-
-## 常用场景
-
-### 场景 1：发布到指定频道
-
-**用户需求**：我有多个频道，想发布内容到特定频道
-
-**操作步骤**：
-1. 用户明确表达"发布到 xxx 频道"
-2. 从 config.json 的 channels 数组中查找匹配的频道
-3. 使用该频道的 token 和 ID 发布内容
-4. 如果未指定频道，使用 defaultChannelId
-
-### 场景 2：设置默认频道
-
-**用户需求**：我想把"技术博客"设为默认频道
-
-**操作步骤**：
-1. 读取 config.json 显示所有频道
-2. 让用户选择要设为默认的频道
-3. 更新 defaultChannelId
-4. 确认设置成功
-
-### 场景 3：修改频道名称或描述
-
-**用户需求**：我想修改频道的名称
-
-**操作步骤**：
-1. 从 config.json 读取指定频道（或默认频道）的 ID 和 token
-2. 提示用户输入新的名称或描述
-3. 调用 `PUT {serverUrl}/api/channels/{channelId}` 更新
-4. 同步更新本地 config.json
-
-### 场景 4：删除不需要的频道
-
-**用户需求**：我创建了一个测试频道，现在想删除它
-
-**操作步骤**：
-1. 读取 config.json 显示所有频道
-2. 让用户选择要删除的频道
-3. 显示频道信息并要求确认
-4. 调用 `DELETE {serverUrl}/api/channels/{channelId}` 删除
-5. 从 config.json 中移除该频道
-6. 如果删除的是默认频道，自动设置新的默认频道
+## 幂等性建议
+- 默认使用 `文件名-时间戳` 或 `内容哈希`；业务场景可用文章 URL。
+- `isNew: true/false` 区分新建或重复。
 
 ## 错误处理
+- 401：检查 token；提示不要暴露 token。
+- 404：检查频道 ID；可先 GET /api/channels。
+- 400：缺 content/file；提示用户。
+- 5xx：提示稍后重试或检查自部署服务。
 
-- **401 Unauthorized**：Token 无效或缺失，检查 `Authorization` 头
-- **404 Not Found**：频道不存在，检查频道 ID
-- **400 Bad Request**：参数错误，检查必填字段 `content`
-- **500 Server Error**：服务器错误，稍后重试
+## 安全与提示
+- Token 不写入日志/回显；不要提交到仓库。
+- 所有 URL 基于 `config.json` 的 `serverUrl` 生成，禁止硬编码 localhost（除非用户确认自部署）。
+- 参考完整 API 示例：`references/api-examples.md`。
 
-## 参考资料
-
-详细的 API 调用示例和响应格式见 `references/api-examples.md`。
-
-## 注意事项
-
-1. **Token 安全**：不要在公开场合分享频道 Token
-2. **内容格式**：支持完整的 Markdown 语法
-3. **字符编码**：使用 UTF-8 编码
-4. **幂等性键**：建议使用有意义的键（如文章 URL、时间戳等）
-5. **认证方式**：必须使用 `Authorization: Bearer` 格式
+## 快速路径
+1) 初始化并改 serverUrl：复制模板 + `jq '.serverUrl="http://agent2rss.yaotutu.top:8765"'` 写回。
+2) 创建频道 → 自动写入 config，缺省设为 currentChannelId。
+3) 推送：用上传接口 + idempotencyKey。
+4) 提供 RSS：`$SERVER_URL/channels/$CHANNEL_ID/rss.xml`。
