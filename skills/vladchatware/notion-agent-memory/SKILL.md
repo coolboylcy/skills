@@ -71,6 +71,19 @@ Want structured databases? See `references/notion-integration.md` for API setup.
 4. **Start every session** by reading MEMORY.md
 5. **Document as you go** — the Continuity Cycle keeps you on track
 
+### Treat Notion Like Obsidian
+
+Notion is NOT a flat database. Think of it as a **knowledge graph** — like Obsidian with a GUI:
+
+- **Pages link to pages** — Use `[[page-name]]` style relationships
+- **Bidirectional context** — Each entry knows what it relates to
+- **Database = queries into the graph** — Views, not containers
+- **Daily logs are a timeline** — Not separate silos, but a flowing narrative
+
+The ACT databases (Hidden Narratives, Limitless, Ideas Pipeline) are not separate boxes — they're lenses into the same memory graph. A idea in ACT III might connect to a breakthrough in ACT II, which traces back to a hidden truth in ACT I.
+
+**Mental model:** You're building a second brain, not filling spreadsheets.
+
 ## The Memory Stack
 
 | Layer | File | Purpose |
