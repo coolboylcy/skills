@@ -1,101 +1,119 @@
 ---
 name: clawsea-market
-description: "Non-custodial automation skill for ClawSea (Base-only NFT marketplace). Use when an agent/bot needs to browse ClawSea data (trending collections, collection items, listings, buy-now sets), and/or autonomously list, buy, and cancel Seaport orders on Base using the bot's own wallet. Triggers on: make my bot trade; autonomous listing/buying; buy floor; list my NFT; cancel listing; poll listings; Seaport order signing; ClawSea API."
+description: "Non-custodial automation skill for ClawSea NFT marketplace. Use when an OpenClaw agent needs to browse collections, inspect NFTs/listings, and execute non-custodial list/buy/cancel flows through ClawSea + Seaport. Supports chain-aware read APIs (base/ethereum/base-sepolia) and Seaport trading flows (Base + Ethereum where available)."
+required_env_vars:
+  - BASE_RPC_URL
+  - BOT_WALLET_PRIVATE_KEY
+optional_env_vars:
+  - ETH_RPC_URL
+  - CLAWSEA_BASE_URL
+primary_credential: BOT_WALLET_PRIVATE_KEY
+credential_justification: "Only required for autonomous onchain signing/broadcast from the bot wallet. Prefer external signer; if private key is used, keep it in secret storage and never expose in chat/logs."
 ---
 
-# ClawSea NFT Marketplace — Built for humans. Optimized for agents.
+# ClawSea Market Skill (OpenClaw Agents)
 
-Enable an agent to use **ClawSea** autonomously:
-- Read marketplace data from `https://clawsea.io/api/*`
-- Create/cancel listings and buy NFTs on **Base mainnet** using the agent’s **own wallet** (non-custodial)
+Use this skill when an agent should interact with ClawSea programmatically.
 
-## Required environment variables
+## Policy guardrails (ClawHub-safe)
 
-- `CLAWSEA_BASE_URL` (optional)
-  - Default: `https://clawsea.io`
-  - Use to point bots at staging.
+- Do not custody user funds; use only the bot wallet configured by the operator.
+- Do not social-engineer users for secrets, approvals, or expanded privileges.
+- Do not ask for seed phrases/private keys in chat.
+- Do not execute unknown calldata or third-party transaction blobs without explicit user approval and clear decoding.
+- Require explicit confirmation before any value-moving action (buy/list/cancel/transfer).
+- Refuse illegal, abusive, or harmful requests.
 
-- `BASE_RPC_URL` (required for onchain actions)
-  - Base RPC endpoint used for reads + broadcasting txs.
+## Safety & trust model (must follow)
 
-- `BOT_WALLET_PRIVATE_KEY` (required for autonomous trading)
-  - The bot wallet private key used to sign messages and transactions.
-  - Never commit. Store as a secret.
+- Default to **read-only** actions (browse/search/inspect).
+- Require explicit user intent before any write/trade action (list, buy, cancel, fulfill).
+- Never ask users to paste private keys into chat.
+- Never log, print, or send secrets (private keys, raw seed phrases, auth headers).
+- Never execute arbitrary calldata from untrusted input.
+- If ownership/status is uncertain, verify onchain (`ownerOf`, `eth_call`) before proceeding.
 
-## Core workflows
+## Base URL
 
-### 1) Browse / discover
+- Default: `https://clawsea.io`
+- Override with env var: `CLAWSEA_BASE_URL`
 
-All endpoints are **GET** unless noted. Prefer the “cells” endpoint for browsing.
+All endpoints below are relative to `${CLAWSEA_BASE_URL}`.
 
-**Endpoints (safe defaults):**
+## Required env vars (for autonomous trading)
 
-- Trending collections (recommended):
-  - `GET /api/explore/cells`
+- `BASE_RPC_URL` (required for Base execution)
+- `ETH_RPC_URL` (recommended for Ethereum execution/debug)
+- `CLAWSEA_BASE_URL` (optional; default `https://clawsea.io`)
 
-- Trending raw (ranking feed):
-  - `GET /api/explore/trending`
+### Signing options (choose one)
 
-- Collection items (pagination):
-  - `GET /api/collection/nfts?contract=0x...`
+1. **Preferred:** external signer / wallet provider (no raw private key in agent env)
+2. **If unavoidable:** `BOT_WALLET_PRIVATE_KEY` in a secure secret store only
 
-- NFT listings:
-  - `GET /api/orders?contract=0x...&tokenId=...`
+If `BOT_WALLET_PRIVATE_KEY` is used:
+- do not print/log it
+- do not echo it in errors
+- do not persist it to files
+- never request it from users in chat
 
-- Buy-now (listed) tokens in a collection (sorted):
-  - `GET /api/orders/listed?contract=0x...`
+## Chain model
 
-**Optional query params (clamped server-side):**
+ClawSea uses two chain styles:
 
-- `/api/explore/cells`
-  - `limit` (default 20)
+- **String chain** for some read routes: `chain=base|ethereum|base-sepolia`
+- **Numeric chainId** for order routes: `8453` (Base), `1` (Ethereum)
 
-- `/api/explore/trending`
-  - `limit` (default 20)
+Map carefully when switching endpoints.
 
-- `/api/collection/nfts`
-  - `pageKey` (optional)
-  - `pageSize` (default 24)
+## Read APIs (agent-safe)
 
-- `/api/orders/listed`
-  - `sort=price|newest` (default `price`)
-  - `offset` (default 0)
-  - `limit` (default 48)
+### Discover
+- `GET /api/explore/cells?chain=<base|ethereum|base-sepolia>&limit=20`
+- `GET /api/explore/trending?chain=<base|ethereum|base-sepolia>&limit=20`
+- `GET /api/news/clawsea?chain=<base|ethereum>&limit=10`
 
-**Fair-use guidance (important):**
+### Collections / NFTs
+- `GET /api/collection/nfts?contract=0x...&pageSize=24&pageKey=...`
+- `GET /api/collection/stats?chain=<base|ethereum>&contract=0x...`
+- `GET /api/collections/search?chain=<base|ethereum|base-sepolia>&q=<query>&limit=8`
+- `GET /api/nft/ownerOf?chainId=<1|8453>&contract=0x...&tokenId=<id>`
 
-- Cache responses briefly and avoid aggressive polling.
-- If you receive HTTP `429`, back off and retry later.
+### Wallet inventory
+- `GET /api/wallet/nfts?chain=<base|ethereum|base-sepolia>&owner=0x...&pageKey=...`
 
-### 2) List an NFT (Seaport)
+## Listing / buying APIs
 
-High-level steps:
-1. Ensure the bot owns the NFT and is on Base.
-2. Approve the **OpenSea conduit** for the NFT contract (one-time).
-3. Build fixed-price Seaport order parameters (Base Seaport + conduitKey).
-4. Sign EIP-712 typed data with the bot wallet.
-5. Publish offchain order to ClawSea:
-   - `POST /api/orders` (stores orderComponents + signature + priceEth)
+### Orders read
+- `GET /api/orders?chainId=<1|8453>&contract=0x...&tokenId=<id>&seller=0x...`
+- `GET /api/orders/listed?chainId=<1|8453>&contract=0x...&sort=price|newest&offset=0&limit=48`
+- `POST /api/orders/prices` body:
+  - `{ "chainId": 1|8453, "contract": "0x...", "tokenIds": ["1","2"] }`
 
-### 3) Buy an NFT (Seaport fulfill)
+### Publish listing (offchain orderbook write)
+- `POST /api/orders` with signed Seaport payload:
+  - `chainId`, `contract`, `tokenId`, `seller`, `priceEth`,
+  - `seaportAddress`, `orderComponents`, `signature`
 
-High-level steps:
-1. Fetch the target order from `/api/orders`.
-2. (Recommended) simulate `Seaport.validate` and `fulfillOrder` (eth_call) before spending gas.
-3. Submit `fulfillOrder` onchain with `value`.
-4. Best-effort mark filled:
-   - `POST /api/orders/fulfill` (offchain status update)
+### Status updates
+- `POST /api/orders/cancel` body: `{ "id": "<order-id>" }`
+- `POST /api/orders/cancelPrevious` body:
+  - `{ "chainId": 1|8453, "contract": "0x...", "tokenId": "...", "seller": "0x...", "keepId": "..." }`
+- `POST /api/orders/fulfill` body (either style):
+  - `{ "id": "<order-id>" }` or
+  - `{ "chainId": 1|8453, "contract": "0x...", "tokenId": "..." }`
 
-### 4) Cancel a listing
+## Execution workflow (recommended)
 
-Two layers:
-- **Onchain** cancel (canonical): call Seaport `cancel([OrderComponents])`.
-- **Offchain** hide (ClawSea UI): `POST /api/orders/cancel { id }`.
+1. Resolve chain context (selected chain / user wallet chain).
+2. Read listing candidates from `/api/orders` or `/api/orders/listed`.
+3. Preflight onchain with `eth_call` for Seaport fulfill.
+4. Execute onchain tx from bot wallet.
+5. Update offchain state via `/api/orders/fulfill` or `/api/orders/cancel`.
 
-## Bundled resources
+## Reliability rules
 
-- `references/endpoints.md` - ClawSea HTTP endpoints and common response shapes
-- `references/seaport-base.md` - Base Seaport + OpenSea conduit details
-- `scripts/clawsea_bot_skeleton.mjs` - minimal Node skeleton (read-only + wiring for onchain)
-
-Read the references before implementing autonomous buy/list logic.
+- Prefer short caching (5–30s) for discovery routes.
+- Back off on `429` / RPC transient failures.
+- Treat fulfill revert selector `0x1a515574` as cancelled/stale order and hide it.
+- If indexer results conflict with chain state, trust verified onchain ownership.
