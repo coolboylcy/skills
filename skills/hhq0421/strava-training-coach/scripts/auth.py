@@ -2,10 +2,17 @@
 """
 Strava OAuth authentication flow
 Gets access token and refresh token for API calls
+
+Security:
+- Tokens stored in XDG config dir with 0600 permissions
+- No sensitive data printed to console
+- OAuth callback handled with timeout
 """
 
 import os
+import sys
 import json
+import time
 import urllib.request
 import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -13,14 +20,24 @@ import threading
 import webbrowser
 
 # Config
-CLIENT_ID = os.environ.get('STRAVA_CLIENT_ID')
-CLIENT_SECRET = os.environ.get('STRAVA_CLIENT_SECRET')
+CLIENT_ID = os.environ.get('STRAVA_CLIENT_ID', '').strip()
+CLIENT_SECRET = os.environ.get('STRAVA_CLIENT_SECRET', '').strip()
 REDIRECT_URI = 'http://localhost:8080/callback'
-TOKEN_FILE = os.path.expanduser('~/.strava_tokens.json')
+
+# Use XDG config directory (consistent with coach_check.py and weekly_report.py)
+def get_config_dir() -> str:
+    """Get secure config directory"""
+    xdg_config = os.environ.get('XDG_CONFIG_HOME')
+    if xdg_config:
+        return os.path.join(xdg_config, 'strava-training-coach')
+    return os.path.expanduser('~/.config/strava-training-coach')
+
+CONFIG_DIR = get_config_dir()
+TOKEN_FILE = os.path.join(CONFIG_DIR, 'strava_tokens.json')
 
 if not CLIENT_ID or not CLIENT_SECRET:
     print("Error: Set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET environment variables")
-    exit(1)
+    sys.exit(1)
 
 class CallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -79,10 +96,12 @@ def exchange_code_for_token(code):
         return json.loads(response.read().decode())
 
 def save_tokens(token_data):
-    """Save tokens to file"""
+    """Save tokens to file with secure permissions"""
+    os.makedirs(CONFIG_DIR, mode=0o700, exist_ok=True)
     with open(TOKEN_FILE, 'w') as f:
         json.dump(token_data, f, indent=2)
-    print(f"Tokens saved to {TOKEN_FILE}")
+    os.chmod(TOKEN_FILE, 0o600)
+    print(f"Tokens saved securely to {TOKEN_FILE}")
 
 def main():
     # Start local server to receive callback
@@ -100,10 +119,16 @@ def main():
     print(f"If browser doesn't open, visit: {auth_url}")
     webbrowser.open(auth_url)
     
-    # Wait for callback
+    # Wait for callback (with timeout and CPU-friendly polling)
     print("Waiting for authorization...")
+    timeout = 300  # 5 minutes
+    start_time = time.time()
     while server.auth_code is None and server.error is None:
-        pass
+        if time.time() - start_time > timeout:
+            server.shutdown()
+            print("Authorization timed out after 5 minutes.")
+            return
+        time.sleep(0.5)
     
     server.shutdown()
     
@@ -118,9 +143,10 @@ def main():
     # Save tokens
     save_tokens(token_data)
     
-    print(f"\nAuthenticated as: {token_data.get('athlete', {}).get('firstname')} {token_data.get('athlete', {}).get('lastname')}")
-    print(f"Access token: {token_data.get('access_token')[:20]}...")
-    print("\nYou can now subscribe to webhooks!")
+    athlete = token_data.get('athlete', {})
+    firstname = athlete.get('firstname', 'Unknown')
+    print(f"\nAuthenticated as: {firstname} {athlete.get('lastname', '')}")
+    print("You can now run coach_check.py and weekly_report.py!")
 
 if __name__ == '__main__':
     main()

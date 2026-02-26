@@ -89,11 +89,23 @@ last_alert_times: Dict[str, float] = {}
 
 class SensitiveDataFilter(logging.Filter):
     """Filter out sensitive data from logs"""
+    REDACTION_PATTERNS = [
+        # Hex tokens (mixed case) — covers Strava, OAuth, and most API tokens
+        (re.compile(r'[a-fA-F0-9]{20,}'), '[REDACTED]'),
+        # Bearer tokens in authorization headers
+        (re.compile(r'Bearer\s+\S+', re.IGNORECASE), 'Bearer [REDACTED]'),
+        # Base64-ish tokens (alphanumeric + common token chars, 20+ chars)
+        (re.compile(r'[A-Za-z0-9_\-]{20,}'), '[REDACTED]'),
+        # Discord webhook URLs
+        (re.compile(r'webhooks/[0-9]+/[a-zA-Z0-9_\-]+'), 'webhooks/[REDACTED]'),
+        # Slack webhook URLs
+        (re.compile(r'hooks\.slack\.com/services/[A-Za-z0-9/]+'), 'hooks.slack.com/services/[REDACTED]'),
+    ]
+
     def filter(self, record: logging.LogRecord) -> bool:
         if record.msg and isinstance(record.msg, str):
-            # Mask tokens, secrets, webhooks
-            record.msg = re.sub(r'[a-f0-9]{20,}', '[REDACTED]', record.msg)
-            record.msg = re.sub(r'webhooks/[0-9]+/[a-zA-Z0-9_-]+', 'webhooks/[REDACTED]', record.msg)
+            for pattern, replacement in self.REDACTION_PATTERNS:
+                record.msg = pattern.sub(replacement, record.msg)
         return True
 
 def setup_logging() -> logging.Logger:
@@ -360,18 +372,51 @@ def safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def calculate_acwr(activities: List[Dict]) -> Optional[float]:
+    """Calculate Acute:Chronic Workload Ratio (Gabbett, 2016).
+    Acute = this week's load. Chronic = 4-week rolling average.
+    ACWR > 1.5 = high injury risk zone."""
+    now = datetime.now(timezone.utc)
+    weekly_loads = []
+
+    for week_offset in range(4):
+        week_start = now - timedelta(days=now.weekday() + (week_offset * 7))
+        week_end = week_start + timedelta(days=7)
+        week_miles = 0.0
+
+        for a in activities:
+            try:
+                date_str = a.get('start_date', '')
+                if not date_str:
+                    continue
+                act_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                if week_start <= act_date < week_end:
+                    week_miles += safe_float(a.get('distance'), 0) / 1609.34
+            except (ValueError, TypeError):
+                continue
+
+        weekly_loads.append(week_miles)
+
+    acute = weekly_loads[0]  # this week
+    chronic = sum(weekly_loads) / len(weekly_loads) if weekly_loads else 0
+
+    if chronic <= 0:
+        return None
+    return acute / chronic
+
+
 def analyze_weekly_load(activities: List[Dict]) -> Tuple[Optional[Dict], float]:
-    """Check for dangerous mileage spikes"""
+    """Check for dangerous mileage spikes using ACWR and week-over-week change"""
     if not activities:
         return None, 0.0
-    
+
     now = datetime.now(timezone.utc)
     week_start = now - timedelta(days=now.weekday())
     last_week_start = week_start - timedelta(days=7)
-    
+
     this_week: List[Dict] = []
     last_week: List[Dict] = []
-    
+
     for a in activities:
         try:
             date_str = a.get('start_date', '')
@@ -384,26 +429,38 @@ def analyze_weekly_load(activities: List[Dict]) -> Tuple[Optional[Dict], float]:
                 last_week.append(a)
         except (ValueError, TypeError):
             continue
-    
+
     this_miles = sum(safe_float(a.get('distance'), 0) for a in this_week) / 1609.34
     last_miles = sum(safe_float(a.get('distance'), 0) for a in last_week) / 1609.34
-    
+
     logger.debug(f"This week: {this_miles:.1f} mi, Last week: {last_miles:.1f} mi")
-    
+
     if last_miles == 0:
         return None, this_miles
-    
+
     change_pct = ((this_miles - last_miles) / last_miles) * 100
-    
+    acwr = calculate_acwr(activities)
+    acwr_str = f" ACWR: {acwr:.2f}." if acwr else ""
+
     if change_pct > MAX_WEEKLY_JUMP:
-        severity = 'high' if change_pct > 50 else 'medium'
+        severity = 'high' if change_pct > 50 or (acwr and acwr > 1.5) else 'medium'
+        rec = "Consider an easy week or cut next week's mileage by 20%."
+        if acwr and acwr > 1.5:
+            rec = (
+                "Your acute:chronic workload ratio is in the high-risk zone (>1.5). "
+                "Research by Gabbett (2016) shows injury risk spikes here. "
+                "Reduce next week's volume by 20-30% and prioritize easy runs."
+            )
         return {
             'type': 'load_spike',
             'severity': severity,
-            'message': f"Weekly mileage up {change_pct:.0f}% ({last_miles:.1f}→{this_miles:.1f} mi). Risk of injury increases significantly above 10% weekly gains.",
-            'recommendation': "Consider an easy week or cut next week's mileage by 20%."
+            'message': (
+                f"Weekly mileage up {change_pct:.0f}% ({last_miles:.1f} -> {this_miles:.1f} mi).{acwr_str} "
+                f"Nielsen et al. (2014) found >30% weekly increases significantly raise injury risk."
+            ),
+            'recommendation': rec
         }, this_miles
-    
+
     return None, this_miles
 
 
@@ -450,10 +507,17 @@ def analyze_intensity(activities: List[Dict]) -> Optional[Dict]:
         return {
             'type': 'intensity_imbalance',
             'severity': 'medium',
-            'message': f"{hard_pct:.0f}% of runs with HR data were moderate/high effort (HR >{EASY_HR_CEILING}).",
-            'recommendation': "Easy days should feel conversational. Slow down to build aerobic base."
+            'message': (
+                f"{hard_pct:.0f}% of runs were moderate/high effort (HR >{EASY_HR_CEILING}). "
+                f"Seiler (2010) found elite athletes keep ~80% of sessions below the first ventilatory threshold."
+            ),
+            'recommendation': (
+                "Easy days should feel conversational. Stoggl & Sperlich (2014) showed "
+                "polarized training (80% easy / 20% hard) produces better VO2max and "
+                "lactate threshold gains than moderate-intensity training."
+            )
         }
-    
+
     return None
 
 
@@ -502,8 +566,14 @@ def check_recovery_gap(activities: List[Dict], state: CoachState) -> Optional[Di
         return {
             'type': 'recovery_gap',
             'severity': 'low',
-            'message': f"{days_since} days since last activity.",
-            'recommendation': "A gentle 20-min walk or yoga can aid recovery without adding fatigue."
+            'message': (
+                f"{days_since} days since last activity. "
+                f"Mujika & Padilla (2000) found VO2max begins declining after ~10 days of inactivity."
+            ),
+            'recommendation': (
+                "A gentle 20-min walk or easy jog can maintain adaptations without adding fatigue. "
+                "Nieman (2000) showed moderate exercise also supports immune function."
+            )
         }
     
     return None
