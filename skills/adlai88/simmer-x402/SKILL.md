@@ -2,10 +2,10 @@
 name: simmer-x402
 displayName: x402 Payments
 description: Make x402 payments to access paid APIs and gated content. Use when a skill needs to fetch data from x402-gated endpoints (like Kaito mindshare API, Simmer premium endpoints, or any x402 provider). Handles 402 Payment Required responses automatically using USDC on Base.
-metadata: {"clawdbot":{"emoji":"💳","requires":{"env":["EVM_PRIVATE_KEY"]},"cron":null,"autostart":false}}
+metadata: {"clawdbot":{"emoji":"💳","requires":{"env":["EVM_PRIVATE_KEY"],"pip":["x402[httpx,evm]"]},"cron":null,"autostart":false}}
 authors:
   - Simmer (@simmer_markets)
-version: "1.0.0"
+version: "1.0.2"
 published: true
 ---
 
