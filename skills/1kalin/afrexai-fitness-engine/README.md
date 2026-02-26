@@ -1,6 +1,6 @@
-# AfrexAI Fitness & Performance Engine 💪
+# 🏋️ Fitness & Training Engineering by AfrexAI
 
-Complete training, nutrition, recovery, and body composition system for AI agents. From beginner to competitive athlete — periodized programming, macro tracking, injury prevention, and race preparation.
+Complete periodized training system — program design, progressive overload, recovery optimization, body composition, and race prep. Works for any goal: strength, hypertrophy, endurance, hybrid (Hyrox/CrossFit), or general fitness.
 
 ## Install
 
@@ -8,39 +8,46 @@ Complete training, nutrition, recovery, and body composition system for AI agent
 clawhub install afrexai-fitness-engine
 ```
 
-## What's Inside
+## What You Get
 
-- **Athlete Profile** — Structured YAML brief with experience auto-detection
-- **Program Templates** — Strength (Upper/Lower 4-day), Running (5K to Half Marathon), Hyrox/Hybrid (16-week)
-- **Periodization** — Linear, undulating, and block models with progression rules
-- **Nutrition Framework** — TDEE calculator, macro targets by goal, meal plan templates, evidence-based supplements
-- **Recovery System** — Sleep optimization, deload protocols, overtraining detection
-- **Injury Prevention** — Warm-up protocol, pain decision tree, exercise substitution table
-- **Body Composition** — Tracking protocol, progress interpretation matrix, healthy rate-of-change targets
-- **Race Prep** — Taper protocols for endurance + powerlifting, race day checklists
-- **RPE Autoregulation** — Daily readiness check, session intensity adjustment
-- **12 Natural Language Commands** — "Build me a program", "Calculate my macros", etc.
+- **8-signal training health check** with /16 scoring
+- **Periodization models** — linear, undulating, block, conjugate, hybrid
+- **Complete programs** — Beginner Full Body, Intermediate Upper/Lower, Hyrox 12-Week Prep
+- **Exercise selection** — movement pattern requirements, rep range guides, RPE scale
+- **Volume landmarks** — MEV/MAV/MRV per muscle group with progression rules
+- **Running programming** — HR zones, 80/20 rule, conditioning modalities
+- **Recovery system** — fatigue monitoring, deload protocols, readiness scoring
+- **Nutrition for training** — macro targets by goal, pre/intra/post workout, evidence-based supplements
+- **Mobility & injury prevention** — daily routine, warmup protocols, common issue fixes
+- **Body composition** — fat loss protocol, muscle gain protocol, recomposition guidance
+- **Race prep** — taper protocols, race day checklist
+- **Progress tracking** — workout log YAML, weekly review template
+- **Plateau troubleshooting** — decision tree for stalled progress
 
 ## Quick Start
 
-Tell your agent:
-> "I'm 29, male, 82kg, training 4 days/week. I want to train for Hyrox while maintaining strength. Build me a 16-week program."
-
-The agent will use the athlete profile, select the Hyrox template, calculate your nutrition, and create a periodized plan.
+Ask your agent:
+- "Design a 4-day training program for hypertrophy"
+- "Score my current program with /fitness-check"
+- "Build a 12-week Hyrox prep plan"
+- "I'm stuck at 100kg bench — help me break through"
+- "Set up my cutting macros at 85kg"
 
 ## ⚡ Level Up
 
-Get the complete **AfrexAI SaaS Context Pack** ($47) — includes operational frameworks for health tech companies building fitness platforms, wearable integrations, and health data AI:
+Want industry-specific AI context packs for your business?
 
-👉 [Browse all context packs](https://afrexai-cto.github.io/context-packs/)
+**[Browse AfrexAI Context Packs →](https://afrexai-cto.github.io/context-packs/)**
+
+$47 each — Healthcare, SaaS, Fintech, and 7 more verticals. Complete agent configurations with industry knowledge, workflows, and automation playbooks.
 
 ## 🔗 More Free Skills by AfrexAI
 
-- [afrexai-productivity-system](https://clawhub.com/skills/afrexai-productivity-system) — Complete productivity operating system
-- [afrexai-decision-engine](https://clawhub.com/skills/afrexai-decision-engine) — Frameworks for better decisions
-- [afrexai-wealth-builder](https://clawhub.com/skills/afrexai-wealth-builder) — Personal finance & investment system
-- [afrexai-customer-success](https://clawhub.com/skills/afrexai-customer-success) — Retention & expansion playbook
-- [afrexai-sales-playbook](https://clawhub.com/skills/afrexai-sales-playbook) — Complete B2B sales methodology
+- [afrexai-nutrition-mastery](https://clawhub.com/skills/afrexai-nutrition-mastery) — Complete nutrition & meal planning system
+- [afrexai-peak-performance](https://clawhub.com/skills/afrexai-peak-performance) — Productivity & deep work system
+- [afrexai-personal-finance](https://clawhub.com/skills/afrexai-personal-finance) — Complete personal finance operating system
+- [afrexai-prompt-engineering](https://clawhub.com/skills/afrexai-prompt-engineering) — Master AI prompt engineering
+- [afrexai-strategic-thinking](https://clawhub.com/skills/afrexai-strategic-thinking) — Mental models & decision frameworks
 
 ---
 

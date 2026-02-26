@@ -1,848 +1,901 @@
-# Fitness & Performance Engine
+# Fitness & Training Engineering
 
-Complete training, nutrition, recovery, and body composition system. From beginner to competitive athlete — periodized programming, macro tracking, injury prevention, and race preparation. Zero dependencies.
+> Complete periodized training system — program design, progressive overload, recovery optimization, body composition, and race prep. Works for any goal: strength, hypertrophy, endurance, hybrid (Hyrox/CrossFit), or general fitness. Zero dependencies.
+
+## Quick Health Check
+
+Run `/fitness-check` on any training program. Score each signal 0–2:
+
+| # | Signal | 0 (Red) | 1 (Yellow) | 2 (Green) |
+|---|--------|---------|------------|-----------|
+| 1 | Progressive overload | No tracking, random weights | Some tracking, inconsistent | Logged every session, planned progression |
+| 2 | Program structure | No plan, different every day | Loosely follows a split | Periodized with mesocycles |
+| 3 | Recovery management | <6h sleep, no rest days | Some rest, inconsistent sleep | 7-9h sleep, planned deloads |
+| 4 | Nutrition alignment | No macro awareness | Tracks sometimes | Protein target hit daily |
+| 5 | Movement quality | Pain during lifts, no warmup | Occasional warmup, some issues | Full warmup, pain-free movement |
+| 6 | Balance | All push, no pull; all upper, no lower | Minor imbalances | Push/pull/legs balanced, mobility included |
+| 7 | Consistency | <2x/week or constantly changing | 3x/week with gaps | 3-6x/week sustained >8 weeks |
+| 8 | Goal specificity | No clear goal | Vague goal ("get fit") | SMART goal with timeline |
+
+**Score: /16** → 0-5: Complete redesign needed | 6-10: Fix gaps first | 11-14: Optimize details | 15-16: Elite — maintain and periodize
 
 ---
 
-## 1. Athlete Profile Brief
+## Phase 1: Athlete Assessment
 
-Before any programming, build the profile:
+### Training Brief YAML
 
 ```yaml
-athlete_profile:
+athlete_brief:
   name: ""
-  age:
-  sex: # M/F
-  height_cm:
-  weight_kg:
-  body_fat_pct: # estimate if unknown
-  training_age_years: # how long they've been training consistently
-  experience_level: # beginner (<1yr) | intermediate (1-3yr) | advanced (3-7yr) | elite (7+yr)
+  age: 0
+  sex: "M/F"
+  height_cm: 0
+  weight_kg: 0
+  body_fat_pct: 0  # estimate if unknown
+  training_age_years: 0  # years of consistent training
   
   goals:
-    primary: # e.g., "lose 10kg fat", "run sub-3hr marathon", "bench 140kg", "complete Hyrox"
-    secondary: # e.g., "improve energy", "build muscle", "injury prevention"
-    timeline: # weeks/months to primary goal
-    
+    primary: ""  # strength / hypertrophy / fat loss / endurance / hybrid / general fitness
+    secondary: ""
+    target_event: ""  # e.g., "Hyrox London — June 2026"
+    timeline_weeks: 0
+  
   current_training:
-    days_per_week:
-    session_duration_min:
-    modalities: [] # strength, running, cycling, swimming, HIIT, yoga, sports
-    current_program: # if any
-    
+    frequency_per_week: 0
+    session_duration_min: 0
+    current_program: ""
+    training_history: ""  # brief summary of last 6-12 months
+  
+  benchmarks:  # current 1RM or best effort
+    squat_kg: 0
+    bench_kg: 0
+    deadlift_kg: 0
+    overhead_press_kg: 0
+    pull_ups: 0
+    run_5k_min: 0
+    run_10k_min: 0
+    row_1000m_sec: 0
+  
   constraints:
-    injuries: [] # e.g., "left shoulder impingement", "knee meniscus tear 2023"
-    equipment: # home gym, commercial gym, outdoor only, minimal
-    schedule_restrictions: # e.g., "can only train mornings", "travel Tue-Thu"
-    dietary: [] # vegetarian, vegan, halal, allergies, intolerances
-    
-  health:
-    sleep_avg_hours:
-    stress_level: # 1-10 (10 = extremely stressed)
-    medications: [] # relevant ones only
-    conditions: [] # e.g., "asthma", "type 2 diabetes", "hypertension"
-    
-  metrics:
-    resting_hr:
-    max_hr: # tested or 220-age estimate
-    hr_zones: # if known
-    1rm: # key lifts if applicable
-      squat:
-      bench:
-      deadlift:
-      ohp:
-    run_benchmarks:
-      mile:
-      5k:
-      10k:
-      half_marathon:
-      marathon:
+    injuries: []
+    equipment_available: ""  # full gym / home gym / bodyweight / limited
+    schedule_constraints: ""
+    nutrition_approach: ""  # tracking macros / intuitive / specific diet
+  
+  lifestyle:
+    sleep_hours: 0
+    stress_level: "low/moderate/high"
+    occupation_activity: "sedentary/light/moderate/active"
+    steps_per_day: 0
 ```
 
-### Experience Level Auto-Detection
+### Training Age Classification
 
-| Signal | Beginner | Intermediate | Advanced | Elite |
-|--------|----------|-------------|----------|-------|
-| Training age | <1 year | 1-3 years | 3-7 years | 7+ years |
-| Squat (M) | <1x BW | 1-1.5x BW | 1.5-2x BW | >2x BW |
-| Squat (F) | <0.75x BW | 0.75-1.25x BW | 1.25-1.75x BW | >1.75x BW |
-| 5K time (M) | >30 min | 22-30 min | 18-22 min | <18 min |
-| 5K time (F) | >35 min | 25-35 min | 20-25 min | <20 min |
-| Recovery needs | 48-72h/muscle | 48h/muscle | 24-48h/muscle | Manages load intuitively |
-| Programming needs | Linear progression | Periodized blocks | Advanced periodization | Self-programmed |
+| Level | Training Age | Characteristics | Progression Rate |
+|-------|-------------|-----------------|-----------------|
+| Beginner | 0-12 months | Rapid neural adaptation, learning movement patterns | 2-5 kg/week on compounds |
+| Intermediate | 1-3 years | Slower gains, needs periodization | 1-2 kg/month on compounds |
+| Advanced | 3-7 years | Marginal gains, advanced programming required | 1-5 kg per training block |
+| Elite | 7+ years | Near genetic ceiling, micro-periodization | Competition-cycle gains only |
+
+### Goal-Specific Focus
+
+| Goal | Volume Priority | Intensity Priority | Cardio | Nutrition |
+|------|----------------|-------------------|--------|-----------|
+| Strength | Moderate (3-5 sets) | High (80-95% 1RM) | Minimal | Surplus or maintenance |
+| Hypertrophy | High (10-20 sets/muscle/week) | Moderate (60-80% 1RM) | Low-moderate | Surplus (+300-500 cal) |
+| Fat loss | Moderate-high (maintain muscle) | Moderate-high (keep strength) | Moderate-high | Deficit (-300-500 cal) |
+| Endurance | Low-moderate (2-3 strength sessions) | Moderate | High priority | Maintenance or slight surplus |
+| Hybrid (Hyrox) | Moderate | Moderate | High — mixed modalities | Maintenance to slight surplus |
+| General fitness | Moderate | Moderate | Moderate | Maintenance |
 
 ---
 
-## 2. Goal-Based Program Selection
-
-### Program Decision Matrix
-
-| Goal | Best Approach | Sessions/Week | Duration | Key Metric |
-|------|--------------|---------------|----------|------------|
-| Fat loss | Caloric deficit + resistance + LISS | 4-5 | 12-16 weeks | Body fat %, waist cm |
-| Muscle gain | Progressive overload + surplus | 4-6 | 12-20 weeks | Lean mass, 1RM |
-| Strength | Heavy compounds + peaking | 3-5 | 8-16 weeks | 1RM / Wilks |
-| Endurance (5K-marathon) | Polarized training 80/20 | 4-6 | 12-20 weeks | Race time |
-| Hyrox / hybrid | Concurrent strength + running | 5-6 | 16-24 weeks | Total Hyrox time |
-| General fitness | Balanced strength + cardio | 3-4 | Ongoing | Subjective energy, metrics |
-| Body recomp | Maintenance cals + high protein + resistance | 4-5 | 16-24 weeks | Mirror, measurements |
-| Sport-specific | Periodized around season | 4-6 | Season-length | Sport performance |
-| Injury rehab | Progressive loading + mobility | 3-5 | 6-12 weeks | Pain-free ROM |
+## Phase 2: Program Architecture
 
 ### Periodization Models
 
-**Linear Periodization** (beginners):
-- Week 1-4: Hypertrophy (3×12 @ 65-70%)
-- Week 5-8: Strength (4×6 @ 75-82%)
-- Week 9-12: Power (5×3 @ 85-92%)
-- Week 13: Deload (2×8 @ 50%)
+| Model | Best For | Structure | When to Use |
+|-------|---------|-----------|-------------|
+| Linear | Beginners | Increase load weekly | First 6-12 months |
+| Undulating (DUP) | Intermediate | Vary rep ranges within week | Stalling on linear |
+| Block | Advanced | 3-4 week focused blocks | Peaking for competition |
+| Conjugate | Advanced strength | Max effort + dynamic effort rotation | Powerlifting focus |
+| Hybrid periodization | Hybrid athletes | Concurrent strength + cardio blocks | Hyrox, CrossFit, OCR |
 
-**Undulating Periodization** (intermediate+):
-- Monday: Heavy (5×5 @ 80-85%)
-- Wednesday: Moderate (3×10 @ 70%)
-- Friday: Light/Speed (4×3 @ 60% explosive)
+### Mesocycle Template YAML
 
-**Block Periodization** (advanced):
-- Block 1 (3-4 weeks): Accumulation — high volume, moderate intensity
-- Block 2 (3-4 weeks): Transmutation — moderate volume, high intensity
-- Block 3 (2-3 weeks): Realization — low volume, peak intensity
-- Deload: 1 week between blocks
+```yaml
+mesocycle:
+  name: "Hypertrophy Block 1"
+  duration_weeks: 4
+  goal: "hypertrophy"
+  
+  week_1:  # Introductory
+    intensity_rpe: "6-7"
+    volume_modifier: 0.85  # 85% of peak volume
+    notes: "Focus on technique, establish baseline"
+  
+  week_2:  # Building
+    intensity_rpe: "7-8"
+    volume_modifier: 0.95
+    notes: "Push volume up"
+  
+  week_3:  # Overreaching
+    intensity_rpe: "8-9"
+    volume_modifier: 1.0  # Peak volume
+    notes: "Hardest week — expect fatigue"
+  
+  week_4:  # Deload
+    intensity_rpe: "5-6"
+    volume_modifier: 0.60
+    notes: "Cut volume 40%, maintain intensity, recover"
+  
+  progression_rule: "Add 2.5kg to compounds or 1-2 reps at same weight"
+  deload_frequency: "Every 4th week (beginners: every 6-8 weeks)"
+```
 
-**Polarized (endurance)** — 80/20 rule:
-- 80% of training at Zone 1-2 (easy, conversational)
-- 20% at Zone 4-5 (hard intervals)
-- Almost no Zone 3 ("grey zone") — it's too hard to recover from but too easy to improve
+### Training Split Selection
+
+| Split | Frequency | Best For | Sessions/Week |
+|-------|-----------|---------|---------------|
+| Full Body | 3x/week | Beginners, time-limited | 3 |
+| Upper/Lower | 4x/week | Intermediates, balanced | 4 |
+| Push/Pull/Legs | 5-6x/week | Intermediates-advanced, hypertrophy | 5-6 |
+| Bro Split | 5x/week | Advanced bodybuilding | 5 |
+| Upper/Lower + Conditioning | 5x/week | Hybrid athletes | 3 lifting + 2 conditioning |
+| Concurrent | 5-6x/week | Hyrox/OCR/CrossFit | Mixed daily |
+
+**Selection Rules:**
+1. Beginners: Full body 3x/week. Always.
+2. If <4 days available: Full body or upper/lower
+3. If hypertrophy focus: PPL or upper/lower for volume
+4. If hybrid/endurance: Upper/lower + dedicated conditioning days
+5. Recovery capacity determines frequency — more isn't always better
 
 ---
 
-## 3. Training Program Templates
+## Phase 3: Exercise Selection & Programming
 
-### 3A. Strength Program (Upper/Lower 4-Day)
+### Movement Pattern Requirements
+
+Every program MUST include these patterns weekly:
+
+| Pattern | Primary Exercises | Alternatives (limited equipment) |
+|---------|------------------|----------------------------------|
+| Horizontal Push | Bench press, dumbbell press | Push-ups, floor press |
+| Horizontal Pull | Barbell row, cable row | Inverted rows, resistance band rows |
+| Vertical Push | Overhead press, dumbbell shoulder press | Pike push-ups, handstand push-ups |
+| Vertical Pull | Pull-ups, lat pulldown | Band pull-ups, doorframe rows |
+| Squat | Back squat, front squat, goblet squat | Pistol squats, Bulgarian split squats |
+| Hinge | Deadlift, Romanian deadlift, hip thrust | Single-leg RDL, KB swings |
+| Carry/Core | Farmer walks, pallof press, hanging leg raise | Plank variations, dead bugs |
+| Lunge/Single-leg | Walking lunges, step-ups | Bodyweight lunges, single-leg glute bridge |
+
+### Rep Range Guide
+
+| Goal | Reps | Sets/Exercise | Rest | RPE Target |
+|------|------|--------------|------|------------|
+| Strength | 1-5 | 3-5 | 3-5 min | 8-9.5 |
+| Hypertrophy | 6-12 | 3-4 | 60-120 sec | 7-9 |
+| Muscular endurance | 12-20+ | 2-3 | 30-60 sec | 7-8 |
+| Power | 1-5 | 3-5 | 3-5 min | 7-8 (explosive) |
+
+### RPE Scale Reference
+
+| RPE | Description | Reps in Reserve |
+|-----|-------------|----------------|
+| 10 | Maximum effort, cannot do another rep | 0 RIR |
+| 9 | Could maybe do 1 more | 1 RIR |
+| 8 | Could do 2 more | 2 RIR |
+| 7 | Could do 3 more, moderate effort | 3 RIR |
+| 6 | Light, warmup weight feel | 4+ RIR |
+
+### Progressive Overload Methods (Priority Order)
+
+1. **Add reps** — Hit top of rep range? Add 1-2 reps next session
+2. **Add weight** — Hit top of rep range for all sets? Add 2.5-5 kg
+3. **Add sets** — Within weekly volume targets? Add 1 set
+4. **Increase ROM** — Deficit deadlifts, paused squats, deeper squats
+5. **Decrease rest** — Only for conditioning/endurance goals
+6. **Increase tempo** — Slower eccentrics (3-4 sec) for hypertrophy
+7. **Increase frequency** — Train muscle group more often within recovery limits
+
+### Weekly Volume Landmarks (Sets Per Muscle Group Per Week)
+
+| Muscle Group | MEV (Minimum) | MAV (Maximum Adaptive) | MRV (Maximum Recoverable) |
+|-------------|---------------|----------------------|--------------------------|
+| Chest | 8 | 12-16 | 20-22 |
+| Back | 8 | 12-18 | 20-25 |
+| Shoulders | 6 | 10-14 | 18-20 |
+| Quads | 6 | 10-16 | 18-20 |
+| Hamstrings | 4 | 8-12 | 14-16 |
+| Biceps | 4 | 8-14 | 16-20 |
+| Triceps | 4 | 8-12 | 14-18 |
+| Glutes | 4 | 8-14 | 16-20 |
+| Calves | 6 | 10-14 | 16-20 |
+| Abs | 0 | 6-10 | 14-16 |
+
+**Rules:**
+- Start at MEV, add 1-2 sets/muscle/week across mesocycle
+- When gains stall, check if approaching MRV (fatigue masking gains)
+- Deload resets fatigue — return to MEV and progress again
+- Compounds count toward multiple muscle groups (bench = chest + triceps + shoulders)
+
+---
+
+## Phase 4: Sample Programs
+
+### Beginner Full Body (3x/week)
 
 ```yaml
-week_template:
-  monday: # Upper A — Strength Focus
-    - exercise: Barbell Bench Press
-      sets: 4
-      reps: 5
-      intensity: "80-85% 1RM"
-      rest: "3 min"
-    - exercise: Barbell Row
-      sets: 4
-      reps: 6
-      intensity: "75-80%"
-      rest: "2-3 min"
-    - exercise: Overhead Press
-      sets: 3
-      reps: 8
-      intensity: "70-75%"
-      rest: "2 min"
-    - exercise: Weighted Pull-ups
-      sets: 3
-      reps: 6-8
-      rest: "2 min"
-    - exercise: Face Pulls
-      sets: 3
-      reps: 15
-      rest: "60s"
-    - exercise: Tricep Dips
-      sets: 3
-      reps: 8-12
-      rest: "90s"
-
-  tuesday: # Lower A — Strength Focus
-    - exercise: Back Squat
-      sets: 4
-      reps: 5
-      intensity: "80-85%"
-      rest: "3-4 min"
-    - exercise: Romanian Deadlift
-      sets: 3
-      reps: 8
-      intensity: "70-75%"
-      rest: "2-3 min"
-    - exercise: Bulgarian Split Squat
-      sets: 3
-      reps: 10/leg
-      rest: "90s"
-    - exercise: Leg Curl
-      sets: 3
-      reps: 12
-      rest: "60s"
-    - exercise: Calf Raises
-      sets: 4
-      reps: 15
-      rest: "60s"
-    - exercise: Ab Wheel Rollout
-      sets: 3
-      reps: 10
-      rest: "60s"
-
-  thursday: # Upper B — Hypertrophy Focus
-    - exercise: Incline Dumbbell Press
-      sets: 4
-      reps: 10
-      intensity: "RPE 7-8"
-      rest: "2 min"
-    - exercise: Cable Row
-      sets: 4
-      reps: 10
-      rest: "90s"
-    - exercise: Lateral Raises
-      sets: 4
-      reps: 15
-      rest: "60s"
-    - exercise: Chin-ups
-      sets: 3
-      reps: 8-12
-      rest: "90s"
-    - exercise: Incline Curl + Overhead Tricep Extension (superset)
-      sets: 3
-      reps: 12
-      rest: "60s"
-
-  friday: # Lower B — Hypertrophy Focus
-    - exercise: Trap Bar Deadlift
-      sets: 4
-      reps: 8
-      intensity: "RPE 7-8"
-      rest: "3 min"
-    - exercise: Front Squat
-      sets: 3
-      reps: 8
-      rest: "2-3 min"
-    - exercise: Hip Thrust
-      sets: 3
-      reps: 12
-      rest: "90s"
-    - exercise: Leg Extension + Leg Curl (superset)
-      sets: 3
-      reps: 12
-      rest: "60s"
-    - exercise: Standing Calf Raise
-      sets: 4
-      reps: 12
-      rest: "60s"
-    - exercise: Hanging Leg Raise
-      sets: 3
-      reps: 12
-      rest: "60s"
+program:
+  name: "Beginner Full Body"
+  level: "beginner"
+  frequency: "3x/week (Mon/Wed/Fri)"
+  duration: "12 weeks"
+  
+  day_a:
+    name: "Full Body A"
+    exercises:
+      - { name: "Barbell Back Squat", sets: 3, reps: "5", progression: "+2.5kg/session" }
+      - { name: "Bench Press", sets: 3, reps: "5", progression: "+2.5kg/session" }
+      - { name: "Barbell Row", sets: 3, reps: "8", progression: "+2.5kg/session" }
+      - { name: "Dumbbell Shoulder Press", sets: 3, reps: "10", progression: "+1kg when 3x10" }
+      - { name: "Plank", sets: 3, reps: "30-60 sec", progression: "+10 sec/week" }
+  
+  day_b:
+    name: "Full Body B"
+    exercises:
+      - { name: "Deadlift", sets: 3, reps: "5", progression: "+5kg/session" }
+      - { name: "Overhead Press", sets: 3, reps: "5", progression: "+2.5kg/session" }
+      - { name: "Pull-ups (or lat pulldown)", sets: 3, reps: "AMRAP (or 8-10)", progression: "add reps → add weight" }
+      - { name: "Romanian Deadlift", sets: 3, reps: "10", progression: "+2.5kg when 3x10" }
+      - { name: "Hanging Leg Raise", sets: 3, reps: "10", progression: "+2 reps/week" }
+  
+  alternation: "A/B/A then B/A/B"
+  warmup: "5 min cardio + movement-specific warmup sets"
+  session_duration: "45-60 min"
 ```
 
-### 3B. Running Program (5K → Half Marathon)
-
-**12-Week Base Building Phase:**
-
-| Week | Easy Runs | Long Run | Intervals | Total km |
-|------|-----------|----------|-----------|----------|
-| 1-2 | 3 × 5km | 8km | — | 23km |
-| 3-4 | 3 × 6km | 10km | 1 × 6×400m | 30km |
-| 5-6 | 3 × 7km | 12km | 1 × 5×800m | 35km |
-| 7-8 | 3 × 7km | 14km | 1 × 4×1km | 39km |
-| 9-10 | 3 × 8km | 16km | 1 × 3×1.6km | 43km |
-| 11 | 3 × 8km | 18km | 1 × 6×800m | 46km |
-| 12 | 2 × 6km | 10km | 1 × 4×400m | 28km (taper) |
-
-**Heart Rate Zone Training:**
-
-| Zone | % Max HR | Feel | Purpose | Weekly % |
-|------|----------|------|---------|----------|
-| Z1 Recovery | 50-60% | Very easy, can chat freely | Active recovery | 10-15% |
-| Z2 Aerobic | 60-70% | Comfortable, can hold conversation | Base building | 60-70% |
-| Z3 Tempo | 70-80% | Uncomfortable, short sentences only | Lactate threshold | 5-10% |
-| Z4 Threshold | 80-90% | Hard, few words | VO2max, speed | 10-15% |
-| Z5 Max | 90-100% | All-out, can't talk | Race pace, sprints | 0-5% |
-
-### 3C. Hyrox / Hybrid Program (16-Week)
+### Intermediate Upper/Lower (4x/week)
 
 ```yaml
-weekly_structure:
-  monday: # Strength — Upper
-    focus: "Push/Pull compounds"
-    duration: "60 min"
-    
-  tuesday: # Running — Intervals
-    focus: "VO2max or tempo"
-    session: "8×400m @ 5K pace, 90s rest"
-    duration: "45 min"
-    
-  wednesday: # Hyrox Stations
-    focus: "2-3 stations practiced"
+program:
+  name: "Intermediate Upper/Lower"
+  level: "intermediate"
+  frequency: "4x/week"
+  structure: "Upper A / Lower A / Rest / Upper B / Lower B / Rest / Rest"
+  
+  upper_a:  # Strength emphasis
+    name: "Upper Strength"
+    exercises:
+      - { name: "Bench Press", sets: 4, reps: "4-6", rpe: 8 }
+      - { name: "Weighted Pull-ups", sets: 4, reps: "4-6", rpe: 8 }
+      - { name: "DB Shoulder Press", sets: 3, reps: "8-10", rpe: 8 }
+      - { name: "Cable Row", sets: 3, reps: "8-10", rpe: 8 }
+      - { name: "Lateral Raises", sets: 3, reps: "12-15", rpe: 8 }
+      - { name: "Tricep Pushdowns", sets: 3, reps: "10-12", rpe: 8 }
+      - { name: "Barbell Curls", sets: 3, reps: "10-12", rpe: 8 }
+  
+  lower_a:  # Quad emphasis
+    name: "Lower Quad Focus"
+    exercises:
+      - { name: "Back Squat", sets: 4, reps: "4-6", rpe: 8 }
+      - { name: "Romanian Deadlift", sets: 3, reps: "8-10", rpe: 8 }
+      - { name: "Leg Press", sets: 3, reps: "10-12", rpe: 8 }
+      - { name: "Walking Lunges", sets: 3, reps: "10/leg", rpe: 7 }
+      - { name: "Leg Curl", sets: 3, reps: "10-12", rpe: 8 }
+      - { name: "Calf Raises", sets: 4, reps: "12-15", rpe: 8 }
+      - { name: "Pallof Press", sets: 3, reps: "10/side", rpe: 7 }
+  
+  upper_b:  # Volume emphasis
+    name: "Upper Hypertrophy"
+    exercises:
+      - { name: "Overhead Press", sets: 4, reps: "6-8", rpe: 8 }
+      - { name: "Lat Pulldown", sets: 4, reps: "8-10", rpe: 8 }
+      - { name: "Incline DB Press", sets: 3, reps: "10-12", rpe: 8 }
+      - { name: "Chest-Supported Row", sets: 3, reps: "10-12", rpe: 8 }
+      - { name: "Face Pulls", sets: 3, reps: "15-20", rpe: 7 }
+      - { name: "Hammer Curls", sets: 3, reps: "10-12", rpe: 8 }
+      - { name: "Overhead Tricep Ext", sets: 3, reps: "10-12", rpe: 8 }
+  
+  lower_b:  # Posterior emphasis
+    name: "Lower Posterior Focus"
+    exercises:
+      - { name: "Deadlift", sets: 4, reps: "3-5", rpe: 8 }
+      - { name: "Front Squat", sets: 3, reps: "6-8", rpe: 8 }
+      - { name: "Hip Thrust", sets: 3, reps: "8-10", rpe: 8 }
+      - { name: "Bulgarian Split Squat", sets: 3, reps: "8/leg", rpe: 8 }
+      - { name: "Nordic Curl (or leg curl)", sets: 3, reps: "6-10", rpe: 8 }
+      - { name: "Standing Calf Raise", sets: 4, reps: "10-12", rpe: 8 }
+      - { name: "Ab Wheel Rollout", sets: 3, reps: "8-12", rpe: 7 }
+```
+
+### Hyrox Training Program (5x/week)
+
+```yaml
+program:
+  name: "Hyrox 12-Week Prep"
+  level: "intermediate-advanced"
+  frequency: "5x/week"
+  structure: "Strength / Run + Stations / Active Recovery / Strength / Long Run + Stations"
+  
+  day_1:  # Monday — Strength
+    name: "Functional Strength"
+    exercises:
+      - { name: "Back Squat", sets: 4, reps: "5", rpe: 8 }
+      - { name: "Bench Press", sets: 4, reps: "5", rpe: 8 }
+      - { name: "Weighted Pull-ups", sets: 4, reps: "6-8", rpe: 8 }
+      - { name: "Farmer Walks", sets: 4, reps: "40m", weight: "32kg/hand" }
+      - { name: "KB Swings", sets: 3, reps: "20", weight: "24kg" }
+      - { name: "Sled Push", sets: 4, reps: "25m", rest: "90 sec" }
+  
+  day_2:  # Tuesday — Run + Stations
+    name: "Race Simulation (Short)"
+    warmup: "10 min easy jog"
+    workout:
+      - { segment: "Run", distance: "1km", pace: "race pace" }
+      - { station: "Ski Erg", distance: "1000m" }
+      - { segment: "Run", distance: "1km", pace: "race pace" }
+      - { station: "Sled Push", distance: "50m" }
+      - { segment: "Run", distance: "1km", pace: "race pace" }
+      - { station: "Burpee Broad Jumps", reps: 80 }
+      - { segment: "Run", distance: "1km", pace: "race pace" }
+    cooldown: "10 min easy jog + stretch"
+  
+  day_3:  # Wednesday — Active Recovery
+    name: "Recovery"
+    workout:
+      - { name: "Easy jog or walk", duration: "30-40 min", hr: "Zone 1-2" }
+      - { name: "Foam rolling", duration: "15 min" }
+      - { name: "Mobility work", duration: "15 min" }
+  
+  day_4:  # Thursday — Strength + Power
+    name: "Power Endurance"
+    exercises:
+      - { name: "Deadlift", sets: 4, reps: "5", rpe: 8 }
+      - { name: "Overhead Press", sets: 4, reps: "5", rpe: 8 }
+      - { name: "Wall Balls", sets: 5, reps: "20", rest: "60 sec" }
+      - { name: "Rowing Intervals", sets: 8, reps: "250m", rest: "60 sec" }
+      - { name: "Lunges (weighted)", sets: 4, reps: "20m", weight: "16kg/hand" }
+      - { name: "Sled Pull", sets: 4, reps: "25m", rest: "90 sec" }
+  
+  day_5:  # Saturday — Long Run + Stations
+    name: "Race Simulation (Full)"
+    warmup: "10 min easy jog"
+    workout:
+      - { segment: "Run", distance: "8km total (1km splits)", pace: "slightly above race pace" }
+      - { note: "Insert one station after each 1km run — rotate through all 8 Hyrox stations" }
     stations_rotation:
-      - "SkiErg 1km + Sled Push 50m"
-      - "Rowing 1km + Farmers Carry 200m"
-      - "Burpee Broad Jumps 80m + Wall Balls 100"
-      - "Sandbag Lunges 200m + Sled Pull 50m"
-    duration: "45-60 min"
-    
-  thursday: # Strength — Lower
-    focus: "Squat/Hinge + single leg"
-    duration: "60 min"
-    
-  friday: # Running — Easy + Strides
-    focus: "Zone 2 easy + 6×100m strides"
-    duration: "40-50 min"
-    
-  saturday: # Long Session — Hyrox Simulation
-    focus: "Partial or full simulation"
-    session: "4 stations with 1km runs between"
-    duration: "60-90 min"
-    
-  sunday: # Recovery
-    focus: "Active recovery or complete rest"
-    options: "Walk, swim, yoga, mobility"
+      - "Ski Erg 1000m"
+      - "Sled Push 50m"
+      - "Sled Pull 50m"
+      - "Burpee Broad Jumps 80m"
+      - "Rowing 1000m"
+      - "Farmer Carry 200m"
+      - "Sandbag Lunges 100m"
+      - "Wall Balls 100 reps"
+    cooldown: "15 min easy jog + full stretch"
+
+  hyrox_station_standards:
+    ski_erg: "1000m"
+    sled_push: "50m (152kg men / 102kg women)"
+    sled_pull: "50m (103kg men / 78kg women)"
+    burpee_broad_jumps: "80m"
+    rowing: "1000m"
+    farmer_carry: "200m (24kg men / 16kg women per hand)"
+    sandbag_lunges: "100m (20kg men / 10kg women)"
+    wall_balls: "100 reps (6kg men / 4kg women, 2.75m/2.44m target)"
+  
+  periodization_12_weeks:
+    weeks_1_4: "Base building — 70% effort, technique focus, build run volume"
+    weeks_5_8: "Intensity building — race pace intervals, full station practice"
+    weeks_9_11: "Peak — race simulations, reduce volume, sharpen speed"
+    week_12: "Taper — 50% volume, stay sharp, race day"
 ```
 
 ---
 
-## 4. Progressive Overload Rules
+## Phase 5: Running & Cardio Programming
 
-### Strength Progression
+### Heart Rate Zones
 
-| Level | Progression Rate | Method |
-|-------|-----------------|--------|
-| Beginner | +2.5kg/session (upper), +5kg/session (lower) | Linear |
-| Intermediate | +2.5kg/week or +1 rep/session | Double progression |
-| Advanced | +2.5-5kg/mesocycle (3-4 weeks) | Block periodization |
+| Zone | % Max HR | RPE | Purpose | Duration |
+|------|---------|-----|---------|----------|
+| Zone 1 | 50-60% | 2-3 | Recovery, warmup | Unlimited |
+| Zone 2 | 60-70% | 4-5 | Aerobic base (80% of training) | 30-90+ min |
+| Zone 3 | 70-80% | 6-7 | Tempo, threshold | 20-40 min |
+| Zone 4 | 80-90% | 8-9 | VO2max intervals | 3-8 min intervals |
+| Zone 5 | 90-100% | 10 | Sprint, anaerobic | 10-60 sec intervals |
 
-**Double Progression Protocol:**
-1. Set a rep range (e.g., 3×8-12)
-2. Start at bottom of range with challenging weight
-3. Add 1 rep per session until top of range on all sets
-4. Increase weight by 2.5-5kg, drop back to bottom of range
-5. Repeat
+**Max HR estimate:** 220 - age (rough) or 208 - (0.7 × age) (more accurate)
 
-**When Progress Stalls (>2 weeks no improvement):**
-1. Check recovery first (sleep, nutrition, stress)
-2. Deload for 1 week (50% volume)
-3. Change rep scheme (switch from 5×5 to 3×8)
-4. Swap exercise variation (flat bench → incline)
-5. If still stalled after 4 weeks: change program
+### 80/20 Rule
 
-### Endurance Progression
+- 80% of running volume in Zone 1-2 (easy, conversational pace)
+- 20% in Zone 3-5 (hard efforts)
+- Violating this is the #1 mistake recreational runners make
+- Easy runs should feel embarrassingly slow
 
-- **10% Rule**: Increase weekly volume by no more than 10%
-- **3-week build, 1-week back-off** cycle
-- Never increase intensity AND volume in the same week
-- Add a new run day only after current days feel sustainable for 3+ weeks
+### Running Progression Rules
 
----
+1. **10% rule:** Increase weekly mileage by max 10%/week
+2. **3-week build, 1-week back:** Build for 3 weeks, reduce 20-30% on 4th
+3. **Long run:** Max 30% of weekly volume in one run
+4. **Easy pace test:** Can hold full conversation? That's Zone 2.
+5. **Speed work:** Only after 4+ weeks of consistent base building
 
-## 5. Nutrition Framework
+### Conditioning Modalities for Hybrid Athletes
 
-### Calorie Targets
-
-**Step 1 — BMR (Mifflin-St Jeor):**
-- Male: BMR = (10 × weight_kg) + (6.25 × height_cm) - (5 × age) + 5
-- Female: BMR = (10 × weight_kg) + (6.25 × height_cm) - (5 × age) - 161
-
-**Step 2 — TDEE (Activity Multiplier):**
-
-| Activity | Multiplier | Description |
-|----------|-----------|-------------|
-| Sedentary | 1.2 | Desk job, no exercise |
-| Light | 1.375 | 1-3 days/week |
-| Moderate | 1.55 | 3-5 days/week |
-| Active | 1.725 | 6-7 days/week |
-| Very Active | 1.9 | 2x/day or physical job + training |
-
-**Step 3 — Goal Adjustment:**
-
-| Goal | Calorie Target | Rate | Duration |
-|------|---------------|------|----------|
-| Aggressive cut | TDEE - 750 | ~0.7kg/week | 8-12 weeks max |
-| Moderate cut | TDEE - 500 | ~0.5kg/week | 12-16 weeks |
-| Slow cut (preserve muscle) | TDEE - 300 | ~0.3kg/week | 16-24 weeks |
-| Maintenance | TDEE | — | Ongoing |
-| Lean bulk | TDEE + 200-300 | ~0.25kg/week | 16-24 weeks |
-| Aggressive bulk | TDEE + 500 | ~0.5kg/week | 12-16 weeks |
-| Recomp | TDEE (± 100) | Scale stable | 24+ weeks |
-
-### Macronutrient Targets
-
-| Macro | Fat Loss | Muscle Gain | Endurance | Maintenance |
-|-------|----------|-------------|-----------|-------------|
-| Protein | 2.0-2.4g/kg | 1.8-2.2g/kg | 1.4-1.8g/kg | 1.6-2.0g/kg |
-| Fat | 0.8-1.0g/kg | 0.8-1.2g/kg | 1.0-1.2g/kg | 0.8-1.2g/kg |
-| Carbs | Remainder | Remainder | Remainder (prioritize) | Remainder |
-
-**Protein Rules:**
-- Spread across 3-5 meals (30-50g per meal for muscle protein synthesis)
-- Within 2 hours post-training (protein + carbs)
-- Before bed: slow protein (casein, Greek yogurt) if optimizing
-- Minimum per meal: 0.4g/kg bodyweight
-
-**Carb Timing for Performance:**
-- Pre-workout (1-2h before): 1-2g/kg — oats, rice, banana
-- Intra-workout (>90 min sessions): 30-60g/hr — sports drink, gels
-- Post-workout (within 1h): 1-1.5g/kg — rice, potato, fruit
-- Rest of day: distribute evenly
-
-### Meal Planning Template
-
-```yaml
-meal_plan:
-  meal_1_breakfast:
-    time: "07:00"
-    example: "3 eggs + 2 toast + avocado + fruit"
-    protein_g: 25
-    carbs_g: 45
-    fat_g: 20
-    calories: 460
-
-  meal_2_lunch:
-    time: "12:00"
-    example: "Chicken breast 200g + rice 150g (dry) + vegetables + olive oil"
-    protein_g: 50
-    carbs_g: 55
-    fat_g: 15
-    calories: 555
-
-  meal_3_pre_workout:
-    time: "15:30"
-    example: "Greek yogurt 200g + banana + honey + oats 40g"
-    protein_g: 25
-    carbs_g: 60
-    fat_g: 5
-    calories: 385
-
-  meal_4_post_workout:
-    time: "18:30"
-    example: "Salmon 200g + sweet potato 250g + broccoli"
-    protein_g: 45
-    carbs_g: 50
-    fat_g: 18
-    calories: 540
-
-  meal_5_evening:
-    time: "21:00"
-    example: "Casein shake + peanut butter + berries"
-    protein_g: 35
-    carbs_g: 15
-    fat_g: 12
-    calories: 310
-
-  daily_totals:
-    protein_g: 180
-    carbs_g: 225
-    fat_g: 70
-    calories: 2250
-```
-
-### Supplement Stack (Evidence-Based Only)
-
-| Supplement | Dose | Timing | Evidence Level | Purpose |
-|-----------|------|--------|---------------|---------|
-| Creatine monohydrate | 5g/day | Any time | ⭐⭐⭐⭐⭐ | Strength, power, lean mass |
-| Caffeine | 3-6mg/kg | 30-60 min pre-workout | ⭐⭐⭐⭐⭐ | Performance, focus |
-| Vitamin D3 | 2000-5000 IU | With fat-containing meal | ⭐⭐⭐⭐ | Immune, bone, mood (if deficient) |
-| Omega-3 (EPA/DHA) | 2-3g combined | With meal | ⭐⭐⭐⭐ | Inflammation, recovery |
-| Magnesium | 200-400mg | Before bed | ⭐⭐⭐⭐ | Sleep, recovery, cramping |
-| Whey protein | As needed | Post-workout or meals | ⭐⭐⭐⭐ | Convenience, hitting protein target |
-| Electrolytes | As needed | During long sessions | ⭐⭐⭐ | Hydration (>60 min or heat) |
-
-**Skip these** (weak/no evidence for healthy people): BCAAs (if eating enough protein), testosterone boosters, fat burners, glutamine.
+| Modality | Muscles | Cardio Benefit | Joint Impact | Hyrox Relevance |
+|----------|---------|---------------|-------------|----------------|
+| Running | Legs, core | High | High | Direct — 8km total |
+| Rowing | Full body | High | Low | Direct — 1000m station |
+| Ski Erg | Upper body, core | High | None | Direct — 1000m station |
+| Assault Bike | Full body | Very high | None | Cross-training |
+| Swimming | Full body | High | None | Active recovery |
+| Cycling | Legs | Moderate-high | None | Zone 2 alternative |
 
 ---
 
-## 6. Recovery & Sleep
+## Phase 6: Recovery & Fatigue Management
 
 ### Recovery Priority Stack
 
-| Priority | Factor | Target | Impact |
-|----------|--------|--------|--------|
-| 1 | Sleep | 7-9 hours | Highest — nothing replaces it |
-| 2 | Nutrition | Hit protein + calories | Fuels adaptation |
-| 3 | Stress management | Daily practice | Cortisol kills gains |
-| 4 | Active recovery | 2-3x/week | Light movement, walking |
-| 5 | Hydration | 0.033L/kg + 500ml/hr training | Often overlooked |
-| 6 | Mobility work | 10-15 min daily | Injury prevention |
-| 7 | Massage/foam rolling | 1-2x/week | Minor benefit, feels good |
-| 8 | Cold/heat exposure | Optional | Marginal, context-dependent |
+| Priority | Method | Impact | Cost | Time |
+|----------|--------|--------|------|------|
+| 1 | Sleep 7-9 hours | ★★★★★ | Free | 7-9h |
+| 2 | Protein 1.6-2.2g/kg | ★★★★★ | $$ | N/A |
+| 3 | Hydration 35-45ml/kg | ★★★★ | Free | N/A |
+| 4 | Deload weeks | ★★★★ | Free | 1 week/4-6 |
+| 5 | Active recovery (Zone 1) | ★★★ | Free | 20-40 min |
+| 6 | Mobility/stretching | ★★★ | Free | 10-15 min |
+| 7 | Foam rolling | ★★ | $ | 10-15 min |
+| 8 | Cold exposure | ★★ | $ | 2-5 min |
+| 9 | Massage | ★★ | $$$ | 60 min |
+| 10 | Compression garments | ★ | $$ | Wear post-session |
 
-### Sleep Optimization Checklist
+**Rules:**
+- Never sacrifice #1-4 for #5-10
+- Cold water immersion: useful for acute recovery between competitions, may blunt hypertrophy if used chronically post-strength training
+- Foam rolling: pre-workout for mobility, post-workout for parasympathetic activation
+- Sleep is the #1 performance enhancer. Period.
 
-- [ ] Consistent bed/wake time (±30 min, even weekends)
-- [ ] Room temperature 16-19°C
-- [ ] Complete darkness (blackout curtains/eye mask)
-- [ ] No screens 30-60 min before bed (or use blue light filter)
-- [ ] No caffeine after 2 PM (or 8-10 hours before bed)
-- [ ] No alcohol within 3 hours of bed (disrupts deep sleep)
-- [ ] Last meal 2-3 hours before bed
-- [ ] Magnesium before bed (glycinate or threonate)
-- [ ] Morning sunlight within 30 min of waking (circadian anchor)
-- [ ] Wind-down routine: reading, stretching, breathing exercises
+### Fatigue Monitoring
+
+```yaml
+daily_readiness:
+  date: "YYYY-MM-DD"
+  sleep_hours: 0
+  sleep_quality: "1-5"  # 1=terrible, 5=great
+  resting_hr: 0  # check first thing in morning
+  hrv: 0  # if tracking
+  muscle_soreness: "1-5"  # 1=none, 5=severe
+  mood_energy: "1-5"  # 1=exhausted, 5=fired up
+  motivation: "1-5"
+  
+  readiness_score: 0  # sum of quality+soreness(inverted)+mood+motivation = /20
+  
+  decision:
+    # 16-20: Full intensity, push hard
+    # 12-15: Normal training
+    # 8-11: Reduce intensity or volume by 20%
+    # 4-7: Active recovery or rest day
+```
 
 ### Deload Protocol
 
-**When to deload** (any 2 of these):
-- Performance declining for 2+ weeks
-- Persistent fatigue, poor sleep, irritability
-- Joint/tendon soreness that doesn't resolve with rest
-- Motivation dropping significantly
-- After 4-6 weeks of hard training (planned)
+| Component | Normal Week | Deload Week |
+|-----------|------------|-------------|
+| Volume (sets) | 100% | 50-60% |
+| Intensity (weight) | Normal | Same or slightly reduce |
+| Frequency | Normal | Same |
+| Cardio volume | Normal | 50-70% |
+| Duration | Normal | Shorter sessions |
 
-**How to deload (pick one):**
-- **Volume deload**: Same weight, 50% fewer sets
-- **Intensity deload**: Same sets/reps, 60% of normal weight
-- **Active recovery week**: Replace training with walking, swimming, yoga
-- **Duration**: 5-7 days
-
-### Overtraining Warning Signs
-
-| Stage | Signals | Action |
-|-------|---------|--------|
-| Overreaching (normal) | Temporary fatigue, slight performance dip | Continue — adaptation coming |
-| Functional overreaching | Fatigue lasting >1 week, motivation dropping | Deload 1 week |
-| Non-functional overreaching | Performance drop >2 weeks, sleep disrupted, mood changes | 2 weeks off, reassess volume |
-| Overtraining syndrome | Chronic fatigue, illness, depression, injury | Medical review, extended rest (months) |
+**When to deload:**
+- Planned: Every 4th week (intermediate), every 6-8th week (beginner)
+- Reactive: 2+ sessions where RPE is higher than expected for same weight
+- Sleep declining, motivation dropping, joint aches increasing
+- Performance plateau for 2+ weeks despite adequate nutrition/sleep
 
 ---
 
-## 7. Injury Prevention & Management
+## Phase 7: Nutrition for Training
 
-### Pre-Workout Warm-Up (10 min)
+### Calorie & Macro Targets
 
-```
-1. General (3 min): Light cardio — rowing, cycling, or brisk walk
-2. Dynamic stretching (3 min):
-   - Leg swings (10/side)
-   - Hip circles (10/side)
-   - Arm circles (10 each direction)
-   - Inchworms (5)
-   - World's greatest stretch (5/side)
-3. Activation (2 min):
-   - Band pull-aparts (15)
-   - Glute bridges (15)
-   - Dead bugs (10/side)
-4. Movement prep (2 min):
-   - Empty bar/light weight sets of first exercise
-   - Ramp up: 50% × 5, 70% × 3, 85% × 1
-```
+**Maintenance TDEE estimate:**
+- Sedentary: BW(kg) × 26-28
+- Lightly active (3x/week): BW(kg) × 30-32
+- Active (5x/week): BW(kg) × 34-36
+- Very active (6x+ hard training): BW(kg) × 38-42
 
-### Common Injury Decision Tree
+**Goal-based adjustments:**
+| Goal | Calorie Adjustment | Protein | Carbs | Fat |
+|------|-------------------|---------|-------|-----|
+| Muscle gain | +300-500 cal | 1.6-2.2 g/kg | 4-7 g/kg | 0.8-1.2 g/kg |
+| Fat loss | -300-500 cal | 2.0-2.4 g/kg | 2-4 g/kg | 0.7-1.0 g/kg |
+| Maintenance | 0 | 1.6-2.0 g/kg | 3-5 g/kg | 0.8-1.2 g/kg |
+| Endurance heavy | +200-400 cal | 1.4-1.8 g/kg | 5-8 g/kg | 0.8-1.0 g/kg |
+| Hybrid (Hyrox) | +0-300 cal | 1.8-2.2 g/kg | 4-6 g/kg | 0.8-1.0 g/kg |
 
-```
-Pain during exercise?
-├── Sharp/acute pain → STOP immediately → RICE → See physio if persists >3 days
-├── Dull ache that warms up → Modify (reduce weight 20%, avoid end-range) → Monitor
-├── Pain only after → Usually DOMS or inflammation → Ice, mobility, reduce volume
-└── Chronic nagging pain (>2 weeks) → See physio → Don't train through it
+### Pre/Intra/Post Workout Nutrition
 
-Joint vs Muscle pain?
-├── Joint: More concerning — reduce load, check form, see professional
-└── Muscle: Usually recoverable — DOMS peaks at 24-72h, persistent = potential strain
-```
+| Timing | What | Why |
+|--------|------|-----|
+| 2-3h pre | Balanced meal (protein + carbs + fat) | Sustained energy |
+| 30-60 min pre | Small snack (carbs + small protein) | Quick fuel, no GI distress |
+| Intra (>60 min session) | 30-60g carbs/hour (sports drink, banana) | Maintain blood glucose |
+| 0-2h post | Protein (30-40g) + carbs (0.8-1g/kg) | Recovery, glycogen replenishment |
 
-### Movement Substitution Table
+### Supplements (Evidence-Based Only)
 
-| If THIS hurts | Try THIS instead |
-|--------------|-----------------|
-| Barbell back squat (low back) | Front squat, goblet squat, leg press |
-| Flat bench press (shoulder) | Floor press, neutral-grip DB press, landmine press |
-| Conventional deadlift (low back) | Trap bar deadlift, Romanian DL, hip thrust |
-| Overhead press (shoulder) | Landmine press, high incline press |
-| Barbell row (low back) | Chest-supported row, cable row, machine row |
-| Running (knee/shin) | Cycling, swimming, elliptical, rowing |
-| Pull-ups (elbow) | Neutral-grip pull-ups, lat pulldown, band-assisted |
+| Supplement | Dose | Evidence | When |
+|-----------|------|----------|------|
+| Creatine monohydrate | 3-5g daily | ★★★★★ | Any time, every day |
+| Caffeine | 3-6 mg/kg | ★★★★★ | 30-60 min pre-workout |
+| Protein powder | As needed to hit target | ★★★★ | Convenience — whole food first |
+| Vitamin D | 1000-4000 IU daily | ★★★★ | If deficient (most people in UK) |
+| Omega-3 (EPA/DHA) | 1-3g daily | ★★★ | Anti-inflammatory |
+| Magnesium | 200-400mg daily | ★★★ | Sleep quality, recovery |
+| Electrolytes | During long sessions | ★★★ | Sessions >60 min, hot weather |
+
+**Don't waste money on:** BCAAs (if eating enough protein), testosterone boosters, fat burners, most pre-workout ingredients beyond caffeine.
 
 ---
 
-## 8. Body Composition Tracking
+## Phase 8: Mobility & Injury Prevention
 
-### Measurement Protocol
+### Daily Mobility Routine (10 min)
 
-**Weekly (same conditions every time):**
-- Weight: Morning, after bathroom, before food/water, same scale
-- Take average of 7 daily weigh-ins — single days mean nothing
+```
+1. Cat-Cow — 10 reps (spine mobility)
+2. World's Greatest Stretch — 5/side (hip flexor, T-spine, hamstring)
+3. 90/90 Hip Switch — 10 reps (hip rotation)
+4. Dead Hang — 30-60 sec (shoulder decompression)
+5. Deep Squat Hold — 30-60 sec (ankle, hip mobility)
+6. Band Pull-Aparts — 15 reps (shoulder health)
+7. Couch Stretch — 30 sec/side (hip flexor)
+```
 
-**Bi-weekly:**
-- Waist circumference (at navel, relaxed)
-- Hip circumference (widest point)
-- Optional: chest, arms, thighs
+### Pre-Workout Warmup Protocol
 
-**Monthly:**
-- Progress photos (front, side, back — same lighting, same time)
-- Strength benchmarks (test or estimate 1RM)
-- Endurance benchmarks (time trial or test set)
+```
+1. General: 5 min light cardio (jog, row, bike)
+2. Dynamic stretches: leg swings, arm circles, hip circles (2 min)
+3. Movement prep: bodyweight version of main lift (10 reps)
+4. Ramping sets: 
+   - Empty bar × 10
+   - 40% × 8
+   - 60% × 5
+   - 75% × 3
+   - 85% × 1
+   - Working weight
+```
 
-### Interpreting Progress
+### Common Issue Prevention
 
-| Weight | Waist | Strength | What's Happening | Action |
-|--------|-------|----------|-----------------|--------|
-| ↓ | ↓ | → or ↑ | Fat loss, muscle maintained ✅ | Continue |
-| ↓ | → | ↓ | Losing muscle ❌ | Increase protein, reduce deficit |
-| ↑ | → | ↑ | Lean gain ✅ | Continue |
-| ↑ | ↑ | ↑ | Gaining fat + muscle | Reduce surplus slightly |
-| → | ↓ | ↑ | Recomposition ✅ | Continue — this is ideal |
-| → | → | → | Plateau | Change something — calories, program, or both |
-| ↑ | ↑ | → | Just getting fat ❌ | Reduce calories, increase activity |
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| Low back pain | Weak core, hip tightness, poor bracing | McGill Big 3, hip flexor stretching, bracing drills |
+| Shoulder impingement | Internal rotation dominance, weak rotator cuff | Face pulls, band external rotations, reduce overhead volume |
+| Knee pain (anterior) | Quad dominance, weak VMO, poor ankle mobility | Terminal knee extensions, ankle dorsiflexion work, step-downs |
+| Elbow tendinitis | Grip/wrist overuse, sudden volume increase | Wrist curls, eccentric work, reduce isolation curl volume |
+| Hip shift in squat | Adductor/abductor imbalance, ankle restriction | Cossack squats, banded squats, heel elevation |
 
-### Rate of Weight Change (Healthy Ranges)
+### When to See a Professional
 
-| Goal | Male | Female | If faster than this |
-|------|------|--------|-------------------|
-| Fat loss | 0.5-1% BW/week | 0.5-0.8% BW/week | Losing muscle — slow down |
-| Muscle gain | 0.25-0.5% BW/month | 0.15-0.25% BW/month | Gaining fat — reduce surplus |
+- Sharp pain during or after exercise (not muscle soreness)
+- Swelling that doesn't resolve in 48 hours
+- Numbness or tingling
+- Loss of range of motion lasting >2 weeks
+- Pain that worsens with each session
+- Any injury that changes your movement pattern
 
 ---
 
-## 9. Training Log & Tracking
+## Phase 9: Progress Tracking
 
-### Session Log Template
+### Workout Log YAML
 
 ```yaml
 session:
   date: "YYYY-MM-DD"
-  type: # strength | cardio | hybrid | recovery
-  duration_min:
-  sleep_hours_last_night:
-  energy_level: # 1-10
+  day: "Upper A"
+  duration_min: 0
+  location: ""
+  readiness_score: 0  # from daily check
   
   exercises:
-    - name: ""
-      sets:
-        - { reps: , weight_kg: , rpe: }
-        - { reps: , weight_kg: , rpe: }
-      notes: ""
-      
-  cardio:
-    type: # run | bike | row | swim
-    duration_min:
-    distance_km:
-    avg_hr:
-    avg_pace:
-    zone_distribution: # e.g., "80% Z2, 20% Z4"
+    - name: "Bench Press"
+      warmup: "bar×10, 60×5, 80×3"
+      working_sets:
+        - { weight_kg: 95, reps: 5, rpe: 8 }
+        - { weight_kg: 95, reps: 5, rpe: 8.5 }
+        - { weight_kg: 95, reps: 4, rpe: 9 }
+      notes: "Slight right shoulder tightness on last set"
     
-  post_session:
-    overall_rating: # 1-10
-    what_went_well: ""
-    what_to_improve: ""
-    pain_or_discomfort: ""
+    - name: "Weighted Pull-ups"
+      working_sets:
+        - { weight_kg: "+15", reps: 6, rpe: 8 }
+        - { weight_kg: "+15", reps: 6, rpe: 8 }
+        - { weight_kg: "+15", reps: 5, rpe: 9 }
+  
+  cardio:
+    type: ""
+    duration_min: 0
+    distance_km: 0
+    avg_hr: 0
+    notes: ""
+  
+  session_notes: ""
+  next_session_adjustments: ""
 ```
 
-### Weekly Review Questions
-
-1. Did I hit all planned sessions? If not, why?
-2. Did any lifts progress (weight or reps)?
-3. Was my energy consistently good? (If not → check sleep, nutrition, stress)
-4. Any pain or discomfort developing?
-5. Am I recovering between sessions?
-6. Bodyweight trend this week? (7-day average vs last week)
-7. Am I enjoying training? (Burnout check)
-
-### Monthly Review
+### Weekly Review Template
 
 ```yaml
-monthly_review:
-  month: "YYYY-MM"
-  sessions_completed: # / planned
-  adherence_pct:
+weekly_review:
+  week_of: "YYYY-MM-DD"
+  sessions_completed: 0
+  sessions_planned: 0
   
   strength_progress:
-    squat: { start: , end: , change: }
-    bench: { start: , end: , change: }
-    deadlift: { start: , end: , change: }
-    
-  body_comp:
-    weight_start:
-    weight_end:
-    waist_start:
-    waist_end:
-    
-  endurance:
-    weekly_km_avg:
-    best_5k:
-    best_10k:
-    
-  energy_avg: # 1-10
-  sleep_avg:
+    squat: { weight: 0, reps: 0, trend: "↑/→/↓" }
+    bench: { weight: 0, reps: 0, trend: "↑/→/↓" }
+    deadlift: { weight: 0, reps: 0, trend: "↑/→/↓" }
   
-  wins: []
-  lessons: []
-  next_month_focus: ""
+  body_composition:
+    weight_avg: 0  # 7-day average
+    weight_trend: "↑/→/↓"
+    waist_cm: 0  # weekly measurement
+  
+  cardio_volume:
+    total_km: 0
+    total_min: 0
+    long_run_km: 0
+  
+  recovery_metrics:
+    avg_sleep: 0
+    avg_readiness: 0
+    soreness_issues: ""
+  
+  wins: ""
+  challenges: ""
+  adjustments_for_next_week: ""
 ```
 
----
+### Key Metrics to Track
 
-## 10. RPE & Autoregulation
-
-### RPE (Rate of Perceived Exertion) Scale
-
-| RPE | Description | Reps in Reserve |
-|-----|-------------|-----------------|
-| 10 | Absolute max, couldn't do 1 more | 0 RIR |
-| 9.5 | Might get 1 more on a great day | 0-1 RIR |
-| 9 | Could definitely get 1 more | 1 RIR |
-| 8.5 | Could get 1-2 more | 1-2 RIR |
-| 8 | Could get 2 more | 2 RIR |
-| 7.5 | Could get 2-3 more | 2-3 RIR |
-| 7 | Could get 3 more, good working weight | 3 RIR |
-| 6 | Warm-up feel, speed work | 4+ RIR |
-
-**RPE Targets by Training Phase:**
-- Hypertrophy: RPE 7-8.5 (2-3 RIR)
-- Strength: RPE 8-9.5 (0-2 RIR)
-- Peaking: RPE 9-10
-- Deload: RPE 5-6
-
-### Daily Readiness Check
-
-Before training, assess (30 seconds):
-
-| Factor | Green (train as planned) | Yellow (reduce 10-20%) | Red (easy session or rest) |
-|--------|------------------------|----------------------|--------------------------|
-| Sleep | 7+ hours, woke refreshed | 5-7 hours | <5 hours |
-| Soreness | None or mild | Moderate, functional | Severe, limits movement |
-| Motivation | Excited to train | Neutral | Dreading it |
-| Stress | Normal | Elevated | Overwhelming |
-| HRV/RHR | Normal range | Slightly off | Significantly elevated |
-
-**2+ Reds = rest day or active recovery. Don't fight your body.**
+| Metric | Frequency | Why |
+|--------|-----------|-----|
+| Working weights (all lifts) | Every session | Progressive overload verification |
+| Body weight (morning, fasted) | Daily → weekly average | Body composition trending |
+| Waist measurement | Weekly | Fat loss indicator (more reliable than scale) |
+| Photos (front/side/back) | Every 4 weeks | Visual progress, mirrors lie |
+| Run pace / distance | Every run | Cardio progression |
+| Sleep hours + quality | Daily | Recovery capacity |
+| RPE per set | Every session | Fatigue management |
+| RHR / HRV | Daily (if tracking) | Readiness, overtraining early warning |
 
 ---
 
-## 11. Race & Competition Prep
+## Phase 10: Plateaus & Troubleshooting
 
-### Taper Protocol (Endurance)
+### Plateau Decision Tree
 
-| Weeks Out | Volume Reduction | Intensity | Notes |
-|-----------|-----------------|-----------|-------|
-| 3 | -20% | Maintain | Last long run |
-| 2 | -40% | Maintain | Short sharp intervals OK |
-| 1 | -60% | 2 easy runs + race pace strides | Rest, sleep, hydrate |
-| Race week | -80% | Race day | Trust the training |
+```
+Strength stalling?
+├─ Eating enough? (surplus for gain, maintenance minimum)
+│  └─ No → Fix nutrition first
+├─ Sleeping 7+ hours?
+│  └─ No → Fix sleep first
+├─ Been training >4 weeks without deload?
+│  └─ Yes → Deload, then reassess
+├─ Same program >12 weeks?
+│  └─ Yes → Change program (new stimulus)
+├─ Volume too high? (approaching MRV)
+│  └─ Yes → Reduce volume, increase intensity
+├─ Volume too low? (at MEV)
+│  └─ Yes → Add 1-2 sets/muscle/week
+└─ All good? → Change rep range or exercise variation
+```
+
+### Common Mistakes
+
+| # | Mistake | Fix |
+|---|---------|-----|
+| 1 | No progressive overload (same weight every week) | Log every session, aim to beat last performance |
+| 2 | Program hopping (new program every 2 weeks) | Stick to a program for minimum 8-12 weeks |
+| 3 | Junk volume (30+ sets/muscle, half-effort) | Do fewer sets at higher effort (RPE 7-9) |
+| 4 | Skipping legs | Follow balanced split — legs are 50%+ of your body |
+| 5 | Never deloading | Schedule deloads, or take reactive deloads when signs appear |
+| 6 | Ego lifting (too heavy, bad form) | Drop weight 20%, master form, then rebuild |
+| 7 | Cardio killing gains | Separate cardio from lifting by 6+ hours, or do after lifting |
+| 8 | Not eating enough protein | 1.6-2.2 g/kg — track for 2 weeks to calibrate |
+| 9 | Ignoring sleep | 7-9 hours non-negotiable — it's when you grow |
+| 10 | All intensity, no technique work | Record yourself, get form checks, invest in one coaching session |
+
+---
+
+## Phase 11: Body Composition Strategies
+
+### Fat Loss Protocol
+
+1. **Set deficit:** -300 to -500 cal/day (1% BW loss/week max)
+2. **Protein HIGH:** 2.0-2.4 g/kg (muscle preservation is priority #1)
+3. **Training:** Maintain intensity (heavy weights), reduce volume slightly if recovery drops
+4. **Cardio:** Add 2-3 sessions of Zone 2 (walks, easy cycling), LISS > HIIT for sustainability
+5. **Step target:** 8,000-12,000 steps/day (NEAT is the biggest calorie lever)
+6. **Timeline:** Aim for 8-16 week cut, then 4+ weeks maintenance
+7. **Refeed:** 1 day/week at maintenance with extra carbs if sub-15% BF
+8. **When to stop:** Reaching target BF%, performance declining, diet fatigue >8/10
+
+### Muscle Gain Protocol
+
+1. **Set surplus:** +200-500 cal/day (0.5-1% BW gain/month for intermediates)
+2. **Protein adequate:** 1.6-2.2 g/kg
+3. **Training:** High volume focus (MAV range), progressive overload
+4. **Cardio:** Minimal but maintain cardiovascular health (2x Zone 2, 20-30 min)
+5. **Timeline:** Bulk for 12-20 weeks, then maintain or mini-cut
+6. **When to stop:** BF% exceeding comfort (usually >18-20% men, >28-30% women), or at planned timeline
+
+### Body Recomposition (Lose Fat + Gain Muscle)
+
+**Who it works for:**
+- Beginners (first 6-12 months)
+- Detrained athletes returning
+- Overweight beginners (higher BF% = more recomp potential)
+- NOT effective for lean intermediates/advanced
+
+**How:** Eat at maintenance, high protein (2.0+ g/kg), train hard with progressive overload. Trust the process — scale may not move but body composition changes.
+
+---
+
+## Phase 12: Competition & Race Prep
+
+### Taper Protocol (Final 1-2 Weeks)
+
+| Variable | 2 Weeks Out | 1 Week Out | 2 Days Out | Race Day |
+|----------|-------------|------------|------------|----------|
+| Volume | -30% | -50% | -70% | Race |
+| Intensity | Maintain | 1-2 race pace efforts | Easy only | Race effort |
+| Frequency | Normal | -1 session | Light movement | Race |
+| Carbs | Normal | Slightly increase | Carb load (+2g/kg) | Race morning meal |
+| Sleep | Priority | 8+ hours | 8+ hours (expect nerves) | Up early enough |
 
 ### Race Day Checklist
 
-- [ ] Nutrition: Nothing new on race day — practice in training
-- [ ] Last big meal: night before (carb-heavy, low fiber)
-- [ ] Race morning: 2-3h before start, familiar meal (toast + banana + coffee)
-- [ ] Hydration: Sip water morning, don't overdrink
-- [ ] Warm-up: 10-15 min easy jog + 4×100m strides
-- [ ] Pacing: Start conservative, negative split if possible
-- [ ] Fueling (>60 min): 30-60g carbs/hour from gels/drink
-
-### Strength Competition Prep (Powerlifting)
-
-| Weeks Out | Focus | Intensity | Volume |
-|-----------|-------|-----------|--------|
-| 8-6 | Volume accumulation | 70-80% | High |
-| 6-4 | Intensity build | 80-90% | Moderate |
-| 4-2 | Peak singles/doubles | 90-100% | Low |
-| 1 | Openers only | 85-90% | Minimal |
-| Meet week | Rest + opener walkthrough | — | — |
-
-**Attempt Selection:**
-- Opener: Something you can triple any day (90-92%)
-- Second: Goal PR or comfortable single (95-97%)
-- Third: Stretch PR (100-103%)
+```yaml
+race_day:
+  morning:
+    - Wake 3-4 hours before start
+    - Familiar breakfast (tested in training)
+    - Light caffeine if used in training
+    - Kit check: shoes, watch, nutrition, number
+    - Arrive 60-90 min before start
+  
+  warmup:
+    - 10-15 min easy jog
+    - Dynamic stretches
+    - 2-3 race pace strides
+    - Station-specific warmup (light ski erg pulls, bodyweight lunges)
+  
+  race_strategy:
+    - Negative split: start conservative, build through middle, push final 2km
+    - Station pacing: steady effort, don't redline early
+    - Nutrition: sports drink/gel every 30-45 min
+    - Mental cues: "relax, breathe, one station at a time"
+  
+  post_race:
+    - Walk/easy movement for 10-15 min
+    - Protein + carbs within 30 min
+    - Rehydrate
+    - Celebrate
+    - Review within 24-48 hours while fresh
+```
 
 ---
 
-## 12. Special Populations & Adaptations
+## Quality Rubric
+
+Score any training program 0-100:
+
+| Dimension | Weight | 0-25 | 50 | 75 | 100 |
+|-----------|--------|------|-----|-----|------|
+| Progressive overload | 20% | No tracking | Some logging | Consistent logging + progression | Planned periodized progression |
+| Exercise selection | 15% | Random, unbalanced | Most patterns covered | All patterns, appropriate variations | Periodized exercise rotation |
+| Volume/intensity | 15% | Way too much or little | Near MEV | MAV range, well managed | Individualized, auto-regulated |
+| Recovery management | 15% | No rest days, poor sleep | Some structure | Planned deloads, good sleep | Full recovery protocol |
+| Nutrition alignment | 15% | No awareness | Protein tracked | Full macro tracking | Periodized nutrition |
+| Specificity to goal | 10% | Training doesn't match goal | Loosely aligned | Well-aligned | Competition-ready specificity |
+| Adaptability | 5% | Rigid, no adjustment | Some flexibility | Reactive deloads, RPE-based | Auto-regulated, AI-assisted |
+| Sustainability | 5% | Burnout trajectory | Manageable short-term | Sustainable long-term | Built for years, enjoyable |
+
+---
+
+## 10 Training Commandments
+
+1. **Progressive overload or you're exercising, not training**
+2. **Sleep is when you grow — protect it like your job depends on it**
+3. **Protein is the only macro that MUST hit target daily**
+4. **Consistency beats intensity — 80% effort for 52 weeks > 100% for 4**
+5. **Track everything — what gets measured gets managed**
+6. **Deload before you need to — proactive beats reactive**
+7. **Ego is the enemy — perfect form at moderate weight beats ugly maxes**
+8. **Specificity matters — train for YOUR goal, not someone else's program**
+9. **Recovery is training — the workout is the stimulus, rest is the adaptation**
+10. **Long game wins — think in years, not weeks**
+
+---
+
+## 10 Common Training Mistakes
+
+| # | Mistake | Impact | Fix |
+|---|---------|--------|-----|
+| 1 | No program (winging it) | Zero progression | Pick a program and follow it 8-12 weeks |
+| 2 | All cardio, no strength | Skinny-fat, injuries | Add 2-3 strength sessions/week minimum |
+| 3 | Running too fast on easy days | Overtraining, injury | Use HR monitor — Zone 2 should feel easy |
+| 4 | Skipping warmup | Injury risk, worse performance | 10 min: cardio + dynamic stretching + ramping sets |
+| 5 | Only training what you like | Imbalances, injury | Program ALL movement patterns |
+| 6 | Copying advanced athletes | Overtraining, frustration | Match program to YOUR training age |
+| 7 | Relying on motivation | Inconsistency | Build habits, schedule sessions like meetings |
+| 8 | Comparing to others | Discouragement | Track YOUR progress over months |
+| 9 | Ignoring pain signals | Chronic injury | Sharp pain = stop, get assessed |
+| 10 | Overcomplicating everything | Analysis paralysis | Simple program + consistency = 90% of results |
+
+---
+
+## Edge Cases
+
+### Coming Back After Injury
+- Start at 50% of previous weights
+- Build back over 4-6 weeks
+- Any exercise that causes pain gets swapped
+- See physio for clearance before returning to sport
 
 ### Training Over 40
+- Recovery takes longer — 3-4x/week often optimal
+- Joint-friendly variations (trap bar deadlift, DB press)
+- Warmup becomes non-negotiable
+- Mobility work daily
+- Prioritize eccentric control over heavy maxes
 
-- Warm-ups take longer — add 5-10 min
-- Recovery takes longer — space hard sessions 48-72h
-- Joint health priority — more machine work, less maximal lifting
-- Focus: strength maintenance, mobility, cardiovascular health
-- Deload more frequently (every 3 weeks instead of 4-6)
+### Training in a Home Gym (Minimal Equipment)
+- DB + bench + pull-up bar covers 90% of needs
+- Resistance bands for rotator cuff and face pulls
+- Adjustable DBs > fixed set (space + cost efficient)
+- Priority buys: adjustable DBs → bench → pull-up bar → barbell + plates → rack
 
-### Training While Traveling
+### Training + Shift Work
+- Train after longest sleep block
+- Keep schedule consistent on work days
+- Caffeine cut-off 6h before sleep
+- Meal prep is essential — no time for decisions
 
-- **Hotel room workout (no equipment):**
-  - Push-ups (4×max), Pike push-ups (3×10), Bulgarian split squats (3×12/leg)
-  - Single-leg RDL (3×10/leg), Plank (3×45s), Burpees (3×10)
-- **Minimal equipment (bands):**
-  - Add banded rows, banded squats, banded face pulls
-- **Priority order:** Sleep > nutrition > some exercise > perfect exercise
-
-### Female-Specific Considerations
-
-- **Menstrual cycle training:**
-  - Follicular phase (day 1-14): Higher tolerance for volume and intensity
-  - Ovulation (day 14): Peak strength potential
-  - Luteal phase (day 15-28): May need to reduce intensity, increase rest
-  - Menstruation (day 1-5): Train by feel — some women perform fine, others need lighter days
-- **Iron**: Monitor if heavy periods — supplement if ferritin <30
-- **Calorie floor**: Never go below 1200 kcal — hormonal disruption risk
-
----
-
-## 13. Habit Building & Consistency
-
-### The 2-Minute Rule
-If motivation is zero, commit to just 2 minutes of the workout. Once you start, you'll usually continue. If you genuinely stop after 2 minutes — that's fine, you maintained the habit.
-
-### Minimum Effective Dose
-When life gets chaotic, don't skip — scale down:
-
-| Full Session | Minimum Version | Time |
-|-------------|----------------|------|
-| 60 min strength | 3 compound lifts, 3×5 | 20 min |
-| 10km run | 20 min easy jog | 20 min |
-| Full Hyrox sim | 1 station + 1km run | 15 min |
-| Meal prep Sunday | Cook 1 protein in bulk | 30 min |
-
-### Streak Protection
-- **Never miss twice in a row** — one skip is rest, two is a pattern
-- **Anchor to existing habit** — gym bag by the door, workout clothes laid out
-- **Remove friction** — gym close to home/work, meals prepped, plan written
+### Beginner Who's Afraid of the Gym
+- Start with 2 weeks of bodyweight at home
+- Go once to just walk around and do cardio
+- Bring a program on your phone — purpose reduces anxiety
+- Early morning or late evening = quieter
+- Everyone started somewhere. Nobody is watching you.
 
 ---
 
-## 14. Common Mistakes
+## Natural Language Commands
 
-| Mistake | Why It Hurts | Fix |
-|---------|-------------|-----|
-| No progressive overload | Body adapts, stops improving | Track every session, add weight/reps |
-| Too much volume too soon | Injury, burnout | 10% weekly increase max |
-| Skipping deloads | Accumulated fatigue, plateau | Planned deload every 4-6 weeks |
-| Not eating enough protein | Poor recovery, muscle loss | 1.6-2.2g/kg minimum |
-| Cardio killing gains | Excessive interference | Separate by 6+ hours or different days |
-| Program hopping | Never adapting to stimulus | Stick with program 8-12 weeks minimum |
-| Ignoring sleep | #1 recovery killer | 7-9 hours non-negotiable |
-| All-or-nothing mindset | Miss one day → miss the week | Minimum effective dose instead |
-| Comparing to others | Demotivation | Compare to last month's you |
-| No tracking | Can't improve what you don't measure | Log sessions + nutrition |
-
----
-
-## 15. Natural Language Commands
-
-Use conversational requests:
-
-| Command | What It Does |
-|---------|-------------|
-| "Build me a training program" | Creates periodized program from athlete profile |
-| "Calculate my macros" | Computes TDEE + macro split for goal |
-| "Write me a meal plan" | Generates daily meal plan hitting macro targets |
-| "Review my training week" | Analyzes session logs, flags issues |
-| "Am I overtraining?" | Checks recovery signals against overtraining markers |
-| "Substitute [exercise]" | Finds alternatives based on injury/equipment |
-| "Plan my race taper" | Creates taper protocol for upcoming race |
-| "Track my body composition" | Interprets weight/measurement trends |
-| "Create a deload week" | Generates deload based on current program |
-| "What should I eat before my workout?" | Pre-workout nutrition based on session type + timing |
-| "Help me break through a plateau" | Diagnoses stall + provides program adjustments |
-| "Build a home workout" | No-equipment or minimal-equipment session |
-
----
-
-## 16. Quick Reference Cards
-
-### The Big 5 Lifts — Cue Cheat Sheet
-
-| Lift | Setup Cues | Execution Cues | Common Fault |
-|------|-----------|----------------|-------------|
-| Squat | Feet shoulder-width, toes 15-30° out, bar on traps | Brace core, break at hips + knees, knees track toes | Knees caving in → cue "spread the floor" |
-| Bench | Eyes under bar, arch + retract scapulae, feet flat | Unrack, lower to nipple line, drive through feet | Flared elbows → tuck 45° |
-| Deadlift | Bar over mid-foot, hip-width stance, grip outside knees | Push floor away, bar drags shins, lockout hips | Rounding lower back → brace harder, drop hips |
-| OHP | Bar on front delts, grip just outside shoulders | Brace glutes, press straight up, head through | Leaning back → squeeze glutes tighter |
-| Row | Hinge 45°, arms hang, pull to lower chest | Lead with elbows, squeeze shoulder blades, control down | Using momentum → lighter weight, pause at top |
-
----
-
-*Built by AfrexAI — the AI-native consultancy. This is what we automate for businesses across 10 industries.*
+- `/fitness-check` — Score any training program with the 8-signal health check
+- `/design-program` — Build a periodized training program from athlete brief
+- `/log-workout` — Record a training session with weights/reps/RPE
+- `/weekly-review` — Generate weekly training summary and adjustments
+- `/plateau-fix` — Diagnose and fix a strength or body composition plateau
+- `/race-prep` — Create a taper and race day strategy
+- `/nutrition-plan` — Calculate macros and create meal timing around training
+- `/mobility-routine` — Generate a mobility routine for specific issues
+- `/deload-check` — Assess whether a deload is needed
+- `/exercise-swap` — Find an alternative exercise for equipment/injury constraints
+- `/body-comp` — Set up a cut, bulk, or recomposition plan
+- `/compare-programs` — Compare two programs for a specific athlete profile
