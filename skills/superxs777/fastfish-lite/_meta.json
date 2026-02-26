@@ -3,11 +3,16 @@
   "slug": "fastfish-lite",
   "displayName": "fastfish 微信公众号（wechat）快速排版精简版",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1771722844187,
-    "commit": "https://github.com/openclaw/skills/commit/7918955161efcd643047562c12dd0b057b242487"
+    "version": "1.0.4",
+    "publishedAt": 1771990537582,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1771722844187,
+      "commit": "https://github.com/openclaw/skills/commit/7918955161efcd643047562c12dd0b057b242487"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1771637235632,
