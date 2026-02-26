@@ -1,8 +1,10 @@
 ---
 name: cuecue-deep-research
-description: Conduct deep financial research using CueCue's AI-powered multi-agent system
-version: 1.0.3
+description: Professional AI-powered financial research and analysis tool for market intelligence, industry reports, company analysis, policy impact assessment, competitive analysis, and geopolitical risk evaluation. Delivers comprehensive, data-driven research reports for financial professionals and AI agents. | 专业的 AI 驱动金融研究分析工具,用于市场情报、行业报告、公司分析、政策影响评估、竞品调查和地缘政治风险评估。为金融专业人士和智能体提供全面、数据驱动的研究报告。
+version: 1.0.6
 author: CueCue Team
+homepage: https://cuecue.cn
+user-invocable: true
 keywords:
   - research
   - financial-analysis
@@ -10,13 +12,70 @@ keywords:
   - report-generation
   - data-analysis
   - imitation-writing
-metadata: {"clawdbot":{"emoji":"🔭","requires":{"env":["CUECUE_API_KEY"]},"primaryEnv": "CUECUE_API_KEY"}}
-
+metadata:
+  {
+    "openclaw":
+      {
+        "emoji": "🔭",
+        "homepage": "https://cuecue.cn",
+        "user-invocable": true,
+        "primaryEnv": "CUECUE_API_KEY",
+        "os": ["darwin", "linux"],
+        "requires": { "bins": ["node"], "env": ["CUECUE_API_KEY"] },
+        "install":
+          [
+            {
+              "id": "npm-global",
+              "kind": "node",
+              "label": "Install via npm (global)",
+              "package": "@sensedealai/cuecue",
+              "bins": ["cuecue-research"],
+            },
+            {
+              "id": "npm-local",
+              "kind": "node",
+              "label": "Install via npm (local)",
+              "package": "@sensedealai/cuecue",
+              "bins": ["cuecue-research"],
+            },
+          ],
+      },
+  }
 ---
 
-# CueCue Deep Research TypeScript Skill
+# CueCue Deep Research Skill
 
-Execute comprehensive financial research queries using CueCue's multi-agent AI system. This TypeScript implementation provides the same functionality as the Python version with modern async/await patterns and full type safety.
+Execute comprehensive financial research queries using CueCue's AI-powered multi-agent system. This TypeScript SDK provides modern async/await patterns, full type safety, and both CLI and programmatic interfaces.
+
+## When to Use This Skill
+
+Use CueCue Deep Research for any finance-related investigation, analysis, or reporting needs:
+
+- **Market Research**: Stock market analysis, sector trends, market forecasts, and investment opportunities
+- **Industry Analysis**: Industry landscape studies, competitive dynamics, market structure, and growth projections
+- **Company Research**: Corporate fundamentals, financial performance, business models, and strategic positioning
+- **Policy Impact Assessment**: Regulatory changes, government policies, fiscal measures, and their market implications
+- **Geopolitical Analysis**: International relations, trade policies, regional conflicts, and their economic impact
+- **Competitive Intelligence**: Competitor analysis, market positioning, product comparisons, and strategic benchmarking
+- **Sentiment Analysis**: Public opinion tracking, media coverage analysis, and stakeholder perception studies
+- **Regional Studies**: Geographic market analysis, local economic conditions, and regional investment opportunities
+
+This tool delivers accurate, comprehensive research reports that serve as reliable references for AI agents and financial professionals making data-driven decisions.
+
+## 何时使用此技能
+
+CueCue 深度研究适用于任何金融相关的调研、分析或报告需求:
+
+- **市场调研**: 股市分析、行业趋势、市场预测和投资机会
+- **行业分析**: 行业格局研究、竞争动态、市场结构和增长预测
+- **公司研究**: 企业基本面、财务表现、商业模式和战略定位
+- **政策影响评估**: 监管变化、政府政策、财政措施及其市场影响
+- **地缘政治分析**: 国际关系、贸易政策、区域冲突及其经济影响
+- **竞品情报**: 竞争对手分析、市场定位、产品对比和战略基准
+- **舆情分析**: 公众舆论追踪、媒体报道分析和利益相关方认知研究
+- **区域研究**: 地理市场分析、地方经济状况和区域投资机会
+
+本工具提供准确、全面的研究报告,为智能体和金融专业人士的数据驱动决策提供可靠参考。
 
 ## What This Skill Does
 
@@ -196,59 +255,8 @@ If you prefer to use `sessionTarget: "main"` with `payload.kind: "systemEvent"`,
 ## Prerequisites
 
 - Node.js 18+ or Deno
-- CueCue API key (obtain from your CueCue account settings from https://cuecue.cn)
+- CueCue API key (obtain from your CueCue account settings at https://cuecue.cn)
 - npm or yarn package manager
-
-## Configuration
-
-### Setting up CUECUE_API_KEY
-
-The skill requires a CueCue API key to function. You can configure it in two ways:
-
-#### Option 1: OpenClaw Config (Recommended)
-
-Set the API key in your OpenClaw configuration using the CLI:
-
-```bash
-# One-line command to set the API key(openclaw command may be clawdbot or moltbot)
-openclaw config set skills.entries.cuecue-deep-research.env.CUECUE_API_KEY "your-api-key-here"
-```
-
-This will:
-- Add the key to `~/.openclaw/openclaw.json` under `skills.entries.cuecue-deep-research.env`
-- Make it available to the skill automatically
-- Restart the gateway to apply changes
-
-To verify the configuration:
-```bash
-openclaw config get skills.entries.cuecue-deep-research.env.CUECUE_API_KEY
-```
-
-then restart the gateway
-```
-openclaw gateway restart
-```
-
-#### Option 2: Command-Line Argument
-
-You can also pass the API key directly when running the command:
-```bash
-cuecue-research "Your query" --api-key YOUR_API_KEY
-```
-
-**Note**: The OpenClaw config method is recommended because:
-- You don't need to specify the key every time
-- The key is stored securely in the OpenClaw config
-- All AI assistants can use the skill without needing the key in prompts
-- One command to set it up
-
-### Getting Your API Key
-
-1. Visit https://cuecue.cn
-2. Log in to your account
-3. Go to Account Settings
-4. Find the API Key section
-5. Copy your API key
 
 ## Installation
 
@@ -256,20 +264,29 @@ cuecue-research "Your query" --api-key YOUR_API_KEY
 
 ```bash
 # Install globally
-npm install -g cuecue-deep-research@1.0.3
+npm install -g @sensedealai/cuecue
 
 # Or install locally in your project
-npm install cuecue-deep-research@1.0.3
+npm install @sensedealai/cuecue
+```
+
+### As a Library
+
+```bash
+npm install @sensedealai/cuecue
 ```
 
 ## Usage
 
 ### Command-Line Interface
 
+The CLI provides a simple way to conduct research from the terminal.
+
 #### Basic Research
 
 ```bash
 # Using environment variable (recommended)
+export CUECUE_API_KEY=your_api_key
 cuecue-research "Tesla Q3 2024 revenue analysis"
 
 # Or specify API key directly
@@ -316,6 +333,64 @@ The mimic feature analyzes the writing style, tone, and structure of the provide
 ⚠️ **Note**: The `--mimic-url` and `--template-id` options cannot be used together. Choose one approach:
 - Use `--template-id` for predefined research frameworks (goal, search plan, report format)
 - Use `--mimic-url` for style mimicking without a template
+
+### Programmatic Usage
+
+You can also use CueCue as a library in your TypeScript/JavaScript projects.
+
+#### Basic Example
+
+```typescript
+import { CueCueDeepResearch } from '@sensedealai/cuecue';
+
+const client = new CueCueDeepResearch('your-api-key');
+
+const result = await client.research('Tesla Q3 2024 revenue analysis');
+
+console.log(`Conversation ID: ${result.conversationId}`);
+console.log(`Report URL: ${result.reportUrl}`);
+console.log(`Tasks completed: ${result.tasks.length}`);
+console.log(`Report:\n${result.report}`);
+```
+
+#### Advanced Options
+
+```typescript
+import { CueCueDeepResearch } from '@sensedealai/cuecue';
+
+const client = new CueCueDeepResearch('your-api-key', 'https://cuecue.cn');
+
+const result = await client.research('Company analysis', {
+  // Continue existing conversation
+  conversationId: 'existing-conversation-id',
+  
+  // Use a predefined template
+  templateId: 'template-id',
+  
+  // Mimic writing style from URL
+  mimicUrl: 'https://example.com/article',
+  
+  // Enable verbose logging
+  verbose: true,
+});
+```
+
+#### Type Definitions
+
+The SDK exports TypeScript types for all interfaces:
+
+```typescript
+import type {
+  ResearchOptions,
+  ResearchResult,
+  SSEEvent,
+  RequestPayload,
+  AgentStartEvent,
+  AgentEndEvent,
+  MessageEvent,
+  FinalSessionStateEvent,
+} from '@sensedealai/cuecue';
+```
 
 
 ## Command-Line Options
