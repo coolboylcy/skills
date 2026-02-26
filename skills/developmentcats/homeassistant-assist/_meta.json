@@ -3,11 +3,16 @@
   "slug": "homeassistant-assist",
   "displayName": "Home Assistant Assist",
   "latest": {
-    "version": "1.1.0",
-    "publishedAt": 1770492050767,
-    "commit": "https://github.com/openclaw/skills/commit/26e3094f136005de1aaf29faa2b59f559fb02654"
+    "version": "1.1.1",
+    "publishedAt": 1771869311671,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.1.0",
+      "publishedAt": 1770492050767,
+      "commit": "https://github.com/openclaw/skills/commit/26e3094f136005de1aaf29faa2b59f559fb02654"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1770438779477,
