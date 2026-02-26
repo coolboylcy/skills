@@ -1,11 +1,17 @@
 {
   "owner": "thomaslwang",
   "slug": "openguardrails-security",
-  "displayName": "OpenGuardrails - Security Guard",
+  "displayName": "test",
   "latest": {
-    "version": "6.5.17",
-    "publishedAt": 1771778083404,
-    "commit": "https://github.com/openclaw/skills/commit/0669ad3cf065c07c8c9fa14ae7f45c4f5779e77e"
+    "version": "6.5.18",
+    "publishedAt": 1772113815754,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "6.5.17",
+      "publishedAt": 1771778083404,
+      "commit": "https://github.com/openclaw/skills/commit/0669ad3cf065c07c8c9fa14ae7f45c4f5779e77e"
+    }
+  ]
 }
