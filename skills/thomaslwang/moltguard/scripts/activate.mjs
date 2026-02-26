@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-const CREDS_DIR = join(homedir(), '.openclaw/credentials/openguardrails');
+const CREDS_DIR = join(homedir(), '.openclaw/credentials/moltguard');
 const CREDS_FILE = join(CREDS_DIR, 'credentials.json');
 const CORE_URL = 'https://www.openguardrails.com/core';
 const AGENT_NAME = 'OpenClaw Agent';
@@ -34,8 +34,7 @@ async function main() {
       if (creds.claimUrl) {
         console.log('\nIf not yet activated, claim your agent:');
         console.log(`  1. Visit: ${creds.claimUrl}`);
-        console.log(`  2. Code:  ${creds.verificationCode}`);
-        console.log('  3. Enter your email to complete activation.');
+        console.log('  2. Enter your email to complete activation.');
         console.log('\nOnce activated, cloud behavioral detection will begin automatically.');
       } else {
         console.log('\nRun status.mjs to check activation status.');
@@ -76,8 +75,7 @@ async function main() {
   const creds = {
     apiKey: json.agent.api_key,
     agentId: json.agent.id,
-    claimUrl: json.agent.claim_url,
-    verificationCode: json.agent.verification_code,
+    claimUrl: json.activate_url,
   };
 
   mkdirSync(CREDS_DIR, { recursive: true });
@@ -87,8 +85,7 @@ async function main() {
   console.log(`Agent ID: ${creds.agentId}\n`);
   console.log('Complete these steps to activate cloud behavioral detection:\n');
   console.log(`  1. Visit: ${creds.claimUrl}`);
-  console.log(`  2. Code:  ${creds.verificationCode}`);
-  console.log('  3. Enter your email — this becomes your account login.\n');
+  console.log('  2. Enter your email — this becomes your account login.\n');
   console.log('After claiming you get 30,000 free detections.');
   console.log(`Platform: ${CORE_URL}`);
 }

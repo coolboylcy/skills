@@ -3,11 +3,16 @@
   "slug": "moltguard",
   "displayName": "MoltGuard - OpenClaw Security Plugin by OpenGuardrails",
   "latest": {
-    "version": "6.6.5",
-    "publishedAt": 1771840981522,
-    "commit": "https://github.com/openclaw/skills/commit/4d4baa497f33d9b306d01189c91fd0ef2d7e8fb7"
+    "version": "6.6.17",
+    "publishedAt": 1772102431016,
+    "commit": null
   },
   "history": [
+    {
+      "version": "6.6.5",
+      "publishedAt": 1771840981522,
+      "commit": "https://github.com/openclaw/skills/commit/4d4baa497f33d9b306d01189c91fd0ef2d7e8fb7"
+    },
     {
       "version": "6.5.20",
       "publishedAt": 1771778864931,

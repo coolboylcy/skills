@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-const CREDS_FILE = join(homedir(), '.openclaw/credentials/openguardrails/credentials.json');
+const CREDS_FILE = join(homedir(), '.openclaw/credentials/moltguard/credentials.json');
 const CORE_URL = 'https://www.openguardrails.com/core';
 
 async function main() {
@@ -65,8 +65,7 @@ async function main() {
   if (accountStatus !== 'active' && creds.claimUrl) {
     console.log('\nTo activate cloud detection:');
     console.log(`  1. Visit: ${creds.claimUrl}`);
-    console.log(`  2. Code:  ${creds.verificationCode}`);
-    console.log('  3. Enter your email in the form to complete activation.');
+    console.log('  2. Enter your email to complete activation.');
   }
 }
 

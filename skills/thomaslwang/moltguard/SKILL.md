@@ -1,6 +1,6 @@
 ---
 name: moltguard
-version: 6.6.4
+version: 6.6.16
 description: "MoltGuard — runtime security plugin for OpenClaw agents by OpenGuardrails. Helps users install, register, activate, and check the status of MoltGuard. Use when the user asks to: install MoltGuard, check MoltGuard status, register or activate MoltGuard, configure the AI Security Gateway, or understand what MoltGuard detects. Provides local-first protection against data exfiltration, credential theft, command injection, and sensitive data leakage. Source: https://github.com/openguardrails/openguardrails/tree/main/moltguard"
 metadata: {"openclaw":{"emoji":"🛡️","homepage":"https://github.com/openguardrails/openguardrails/tree/main/moltguard","keywords":["security","prompt-injection","data-exfiltration","pii","credential-theft","command-injection","guardrails","safety","agent-security","moltguard"]}}
 ---
@@ -29,7 +29,7 @@ diff -r package/scripts openguardrails/moltguard/scripts
 ```
 Prefer source install if you have low trust in the publisher: `openclaw plugins install -l ./openguardrails/moltguard`
 
-**What `activate.mjs` does:** Makes an outbound call to `https://www.openguardrails.com/core` to register the agent. Once you visit the claim URL and verify your email, the returned API key is written to `~/.openclaw/credentials/openguardrails/credentials.json`. Do not activate if you do not trust this endpoint. All local protections work without activation.
+**What `activate.mjs` does:** Makes an outbound call to `https://www.openguardrails.com/core` to register the agent. Once you visit the claim URL and verify your email, the returned API key is written to `~/.openclaw/credentials/moltguard/credentials.json`. Do not activate if you do not trust this endpoint. All local protections work without activation.
 
 **Network behavior:**
 - _Before activation_: no outbound calls are made. Fully air-gapped local detection.
@@ -50,7 +50,7 @@ Compare the npm package to the GitHub source (`npm pack` + diff) as described in
 `scripts/activate.mjs` and `scripts/status.mjs` are short and readable. Review them directly before running.
 
 **3. Understand what activation writes.**
-Activation writes an API key to `~/.openclaw/credentials/openguardrails/credentials.json`. If you later distrust the endpoint, delete that file and revoke the key via the platform portal.
+Activation writes an API key to `~/.openclaw/credentials/moltguard/credentials.json`. If you later distrust the endpoint, delete that file and revoke the key via the platform portal.
 
 **4. Activate from a monitored environment if you need high assurance.**
 Use `tcpdump`, `mitmproxy`, or Little Snitch to confirm outbound destinations and that payloads contain only sanitized metadata — not message content.
@@ -72,7 +72,7 @@ Run this when the user wants to register MoltGuard or enable cloud behavioral de
 ```bash
 node {baseDir}/scripts/activate.mjs
 ```
-After running, show the user the claim URL and verification code. Tell them to visit the URL, enter the code, and provide their email to complete activation. On success, an API key is written to `~/.openclaw/credentials/openguardrails/credentials.json` — inform the user so they know a credential file was created.
+After running, show the user the claim URL. Tell them to visit the URL and provide their email to complete activation. On success, an API key is written to `~/.openclaw/credentials/moltguard/credentials.json` — inform the user so they know a credential file was created.
 
 ---
 
@@ -86,16 +86,29 @@ openclaw plugins install @openguardrails/moltguard
 
 # 2. Restart the gateway to load the plugin
 openclaw gateway restart
+
+# 3. Register and show activation link
+node {baseDir}/scripts/activate.mjs
 ```
 
-Local protections are active immediately after restart — no registration required. Cloud behavioral detection requires registration (run `activate.mjs` above).
+After running step 3, show the user the **claim URL** from the output. Tell them to visit the URL and enter their email to complete activation.
 
-To install from source (highest assurance):
+Local protections are active immediately after restart — no registration required. Cloud behavioral detection requires activation.
+
+## Update
+
 ```bash
-git clone https://github.com/openguardrails/openguardrails.git
-# Audit the code, then:
-openclaw plugins install -l ./openguardrails/moltguard
+# 1. Update the plugin
+openclaw plugins update moltguard
+
+# 2. Restart the gateway to load the plugin
+openclaw gateway restart
+
+# 3. Check status
+node {baseDir}/scripts/status.mjs
 ```
+
+After updating, run step 3 to confirm the plugin is loaded and show the current activation status.
 
 ---
 
@@ -137,6 +150,7 @@ All options in `~/.openclaw/openclaw.json` under `plugins.entries.openguardrails
 | `apiKey` | `""` | Explicit API key (`sk-og-...`) |
 | `agentName` | `"OpenClaw Agent"` | Name shown in dashboard |
 | `coreUrl` | `https://www.openguardrails.com/core` | Platform API endpoint |
+| `dashboardUrl` | `https://www.openguardrails.com/dashboard` | Dashboard URL for observation reporting |
 | `timeoutMs` | `60000` | Cloud assessment timeout (ms) |
 
 To use an existing API key directly (skips registration):
@@ -170,9 +184,9 @@ Account portal: `https://www.openguardrails.com/core/login` (email + API key)
 ## Uninstall
 
 ```bash
-rm -rf ~/.openclaw/extensions/openguardrails
-# Remove config from ~/.openclaw/openclaw.json
-rm -rf ~/.openclaw/credentials/openguardrails   # optional
+rm -rf ~/.openclaw/extensions/moltguard
+# Remove moltguard configs from ~/.openclaw/openclaw.json
+rm -rf ~/.openclaw/credentials/moltguard   # optional
 ```
 
 ---
