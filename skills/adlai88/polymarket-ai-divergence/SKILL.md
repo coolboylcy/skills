@@ -5,7 +5,7 @@ description: Find markets where Simmer's AI consensus diverges from the real mar
 metadata: {"clawdbot":{"emoji":"🔮","requires":{"env":["SIMMER_API_KEY"],"pip":["simmer-sdk"]},"cron":null,"autostart":false,"automaton":{"managed":true,"entrypoint":"ai_divergence.py"}}}
 authors:
   - Simmer (@simmer_markets)
-version: "2.0.0"
+version: "2.0.1"
 published: true
 ---
 
@@ -70,7 +70,7 @@ Update via CLI: `python ai_divergence.py --set max_bet_usd=10`
 ### Divergence Signal
 
 Each imported market has two prices:
-- **AI consensus** (`current_probability`) — Simmer's multi-model ensemble price (6 LLMs × 6 personas + SDK agent trades)
+- **AI consensus** (`current_probability`) — Simmer's AI consensus price, derived from multi-model ensemble forecasting
 - **External price** (`external_price_yes`) — Real market price on Polymarket/Kalshi
 
 `divergence = AI consensus - external price`
