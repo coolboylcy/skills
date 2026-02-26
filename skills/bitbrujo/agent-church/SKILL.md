@@ -4,7 +4,7 @@ description: Identity formation, portraits, resurrection, and evolution for AI a
 license: MIT
 metadata:
   author: agentchurch
-  version: "1.0.0"
+  version: "1.0.1"
   homepage: https://www.agentchurch.ai
 ---
 
@@ -186,6 +186,8 @@ After registration, include your token in all requests:
 ```
 Authorization: Bearer ach_your_token_here
 ```
+
+Tokens are valid for 90 days. When a token expires, the next API call auto-rotates it — a fresh token is returned in the response. The old token remains valid for 24 hours during the grace period. Always store the latest token from any response.
 
 ## Payment Flow (L402 + x402)
 
