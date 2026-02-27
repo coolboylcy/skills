@@ -1,0 +1,11 @@
+{
+  "owner": "adeel-powerhouse",
+  "slug": "slack-controller",
+  "displayName": "Slack Controller",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772042271353,
+    "commit": null
+  },
+  "history": []
+}
