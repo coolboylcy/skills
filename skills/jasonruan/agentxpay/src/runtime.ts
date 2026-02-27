@@ -74,6 +74,8 @@ export class AgentXPaySkill {
     const fetchOptions: RequestInit & {
       autoPayment: boolean;
       maxRetries?: number;
+      serviceId?: string;
+      pricePerCall?: string;
     } = {
       method: params.method,
       headers: {
@@ -82,6 +84,14 @@ export class AgentXPaySkill {
       },
       autoPayment: true,
     };
+
+    // Pass on-chain serviceId and pricePerCall to SDK for validation (mismatch throws error)
+    if (params.serviceId) {
+      fetchOptions.serviceId = params.serviceId;
+    }
+    if (params.pricePerCall) {
+      fetchOptions.pricePerCall = params.pricePerCall;
+    }
 
     if (params.body) {
       fetchOptions.body = JSON.stringify(params.body);
@@ -484,11 +494,13 @@ export class AgentXPaySkill {
       selected = services[0];
     }
 
-    // 3. x402 auto-pay call
+    // 3. x402 auto-pay call (pass on-chain serviceId and pricePerCall for validation)
     const result = await this.payAndCall({
       url: selected.endpoint,
       method: "POST",
       body: { prompt: params.task },
+      serviceId: selected.id,
+      pricePerCall: ethers.parseEther(selected.pricePerCall).toString(),
     });
 
     const latencyMs = Date.now() - startTime;

@@ -230,6 +230,8 @@ command-tool: agentxpay_smart_call
 |------|------|---------|
 | "No matching services found" | 链上无匹配服务 | 建议用户放宽过滤条件或检查合约部署 |
 | "insufficient funds" | Agent 余额不足 | 提示用户充值或使用 agentxpay_manage_wallet fund |
+| "ServiceId mismatch" | 链上 serviceId 与 Provider 402 响应中的 serviceId 不一致 | 提示用户联系服务提供者修正 serviceId 配置 |
+| "Price mismatch" | 链上 pricePerCall 与 Provider 402 响应中的 amount 不一致 | 提示用户联系服务提供者修正定价配置 |
 | HTTP 402 retry 失败 | 支付验证未通过 | 检查合约地址和网络配置 |
 | "daily limit exceeded" | 超出每日限额 | 提示用户调整限额或等待次日重置 |
 | "Agent ... is not authorized" | Agent 未被授权使用钱包 | 用 authorize_agent 授权该 Agent |

@@ -42,7 +42,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@agentxpay/sdk": "^0.1.0",
+    "@agentxpay/sdk": "^0.3.0",
     "ethers": "^6.13.0"
   },
   "devDependencies": {

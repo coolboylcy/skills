@@ -33,8 +33,12 @@ const response = await client.fetch("https://ai-service.com/api/chat", {
   body: JSON.stringify({ prompt: "Hello" }),
   autoPayment: true,   // 自动处理 HTTP 402
   maxRetries: 1,        // 最大重试次数
+  serviceId: "1",       // 可选：链上 serviceId，用于校验 402 响应中的 serviceId（不匹配则抛错）
+  pricePerCall: "10000000000000000", // 可选：链上价格（wei），用于校验 402 响应中的 amount（不匹配则抛错）
 });
 ```
+
+> **注意**：`serviceId` 和 `pricePerCall` 用于**校验**（validate）而非覆盖。如果链上值与 Provider 返回的 402 响应值不匹配，SDK 会抛出错误，提示联系服务提供者修正配置。
 
 #### `client.discoverServices(filter?)` — 服务发现
 
@@ -132,8 +136,8 @@ const result = await client.subscribe(1n, 1n, parseEther("0.1"));
 
 | 合约 | 地址 |
 |------|------|
-| ServiceRegistry | `0x5c932424AcBfab036969b3B9D94bA9eCbae7565D` |
-| PaymentManager | `0x3949c97925e5Aa13e34ddb18EAbf0B70ABB0C7d4` |
-| SubscriptionManager | `0x9e7F7d0E8b8F38e3CF2b3F7dd362ba2e9E82baa4` |
-| Escrow | `0x0724F18B2aA7D6413D3fDcF6c0c27458a8170Dd9` |
-| AgentWalletFactory | `0xE7FF84Df24A9a252B6E8A5BB093aC52B1d8bEEdf` |
+| ServiceRegistry | `0x20368a34868a75a56225B4D9b79fFE4468624F6b` |
+| PaymentManager | `0x1593b641a7038d30d068EE567A33c892DB7F17f2` |
+| SubscriptionManager | `0xb4daE4538dACA8430421869E3c234DD1d7aBa7DE` |
+| Escrow | `0xe526449804284bDfC831819697e518959b641ea4` |
+| AgentWalletFactory | `0x46e5c939294671ab11E40Baf27Ae959740CBE691` |

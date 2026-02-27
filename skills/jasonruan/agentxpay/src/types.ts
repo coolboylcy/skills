@@ -31,6 +31,10 @@ export interface PayAndCallParams {
   body?: Record<string, unknown>;
   /** Additional HTTP headers */
   headers?: Record<string, string>;
+  /** On-chain service ID (from discoverServices). Validates against provider's 402 serviceId — mismatch throws an error. */
+  serviceId?: string;
+  /** On-chain pricePerCall in wei (from discoverServices). Validates against provider's 402 amount. */
+  pricePerCall?: string;
 }
 
 export interface ManageWalletParams {

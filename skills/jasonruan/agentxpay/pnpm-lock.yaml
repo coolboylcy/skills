@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@agentxpay/sdk':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
       ethers:
         specifier: ^6.13.0
         version: 6.16.0
@@ -30,8 +30,8 @@ packages:
   '@adraffy/ens-normalize@1.10.1':
     resolution: {integrity: sha512-96Z2IP3mYmF1Xg2cDm8f1gWGf/HUVedQ3FMifV4kG/PQ4yEP51xDtRAEfhVNt5f/uzpNkZHwWQuUcu6D6K+Ekw==}
 
-  '@agentxpay/sdk@0.1.0':
-    resolution: {integrity: sha512-/W6fEQex3KXbaBFQEeyDflFg8Puf8Che2IPq33Gz4jgp4RLQ+xcHz3NJ0TZOOonHuL/xbNS8wtNLHcQ5rZwiUQ==}
+  '@agentxpay/sdk@0.2.0':
+    resolution: {integrity: sha512-uTiW7ic/OTeBg8nSZwilbfUmxaeYJ6djcu08gJkWFAyy7JNjaNqIb6FKTS5m6dx7xgpeaNKiXecnZd8WpIuzEQ==}
     engines: {node: '>=18.0.0'}
 
   '@esbuild/aix-ppc64@0.21.5':
@@ -881,7 +881,7 @@ snapshots:
 
   '@adraffy/ens-normalize@1.10.1': {}
 
-  '@agentxpay/sdk@0.1.0':
+  '@agentxpay/sdk@0.2.0':
     dependencies:
       ethers: 6.16.0
     transitivePeerDependencies:
