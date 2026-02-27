@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Apiosk Publisher - Update API
-# Update your API configuration with signed wallet auth.
+# Apiosk Publisher - Delete API
+# Deactivate an API with signed wallet auth.
 
 GATEWAY_URL="https://gateway.apiosk.com"
 
@@ -10,30 +10,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=auth-utils.sh
 source "$SCRIPT_DIR/auth-utils.sh"
 
-# Default values
 SLUG=""
 WALLET=""
 PRIVATE_KEY=""
-ENDPOINT=""
-PRICE=""
-DESCRIPTION=""
-ACTIVE=""
 
 print_help() {
   echo "Usage: $0 --slug SLUG [OPTIONS]"
   echo ""
   echo "Options:"
-  echo "  --slug SLUG              API slug to update (required)"
+  echo "  --slug SLUG              API slug to deactivate (required)"
   echo "  --wallet ADDRESS         Wallet address (optional: defaults from ~/.apiosk)"
   echo "  --private-key HEX        Wallet private key for signature (optional)"
-  echo "  --endpoint URL           New endpoint URL (HTTPS required)"
-  echo "  --price USD              New price per request (0.0001-10.00)"
-  echo "  --description TEXT       New description"
-  echo "  --active BOOL            Active status (true/false)"
   echo "  --help                   Show this help"
 }
 
-# Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --slug)
@@ -46,22 +36,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --private-key)
       PRIVATE_KEY="$2"
-      shift 2
-      ;;
-    --endpoint)
-      ENDPOINT="$2"
-      shift 2
-      ;;
-    --price)
-      PRICE="$2"
-      shift 2
-      ;;
-    --description)
-      DESCRIPTION="$2"
-      shift 2
-      ;;
-    --active)
-      ACTIVE="$2"
       shift 2
       ;;
     --help)
@@ -100,57 +74,19 @@ if [[ -z "$PRIVATE_KEY" ]]; then
   exit 1
 fi
 
-if [[ -n "$ENDPOINT" && ! "$ENDPOINT" =~ ^https:// ]]; then
-  echo "Error: Endpoint must use HTTPS"
-  exit 1
-fi
-
 require_signing_bin
 
-RESOURCE="update:${SLUG}"
-sign_wallet_auth "update_api" "$RESOURCE" "$WALLET" "$PRIVATE_KEY"
+RESOURCE="delete:${SLUG}"
+sign_wallet_auth "delete_api" "$RESOURCE" "$WALLET" "$PRIVATE_KEY"
 
-# Build JSON payload (only include provided fields)
-PAYLOAD_ARGS=(--arg wallet "$WALLET")
-JQ_FIELDS="{ owner_wallet: \$wallet"
-
-if [[ -n "$ENDPOINT" ]]; then
-  PAYLOAD_ARGS+=(--arg endpoint "$ENDPOINT")
-  JQ_FIELDS+=", endpoint_url: \$endpoint"
-fi
-
-if [[ -n "$PRICE" ]]; then
-  PAYLOAD_ARGS+=(--argjson price "$PRICE")
-  JQ_FIELDS+=", price_usd: \$price"
-fi
-
-if [[ -n "$DESCRIPTION" ]]; then
-  PAYLOAD_ARGS+=(--arg description "$DESCRIPTION")
-  JQ_FIELDS+=", description: \$description"
-fi
-
-if [[ -n "$ACTIVE" ]]; then
-  ACTIVE_BOOL="false"
-  if [[ "$ACTIVE" == "true" || "$ACTIVE" == "1" ]]; then
-    ACTIVE_BOOL="true"
-  fi
-  PAYLOAD_ARGS+=(--argjson active "$ACTIVE_BOOL")
-  JQ_FIELDS+=", active: \$active"
-fi
-
-JQ_FIELDS+=" }"
-PAYLOAD="$(jq -n "${PAYLOAD_ARGS[@]}" "$JQ_FIELDS")"
-
-echo "Updating API '$SLUG'..."
+echo "Deactivating API '$SLUG'..."
 echo ""
 
-RAW_RESPONSE="$(curl -s -w "\n%{http_code}" -X POST "$GATEWAY_URL/v1/apis/$SLUG" \
-  -H "Content-Type: application/json" \
+RAW_RESPONSE="$(curl -s -w "\n%{http_code}" -X DELETE "$GATEWAY_URL/v1/apis/$SLUG?wallet=$WALLET" \
   -H "x-wallet-address: $WALLET" \
   -H "x-wallet-signature: $AUTH_SIGNATURE" \
   -H "x-wallet-timestamp: $AUTH_TIMESTAMP" \
-  -H "x-wallet-nonce: $AUTH_NONCE" \
-  -d "$PAYLOAD")"
+  -H "x-wallet-nonce: $AUTH_NONCE")"
 
 HTTP_CODE="$(echo "$RAW_RESPONSE" | tail -n1)"
 RESPONSE="$(echo "$RAW_RESPONSE" | sed '$d')"
@@ -164,12 +100,10 @@ fi
 SUCCESS="$(echo "$RESPONSE" | jq -r '.success')"
 
 if [[ "$SUCCESS" == "true" ]]; then
-  echo "API updated successfully."
-  echo ""
+  echo "API deactivated successfully."
   echo "$(echo "$RESPONSE" | jq -r '.message')"
 else
-  echo "Update failed"
-  echo ""
+  echo "Deactivation failed"
   echo "$(echo "$RESPONSE" | jq -r '.message')"
   exit 1
 fi

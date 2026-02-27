@@ -72,5 +72,5 @@ fi
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "Note: Free test request (no payment required for health checks)"
-echo "To test with payment, use the apiosk skill: ./call-api.sh"
+echo "Note: This probe sends no x402 payment proof."
+echo "If the endpoint is paid, you may receive HTTP 402."

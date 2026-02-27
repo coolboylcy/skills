@@ -13,9 +13,9 @@ This skill is rated **Benign** on the ClawHub security scale.
 - ✅ No arbitrary code execution
 - ✅ No `curl | bash` patterns
 - ✅ All external requests go to verified Apiosk infrastructure
-- ✅ No plaintext secrets in scripts
+- ✅ Private keys are never sent to third parties (used locally for signing only)
 - ✅ No write access outside `~/.apiosk/` directory
-- ✅ All dependencies declared (`curl`, `jq`)
+- ✅ All dependencies declared (`curl`, `jq`, `cast`)
 
 ## Network Access
 
@@ -26,20 +26,22 @@ All communication uses HTTPS exclusively.
 
 ## Data Access
 
-- **Reads:** `~/.apiosk/wallet.txt` (your wallet address, same as `apiosk` skill)
+- **Reads:** `~/.apiosk/wallet.json` (address + private key) or `~/.apiosk/wallet.txt` (address only)
 - **Writes:** None (skill stores no local data)
 
 ## Wallet Security
 
-- Wallet address is read from `~/.apiosk/wallet.txt`
-- No private keys are accessed or transmitted
-- Wallet address is sent to Apiosk gateway for ownership verification only
+- Wallet address is read from `~/.apiosk/wallet.json` or `~/.apiosk/wallet.txt`
+- Private key may be read from `~/.apiosk/wallet.json`, `APIOSK_PRIVATE_KEY`, or `--private-key`
+- Private key is only used locally to produce ECDSA signatures for gateway auth headers
+- Private key is not transmitted directly to the gateway
 - You retain full control of your wallet
 
 ## Required Binaries
 
 - `curl` — HTTP requests
 - `jq` — JSON parsing
+- `cast` — wallet message signing for auth headers
 
 These are standard Unix utilities and are **not** downloaded by this skill.
 
@@ -75,5 +77,5 @@ This skill may receive security updates. Check the latest version on ClawHub.
 
 ---
 
-**Last Updated:** 2026-02-15  
-**Version:** 1.0.0
+**Last Updated:** 2026-02-26  
+**Version:** 1.1.0

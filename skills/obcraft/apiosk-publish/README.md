@@ -1,80 +1,70 @@
 # Apiosk Publisher
 
-Publish and manage your own APIs on the Apiosk marketplace. Register your API endpoint, set pricing, and start earning from every request.
+Publish and manage paid APIs on `https://gateway.apiosk.com`.
 
 ## Quick Start
 
-### 1. Register Your API
-
 ```bash
+# Register (signed request)
 ./register-api.sh \
   --name "My Weather API" \
   --slug "my-weather-api" \
   --endpoint "https://my-api.com/v1" \
   --price 0.01 \
   --description "Real-time weather data" \
-  --wallet "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+  --listing-group datasets
+
+# List your APIs (signed request)
+./my-apis.sh
+
+# Update (signed request)
+./update-api.sh --slug my-weather-api --price 0.02
+
+# Deactivate (signed request)
+./delete-api.sh --slug my-weather-api
 ```
 
-### 2. Check Your APIs & Revenue
+## Auth Requirements
 
-```bash
-./my-apis.sh --wallet "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-```
+Gateway management routes require signed wallet auth headers:
 
-### 3. Update Your API
+- `x-wallet-address`
+- `x-wallet-signature`
+- `x-wallet-timestamp`
+- `x-wallet-nonce`
 
-```bash
-./update-api.sh \
-  --slug "my-weather-api" \
-  --price 0.02 \
-  --wallet "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-```
+Scripts generate these automatically using your key from:
 
-### 4. Test Your API Through the Gateway
+- `~/.apiosk/wallet.json` (preferred, created by `apiosk-skill/setup-wallet.sh`)
+- `APIOSK_PRIVATE_KEY` env var
+- `--private-key` flag
 
-```bash
-./test-api.sh --slug "my-weather-api"
-```
+## Listing Groups (Current)
+
+For discovery and positioning, use these groups:
+
+- `api`
+- `datasets`
+- `compute`
+
+`register-api.sh --listing-group` maps to `category`:
+
+- `api` -> `data`
+- `datasets` -> `dataset`
+- `compute` -> `compute`
+
+## Commands
+
+- `register-api.sh` register a new API
+- `my-apis.sh` list your APIs and earnings
+- `update-api.sh` update endpoint, price, description, active state
+- `delete-api.sh` deactivate an API
+- `test-api.sh` send a plain probe request via gateway (no payment proof)
 
 ## Requirements
 
-- **Wallet:** You need an Ethereum wallet address (same one used with `apiosk` skill)
-- **HTTPS Endpoint:** Your API must be accessible over HTTPS
-- **Health Check:** Gateway performs a health check (HEAD/GET request) during registration
+- `curl`
+- `jq`
+- `cast` (Foundry, used for request signatures)
 
-## Revenue Split
-
-- **Developer:** 90% (first 100 developers get 95%)
-- **Apiosk:** 10% (5% for early adopters)
-
-Earnings accumulate in your developer account and can be withdrawn anytime.
-
-## Features
-
-- ✅ **Auto-approval:** If health check passes, your API goes live immediately
-- ✅ **No API keys:** Authentication by wallet address
-- ✅ **Flexible pricing:** Set prices between $0.0001 and $10.00 per request
-- ✅ **Real-time stats:** Track requests and revenue
-- ✅ **Update anytime:** Change endpoint, price, or deactivate
-
-## Security
-
-- All endpoints must use HTTPS
-- Wallet ownership verified for all operations
-- No plaintext secrets in scripts
-- Gateway validates all inputs
-
-## Files
-
-- `register-api.sh` — Register a new API
-- `my-apis.sh` — List your APIs and revenue
-- `update-api.sh` — Update price/endpoint/status
-- `test-api.sh` — Test your API through the gateway
-- `SKILL.md` — Full documentation
-
-## Support
-
-- Docs: https://apiosk.com/docs
-- Discord: https://discord.gg/apiosk
-- Email: hello@apiosk.com
+Install Foundry: [https://book.getfoundry.sh/getting-started/installation](https://book.getfoundry.sh/getting-started/installation)
