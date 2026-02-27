@@ -9,6 +9,7 @@ import json
 import os
 import sys
 from pathlib import Path
+import unittest
 from unittest.mock import MagicMock, patch
 
 # Add scripts to path

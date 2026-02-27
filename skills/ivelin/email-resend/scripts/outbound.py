@@ -18,6 +18,10 @@ from pathlib import Path
 
 import requests
 
+# Import shared preferences
+sys.path.insert(0, str(Path(__file__).parent))
+from preferences import get_from_email, get_from_name
+
 # Configuration
 API_KEY = os.environ.get("RESEND_API_KEY")
 if not API_KEY:
@@ -27,9 +31,9 @@ if not API_KEY:
 
 API_BASE = "https://api.resend.com"
 
-# Default sender info from environment (set by skill invoking agent)
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
-DEFAULT_FROM_NAME = os.environ.get("DEFAULT_FROM_NAME", "User")
+# Default sender info - prefers env var, falls back to preferences file
+DEFAULT_FROM_EMAIL = get_from_email()
+DEFAULT_FROM_NAME = get_from_name()
 
 
 def fetch_message_id(email_id: str) -> str:

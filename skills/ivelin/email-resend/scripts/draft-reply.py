@@ -14,6 +14,10 @@ import json
 from pathlib import Path
 import requests
 
+# Import shared preferences
+sys.path.insert(0, str(Path(__file__).parent))
+from preferences import get_from_email, get_from_name
+
 API_KEY = os.environ.get("RESEND_API_KEY")
 if not API_KEY:
     print("ERROR: RESEND_API_KEY not set")
@@ -26,9 +30,9 @@ WORKSPACE_DIR = Path.home() / ".openclaw" / "workspace"
 STATE_FILE = WORKSPACE_DIR / "memory" / "email-resend-inbound-notified.json"
 DRAFT_STATE_FILE = WORKSPACE_DIR / "memory" / "email-draft-state.json"
 
-# Sender info from environment (set by agent that invokes this script)
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
-DEFAULT_FROM_NAME = os.environ.get("DEFAULT_FROM_NAME", "User")
+# Sender info - prefers env var, falls back to preferences file
+DEFAULT_FROM_EMAIL = get_from_email()
+DEFAULT_FROM_NAME = get_from_name()
 
 # Channel preferences loaded by agent from memory
 

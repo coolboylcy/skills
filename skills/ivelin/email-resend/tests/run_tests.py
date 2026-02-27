@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Run email-resend skill tests."""
+"""Run email-resend skill tests using pytest."""
+import os
+import subprocess
 import sys
-from pathlib import Path
 
-# Add skills to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "skills" / "email-resend" / "tests"))
-
-exec(open(Path(__file__).parent.parent / "skills" / "email-resend" / "tests" / "test_inbound.py").read().replace("if __name__ == \"__main__\":", "if False:"))
+# Run pytest on the tests directory
+tests_dir = os.path.dirname(os.path.abspath(__file__))
+result = subprocess.run(
+    [sys.executable, "-m", "pytest", tests_dir, "-v", "--tb=short"]
+)
+sys.exit(result.returncode)

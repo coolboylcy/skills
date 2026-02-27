@@ -1,41 +1,75 @@
 # Email Inbound Cron
 
-Run every 15 minutes to check for new emails and notify the user.
+Run every 15 minutes to check for new emails.
+
+## Step 0: Load Full Skill Context (IMPORTANT)
+
+Before processing, load the skill's documentation to understand capabilities, rules, and best practices:
+
+```
+read path="skills/email-resend/SKILL.md"
+```
+
+**Key rules from SKILL.md to follow:**
+- Always use `draft-reply.py` for replying to emails (NOT `outbound.py`)
+- Threading: use In-Reply-To and References headers for proper Gmail threading
+- Acknowledge flow: reply to notification to mark as read
+- Use proper message format with replyTo parameter
+
+Also check for any skill-specific scripts:
+```
+ls skills/email-resend/scripts/
+```
 
 ## Steps
 
-1. Run: `python3 ~/.openclaw/workspace/skills/email-resend/scripts/inbound.py`
+### 1. Load User Preferences (Smart Fallback)
 
-2. Check the output for "New:" keyword - if found, there are new emails
+**Step 1:** Try explicit preferences file:
+```
+memory_get path="memory/email-preferences.md"
+```
 
-3. Read the pending emails from: `~/.openclaw/workspace/memory/email-resend-inbound-notified.json`
-   - Parse the `pending_ids` object
+**Step 2:** If not found, use OpenClaw context (available in cron runtime):
+- `context.chat_id` - Telegram chat ID
+- `context.thread_id` - Telegram topic/thread ID
+- `context.channel` - Delivery channel (telegram, discord, etc.)
 
-4. For each pending email, send a notification:
-   - **Target:** Use the OpenClaw context to determine the notification channel
-   - If running as cron job, use the cron job's configured delivery target
-   - If running interactively, use the session's channel/target from context
-   - Default: Send to the user who invoked the cron or the default notification channel
-   
-   Format:
-   ```
-   📬 New Email
+**DO NOT** use memory_search to scan MEMORY.md, USER.md, TOOLS.md, or other memory files.
 
-   **From:** [from email]
-   **Subject:** [subject]
-   **Date:** [date]
+This approach:
+- Uses explicit preferences if configured
+- Falls back to runtime context (no file scanning)
+- Avoids information leakage from sensitive files
 
-   Reply to acknowledge
-   ```
+### 2. Run Email Checker
 
-5. After notifying, acknowledge the emails by updating the JSON file:
-   - Move each notified email from `pending_ids` to `acknowledged_ids`
+```
+python3 ~/.openclaw/workspace/skills/email-resend/scripts/inbound.py
+```
 
-6. Reply with "✅ Email check complete: X new emails notified" when done.
+Parse the JSON output for new emails.
 
-## Note on Notification Target
+### 3. Apply User Rules
 
-**Do not hardcode notification destinations.** Use:
-- OpenClaw context (channel, chat_id, thread_id) from the cron job or session
-- Environment variables if needed (e.g., NOTIFICATION_CHAT_ID, NOTIFICATION_THREAD_ID)
-- Default to the invoking user's context
+Based on preferences found in step 1:
+- If no telegram preferences found, use current context channel
+- Apply any user-specified filtering rules (e.g., only notify for HIGH importance)
+- Use the user's preferred notification channel
+
+### 4. Produce Summary (DO NOT send individual notifications)
+
+⚠️ IMPORTANT: Do NOT try to send individual email notifications via message tool. The cron delivery system will handle delivering the summary to your chat.
+
+Instead, just produce a summary output:
+```
+📬 Email check complete: X new, Y pending, Z acknowledged
+```
+
+The cron delivery system will deliver this summary to your configured Telegram topic.
+
+### 5. DO NOT Acknowledge
+
+⚠️ CRITICAL: Do NOT auto-acknowledge emails. Leave them in pending state.
+
+The user will explicitly acknowledge by replying to the notification message. The notification should include "Reply to acknowledge" instruction.
