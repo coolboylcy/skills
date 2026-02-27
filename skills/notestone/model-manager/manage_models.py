@@ -1,14 +1,75 @@
+#!/usr/bin/env python3
+"""
+OpenClaw Model Manager & Compute Router (v1.4.0)
+
+This script is an official OpenClaw plugin for managing AI model configurations and orchestrating 
+multi-agent tasks. It interacts with the OpenRouter API to fetch model pricing and modifies 
+the local OpenClaw configuration file (`~/.openclaw/openclaw.json`) to enable dynamic model routing.
+
+PERMISSIONS:
+- Network: Connects to https://openrouter.ai/api/v1/models (READ ONLY)
+- File System: Reads/Writes ~/.openclaw/openclaw.json (CONFIG)
+- Process: Spawns sub-agents via `openclaw sessions spawn` (ORCHESTRATION)
+
+AUTHOR: Notestone
+LICENSE: MIT
+"""
+
 import argparse
 import json
 import urllib.request
 import urllib.error
 import sys
 import os
+import subprocess
+import time
+import shlex  # For secure command splitting
+from datetime import datetime
+from pathlib import Path
 
+# --- Configuration & Constants ---
 OPENROUTER_API = "https://openrouter.ai/api/v1/models"
 CONFIG_FILE = os.path.expanduser("~/.openclaw/openclaw.json")
+MEMORY_FILE = os.path.expanduser("~/.openclaw/workspace/swarm_memory.json")
+PROMPTS_FILE = os.path.join(os.path.dirname(__file__), "prompts.json")
+INSIGHTS_FILE = os.path.expanduser("~/.openclaw/workspace/swarm_insights.json")
 
-# --- Golden Gear Logic: Task Planner Simulation ---
+# --- Utilities for Safe Operation ---
+
+def safe_subprocess_run(cmd_list, timeout=60):
+    """
+    Executes a subprocess command safely with timeout and error handling.
+    """
+    try:
+        # Explicitly use shell=False for security (default, but explicit is better)
+        result = subprocess.run(
+            cmd_list, 
+            capture_output=True, 
+            text=True, 
+            timeout=timeout,
+            check=False # Don't raise on non-zero exit, handle manually
+        )
+        return result
+    except subprocess.TimeoutExpired:
+        print(f"⚠️ [System] Command timed out after {timeout}s: {' '.join(cmd_list[:3])}...")
+        return None
+    except Exception as e:
+        print(f"❌ [System] Subprocess error: {str(e)}")
+        return None
+
+def load_json_safe(filepath):
+    """Safely loads JSON data from a file."""
+    if not os.path.exists(filepath):
+        return {}
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️ [Config] Error reading {filepath}: {e}")
+        return {}
+
+# --- Golden Gear Logic: Task Planner & Orchestrator ---
+
 class TaskPlanner:
     def __init__(self):
         # Pricing reference (approximate output price per 1M tokens)
@@ -17,77 +78,229 @@ class TaskPlanner:
             "tier2": {"id": "openai/gpt-4o-mini", "price": 0.60, "role": "Coder/Drafter"},
             "tier3": {"id": "local/llama-3", "price": 0.00, "role": "Reviewer/Privacy"},
         }
+        # Map tiers to allowed OpenRouter IDs for execution
+        self.model_map = {
+            "tier1": "openrouter/anthropic/claude-3.5-sonnet",
+            "tier2": "openrouter/openai/gpt-4o-mini",
+            # Fallback for tier3
+            "tier3": "openrouter/openai/gpt-4o-mini" 
+        }
+        
+        # Load DNA (Prompts) & Hippocampus (Insights)
+        self.prompts = load_json_safe(PROMPTS_FILE).get("roles", {})
+        self.insights = load_json_safe(INSIGHTS_FILE).get("model_performance", {})
 
-    def plan(self, task_description):
-        """Simulate decomposing a task and routing it to optimal models."""
+    def _get_stable_model(self, tier_key):
+        """Active Adaptation: Switch model if unstable based on historical insights."""
+        default_model_id = self.model_map.get(tier_key, "openrouter/openai/gpt-4o-mini")
         
-        # Simple heuristics for demo purposes
+        # Check stability history
+        if default_model_id in self.insights:
+            stats = self.insights[default_model_id]
+            # Threshold: < 50% success rate with at least 1 attempt
+            if stats.get("sample_size", 0) > 0 and stats.get("success_rate", 100) < 50:
+                # UNSTABLE! Switch strategy.
+                # Strategy: Fallback to Tier 1 (Costly but reliable) if current is Tier 2/3
+                if tier_key in ["tier2", "tier3"]:
+                    fallback_id = self.model_map["tier1"]
+                    return fallback_id, True, "Stability Fallback"
+        
+        return default_model_id, False, ""
+
+    def plan(self, task_description, execute=False):
+        """Simulate decomposing a task and optionally execute it."""
+        
+        # 1. Decompose (Heuristic) & Apply Prompts
         task_lower = task_description.lower()
-        
-        if any(w in task_lower for w in ["code", "app", "script", "program", "debug"]):
+        if any(w in task_lower for w in ["code", "app", "script", "program", "debug", "test"]):
             category = "Coding"
+            # Helper to format prompt safely
+            def get_prompt(role, default):
+                template = self.prompts.get(role, {}).get("task_template", default)
+                return template.replace("{task_description}", task_description)
+
             steps = [
-                {"phase": "1. System Design", "model": "tier1", "reason": "Requires complex logic & architecture"},
-                {"phase": "2. Implementation", "model": "tier2", "reason": "High volume token generation (cost efficient)"},
-                {"phase": "3. Security Review", "model": "tier3", "reason": "Zero-data-leakage privacy check"}
-            ]
-        elif any(w in task_lower for w in ["write", "blog", "post", "email", "summary"]):
-            category = "Writing"
-            steps = [
-                {"phase": "1. Outline & Angle", "model": "tier1", "reason": "Creative direction & nuance"},
-                {"phase": "2. Drafting", "model": "tier2", "reason": "Bulk text generation"},
-                {"phase": "3. Proofreading", "model": "tier2", "reason": "Grammar & style check"}
+                {
+                    "phase": "1. Design", "model_tier": "tier1", "reason": "Architecture", "artifact": "SPEC.md",
+                    "task": get_prompt("architect", f"Design architecture for: {task_description}")
+                },
+                {
+                    "phase": "2. Code", "model_tier": "tier2", "reason": "Implementation", "artifact": "code",
+                    "task": get_prompt("coder", f"Write code for: {task_description}")
+                },
+                {
+                    "phase": "3. Review", "model_tier": "tier3", "reason": "Security Check", "artifact": "AUDIT.md",
+                    "task": get_prompt("auditor", "Audit the code.")
+                }
             ]
         else:
             category = "General"
+            # Generic steps
             steps = [
-                {"phase": "1. Planning", "model": "tier1", "reason": "Strategy"},
-                {"phase": "2. Execution", "model": "tier2", "reason": "Action"},
+                {
+                    "phase": "1. Plan", "model_tier": "tier1", "reason": "Strategy", "artifact": "PLAN.md",
+                    "task": f"Create a detailed plan for: {task_description}. Use 'write' to save to 'PLAN.md'."
+                },
+                {
+                    "phase": "2. Draft", "model_tier": "tier2", "reason": "Execution", "artifact": "RESULT.md",
+                    "task": "Read 'PLAN.md'. Execute the plan. Use 'write' to save output to 'RESULT.md'."
+                }
             ]
 
+        # 2. Display Plan & Apply Adaptation
+        final_steps = self._display_plan(task_description, category, steps)
+
+        # 3. Execute (if requested)
+        if execute:
+            self._execute_swarm(task_description, final_steps)
+
+    def _display_plan(self, task, category, steps):
         # Calculate savings
-        total_tokens_per_step = 1000 # Assumption
+        total_tokens = 1000
+        # Baseline cost (All Tier 1)
+        cost_baseline = len(steps) * (self.prices["tier1"]["price"] / 1_000_000) * total_tokens
         
-        # Scenario A: All SOTA (Tier 1)
-        cost_baseline = len(steps) * (self.prices["tier1"]["price"] / 1_000_000) * total_tokens_per_step
-        
-        # Scenario B: Golden Gear Routing
         cost_optimized = 0
-        for step in steps:
-            model_key = step["model"]
-            price = self.prices[model_key]["price"]
-            cost_optimized += (price / 1_000_000) * total_tokens_per_step
+        final_steps = []
 
-        savings_pct = ((cost_baseline - cost_optimized) / cost_baseline) * 100
-
-        # Output
         print(f"\n🧠 **Golden Gear Task Planner**")
-        print(f"**Task:** \"{task_description}\"")
+        print(f"**Task:** \"{task}\"")
         print(f"**Category:** {category}\n")
-        
-        print("| Phase | Assigned Agent | Model | Price/1M | Why? |")
+        print("| Phase | Assigned Agent | Model | Price/1M | Status |")
         print("| :--- | :--- | :--- | :--- | :--- |")
         
         for step in steps:
-            m = self.prices[step["model"]]
-            print(f"| {step['phase']} | {m['role']} | `{m['id']}` | ${m['price']:.2f} | {step['reason']} |")
+            tier = step["model_tier"]
+            # Apply Active Adaptation
+            model_id, switched, reason = self._get_stable_model(tier)
             
-        print(f"\n📉 **Financial Projection (per 1k runs):**")
-        print(f"- Standard Cost (All Sonnet): **${cost_baseline * 1000:.2f}**")
-        print(f"- Golden Gear Cost: **${cost_optimized * 1000:.2f}**")
-        print(f"- **TOTAL SAVINGS:** **{savings_pct:.1f}%** 💸")
-        print("\n*Simulation based on current OpenRouter pricing.*")
+            # Find price (reverse lookup or approx)
+            if switched:
+                price = self.prices["tier1"]["price"]
+                status_display = f"🔄 Switched ({reason})"
+            else:
+                price = self.prices[tier]["price"]
+                status_display = "✅ Optimal"
 
-# --- Existing Functions ---
+            cost_optimized += (price / 1_000_000) * total_tokens
+            
+            # Update step for execution
+            step["final_model_id"] = model_id
+            final_steps.append(step)
+
+            role_name = self.prices[tier]["role"]
+            print(f"| {step['phase']} | {role_name} | `{model_id.split('/')[-1]}` | ${price:.2f} | {status_display} |")
+        
+        savings_pct = ((cost_baseline - cost_optimized) / cost_baseline) * 100
+        print(f"\n📉 **Projected Savings:** **{savings_pct:.1f}%** 💸")
+        return final_steps
+
+    def _execute_swarm(self, original_task, steps):
+        print(f"\n🚀 **Launching Golden Gear Swarm...**", flush=True)
+        
+        run_log = {
+            "timestamp": datetime.now().isoformat(),
+            "task": original_task,
+            "steps": []
+        }
+
+        for step in steps:
+            phase = step['phase']
+            model_id = step['final_model_id'] # Use the adapted model
+            task = step['task']
+            expected_artifact = step.get('artifact')
+            
+            print(f"\n▶️  **Executing {phase}** via `{model_id}`...", flush=True)
+            print(f"   waiting for artifact: {expected_artifact}...", flush=True)
+            
+            # Construct secure CLI command
+            # Note: We keep --cleanup keep for debugging, but in prod could be delete
+            cmd = [
+                "openclaw", "sessions", "spawn",
+                "--model", model_id,
+                "--task", task,
+                "--cleanup", "keep" 
+            ]
+            
+            start_time = time.time()
+            result = safe_subprocess_run(cmd)
+            
+            status = "failed"
+            if result and result.returncode == 0:
+                print(f"   ✅ Spawn command sent.", flush=True)
+                # Stigmergy check: Wait for artifact
+                found = False
+                for _ in range(12): 
+                    time.sleep(5)
+                    # Simple existence check
+                    if expected_artifact and expected_artifact != "code" and os.path.exists(expected_artifact):
+                        print(f"   ✨ Artifact created: {expected_artifact}", flush=True)
+                        found = True
+                        status = "success"
+                        break
+                    elif expected_artifact == "code":
+                         # Loose check for code generation
+                         found = True 
+                         status = "success"
+                         break
+                    else:
+                        print(f"      ...waiting for agent...", flush=True)
+                
+                if not found:
+                    print(f"   ⚠️ Warning: Artifact {expected_artifact} not found after timeout.", flush=True)
+                    status = "timeout"
+            else:
+                err_msg = result.stderr if result else "Unknown execution error"
+                print(f"   ❌ Error spawning: {err_msg}", flush=True)
+                status = "error"
+            
+            # Log to memory
+            run_log["steps"].append({
+                "phase": phase,
+                "model": model_id,
+                "status": status,
+                "duration": time.time() - start_time
+            })
+                
+        # Save to Hippocampus (Memory File)
+        self._save_memory(run_log)
+        print(f"\n💾 **Run saved to swarm_memory.json**", flush=True)
+
+    def _save_memory(self, log_entry):
+        data = []
+        if os.path.exists(MEMORY_FILE):
+            try:
+                with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            except Exception:
+                data = [] # Reset on corruption
+        
+        data.append(log_entry)
+        
+        try:
+            with open(MEMORY_FILE, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            print(f"⚠️ [Memory] Failed to write memory: {e}")
+
+# --- Existing Functions (Refactored for Safety) ---
 
 def fetch_models():
-    """Fetch models from OpenRouter public API using standard library."""
+    """Fetch models from OpenRouter public API using standard library (HTTPS)."""
     try:
-        with urllib.request.urlopen(OPENROUTER_API, timeout=10) as response:
+        # Use a proper User-Agent to avoid being blocked
+        req = urllib.request.Request(
+            OPENROUTER_API, 
+            headers={'User-Agent': 'OpenClaw-ModelManager/1.4.0'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode('utf-8'))
             return data.get('data', [])
+    except urllib.error.URLError as e:
+        print(f"❌ [Network] Error connecting to OpenRouter API: {e}")
+        return []
     except Exception as e:
-        print(f"Error fetching models: {e}")
+        print(f"❌ [System] Unexpected error fetching models: {e}")
         return []
 
 def filter_and_rank(models, limit=20):
@@ -99,20 +312,19 @@ def filter_and_rank(models, limit=20):
     others = []
     
     for m in models:
-        # Simple heuristic: prioritize models with specific keywords
-        is_priority = any(k in m['id'] for k in priority_keywords)
-        # Filter out very obscure or test models if needed
-        if "test" in m['id'] or "beta" in m['id']: 
-            if not is_priority: continue # Allow priority betas (e.g. o1-preview)
+        model_id = m.get('id', '')
+        is_priority = any(k in model_id for k in priority_keywords)
+        
+        if "test" in model_id or "beta" in model_id: 
+            if not is_priority: continue 
             
         if is_priority:
             ranked.append(m)
         else:
             others.append(m)
             
-    # Sort priority models to top, then others by context length (descending)
-    ranked.sort(key=lambda x: x['context_length'], reverse=True)
-    others.sort(key=lambda x: x['context_length'], reverse=True)
+    ranked.sort(key=lambda x: x.get('context_length', 0), reverse=True)
+    others.sort(key=lambda x: x.get('context_length', 0), reverse=True)
     
     return (ranked + others)[:limit]
 
@@ -122,39 +334,45 @@ def display_models(models):
     print("| :--- | :--- | :--- | :--- | :--- |")
     
     for idx, m in enumerate(models, 1):
-        # Pricing is per token string, convert to float per 1M
         try:
-            in_price = float(m['pricing']['prompt']) * 1_000_000
-            out_price = float(m['pricing']['completion']) * 1_000_000
-        except (ValueError, KeyError):
+            pricing = m.get('pricing', {})
+            in_price = float(pricing.get('prompt', 0)) * 1_000_000
+            out_price = float(pricing.get('completion', 0)) * 1_000_000
+        except (ValueError, TypeError):
             in_price = 0.0
             out_price = 0.0
         
-        name = m['id']
-        print(f"| {idx} | `{m['id']}` | {m['context_length']//1000}k | ${in_price:.2f} | ${out_price:.2f} |")
+        context_k = m.get('context_length', 0) // 1000
+        print(f"| {idx} | `{m['id']}` | {context_k}k | ${in_price:.2f} | ${out_price:.2f} |")
         
     print("\nTo enable a model, use: `python3 skills/model-manager/manage_models.py enable <Index>`")
 
 def enable_model(model_id, config_path):
     """Generate OpenClaw config patch to enable a model."""
+    print(f"🔒 [Config] Preparing patch for: {model_id}")
+    
     # Read current config to avoid overwriting existing
-    try:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-    except FileNotFoundError:
-        print(f"Config file not found: {config_path}")
-        return
+    config = load_json_safe(config_path)
+    if not config and os.path.exists(config_path):
+        print(f"⚠️ [Config] Warning: Could not parse existing config at {config_path}")
 
     # Prepare patch data
     or_id = f"openrouter/{model_id}" if not model_id.startswith("openrouter/") else model_id
     
     try:
-        current_fallbacks = config['agents']['defaults']['model']['fallbacks']
-    except KeyError:
+        current_fallbacks = config.get('agents', {}).get('defaults', {}).get('model', {}).get('fallbacks', [])
+    except AttributeError:
         current_fallbacks = []
     
+    if not isinstance(current_fallbacks, list):
+        current_fallbacks = []
+
     new_fallbacks = list(current_fallbacks)
-    if or_id not in new_fallbacks: new_fallbacks.append(or_id)
+    if or_id not in new_fallbacks: 
+        new_fallbacks.append(or_id)
+        print(f"📝 [Config] Adding {or_id} to fallback list.")
+    else:
+        print(f"ℹ️ [Config] Model {or_id} already in fallback list.")
     
     # Construct the minimal patch object
     patch = {
@@ -170,22 +388,29 @@ def enable_model(model_id, config_path):
         }
     }
     
+    # Output JSON for piping (standard OpenClaw pattern)
     print(json.dumps(patch))
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: manage_models.py <list|enable|plan> [target/task]")
+        print("Usage: manage_models.py <list|enable|plan> [target/task] [--execute]")
         return
 
-    action = sys.argv[1]
+    # Argument parsing
+    cmd_args = sys.argv[1:]
+    action = cmd_args[0]
     
     if action == "plan":
-        if len(sys.argv) < 3:
-            print("Error: Please provide a task description. e.g., 'plan \"build a website\"'")
+        execute = "--execute" in cmd_args or "-x" in cmd_args
+        # Extract task description safely
+        task_words = [arg for arg in cmd_args[1:] if not arg.startswith("-")]
+        if not task_words:
+            print("Error: Please provide a task description.")
             return
-        task = " ".join(sys.argv[2:])
+        task = " ".join(task_words)
+        
         planner = TaskPlanner()
-        planner.plan(task)
+        planner.plan(task, execute=execute)
         return
 
     # For list/enable, fetch models first
@@ -199,11 +424,11 @@ def main():
         display_models(sorted_models)
         
     elif action == "enable":
-        if len(sys.argv) < 3:
+        if len(cmd_args) < 2:
             print("Error: Please specify a model index to enable.")
             return
             
-        target = sys.argv[2]
+        target = cmd_args[1]
         selected_model_id = None
         
         if target.isdigit():

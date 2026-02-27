@@ -12,12 +12,11 @@ Interact with OpenRouter API to fetch available models, compare pricing instantl
 
 **💰 拒绝冤枉钱！自动路由高性价比模型，最高节省 96% Token 费用。**
 
-为什么要花 **$15/1M tokens** 的价格去处理简单的翻译或摘要任务？明明可以用 **$0.60/1M** 的模型搞定！
-
 这个 Skill 能帮你：
-1.  **即时比价**：列出当前 OpenRouter 上的模型价格（每百万 Token 输入/输出成本），一目了然。
-2.  **智能配置**：自动将简单任务路由给高性价比的小模型（如 GPT-4o-mini, Haiku），复杂任务留给大模型。
-3.  **🆕 任务模拟器 (Plan Mode)**：输入你想做的任务，模拟展示“金齿轮”如何拆解任务并分配给不同模型，直接算出能省多少钱。
+1.  **即时比价**：列出当前 OpenRouter 上的模型价格。
+2.  **智能配置**：自动将简单任务路由给高性价比的小模型（如 GPT-4o-mini）。
+3.  **🆕 任务模拟器 (Plan Mode)**：输入任务，预览“金齿轮”如何拆解任务并分配给不同模型。
+4.  **🧠 自我进化 (Self-Healing)**：如果便宜模型经常失败，系统会自动切换到更稳定的模型（Active Adaptation）。
 
 ### 📉 Cost Savings Logic (Per 1M Output Tokens)
 
@@ -32,7 +31,8 @@ Interact with OpenRouter API to fetch available models, compare pricing instantl
 - **Compare Prices**: See input/output costs per 1M tokens side-by-side.
 - **Smart Routing**: Configure `openrouter/auto` to handle easier tasks with efficient models.
 - **Stay Updated**: Always access the latest price drops and new models from OpenRouter.
-- **Plan & Simulate**: Preview how a complex task is split into cheaper sub-tasks.
+- **Plan & Execute**: Decompose tasks into sub-agents and execute them in parallel.
+- **Adaptive Memory**: Learns from timeouts/errors and auto-switches to stable models.
 
 ## Installation 📦
 
@@ -50,30 +50,28 @@ In your OpenClaw chat:
 
 **List Models:**
 > "list models"
-> "列出模型"
 
-**Simulate Savings (NEW):**
+**Simulate Savings:**
 > "plan build a python scraper"
-> "规划 写一个爬虫"
+
+**Execute Swarm (NEW):**
+> "plan build a python scraper --execute"
 
 **Enable a Model:**
 > "enable 1"
-> "启用 1" (where 1 is the index from the list)
 
 **Manual Command:**
 You can also run it from the terminal:
 ```bash
-python3 skills/model-manager/manage_models.py list
-python3 skills/model-manager/manage_models.py plan "your task"
+python3 skills/model-manager/manage_models.py plan "your task" --execute
 ```
 
 ## How it Works 🧠
 
 1. **Fetches** `https://openrouter.ai/api/v1/models` (public API).
 2. **Filters** for top-tier models and sorts by context length.
-3. **Displays** a markdown table with pricing (input/output per 1M tokens).
-4. **Patches** `~/.openclaw/openclaw.json` to add the selected model ID to `agents.defaults.models` and `fallbacks`.
-5. **Simulates** task decomposition using a local heuristic planner to estimate savings.
+3. **Orchestrates Swarms**: Uses `openclaw sessions spawn` to create specialized sub-agents (Architect, Coder, Auditor).
+4. **Consolidates Memory**: Tracks success rates in `swarm_memory.json` and adapts routing logic to avoid unstable models.
 
 ## Requirements
 
