@@ -6,27 +6,38 @@ metadata: {"openclaw":{"emoji":"🚄","requires":{"bins":["node"]}}}
 
 # 12306 Train Query
 
-Query train schedules and remaining tickets from China Railway 12306.
+Query train schedules and remaining tickets from China Railway 12306. Output is an HTML file.
 
 ## Query Tickets
 
 ```bash
-node {baseDir}/scripts/query.mjs <from> <to> [-d YYYY-MM-DD] [-t G|D|Z|T|K]
+node {baseDir}/scripts/query.mjs <from> <to> [options]
 ```
+
+The command prints the output file path to stdout and query info to stderr.
 
 ### Examples
 
 ```bash
-# All trains from Beijing to Shanghai tomorrow
-node {baseDir}/scripts/query.mjs 北京 上海 -d 2026-02-24
+# All trains from Beijing to Shanghai (defaults to today)
+node {baseDir}/scripts/query.mjs 北京 上海
+
+# Specify a date
+node {baseDir}/scripts/query.mjs 北京 上海 -d 2026-03-01
 
 # Only high-speed trains (G)
-node {baseDir}/scripts/query.mjs 揭阳 杭州 -d 2026-02-24 -t G
+node {baseDir}/scripts/query.mjs 北京 上海 -t G
 
-# Multiple types: G and D trains
-node {baseDir}/scripts/query.mjs 深圳 长沙 -d 2026-02-25 -t GD
+# Morning departures, 2h max, with second class available
+node {baseDir}/scripts/query.mjs 上海 杭州 -t G --depart 06:00-12:00 --max-duration 1h --seat ze
 
-# JSON output
+# Only bookable trains arriving before 6pm
+node {baseDir}/scripts/query.mjs 深圳 长沙 --available --arrive -18:00
+
+# Custom output path
+node {baseDir}/scripts/query.mjs 广州 武汉 -o /tmp/tickets.html
+
+# JSON output (to stdout)
 node {baseDir}/scripts/query.mjs 广州 武汉 --json
 ```
 
@@ -34,22 +45,27 @@ node {baseDir}/scripts/query.mjs 广州 武汉 --json
 
 - `-d, --date <YYYY-MM-DD>`: Travel date (default: today)
 - `-t, --type <G|D|Z|T|K>`: Filter train types (combinable, e.g. `GD`)
-- `--json`: Output raw JSON
+- `--depart <HH:MM-HH:MM>`: Depart time range (e.g. `08:00-12:00`, `18:00-`)
+- `--arrive <HH:MM-HH:MM>`: Arrive time range (e.g. `-18:00`, `14:00-20:00`)
+- `--max-duration <duration>`: Max travel time (e.g. `2h`, `90m`, `1h30m`)
+- `--available`: Only show bookable trains
+- `--seat <types>`: Only show trains with tickets for given seat types (comma-separated: `swz,zy,ze,rw,dw,yw,yz,wz`)
+- `-o, --output <path>`: Output HTML file path (default: `{baseDir}/data/<from>-<to>-<date>.html`)
+- `--json`: Output raw JSON to stdout
 
 ### Output Columns
 
 | Column | Meaning |
 |--------|---------|
-| 商务/特等 | Business class / Premium |
-| 一等座 | First class |
-| 二等座 | Second class |
-| 软卧/动卧 | Soft sleeper / Bullet sleeper |
-| 硬卧 | Hard sleeper |
-| 硬座 | Hard seat |
-| 无座 | Standing |
-| 可买 | ✅ = available, ❌ = sold out |
+| 商务/特等 | Business class / Premium (swz) |
+| 一等座 | First class (zy) |
+| 二等座 | Second class (ze) |
+| 软卧/动卧 | Soft sleeper / Bullet sleeper (rw/dw) |
+| 硬卧 | Hard sleeper (yw) |
+| 硬座 | Hard seat (yz) |
+| 无座 | Standing (wz) |
 
-Values: number = remaining seats, `有` = available (qty unknown), `--` = not applicable
+Values: number = remaining seats, `有` = available (qty unknown), `—` = not applicable
 
 ## Station Lookup
 
