@@ -3,9 +3,15 @@
   "slug": "totp",
   "displayName": "TOTP",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1772003140674,
-    "commit": "https://github.com/openclaw/skills/commit/9bc8b2c5c3f203abcf5ad170abeb194cb525bde0"
+    "version": "1.0.2",
+    "publishedAt": 1772047704313,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1772003140674,
+      "commit": "https://github.com/openclaw/skills/commit/9bc8b2c5c3f203abcf5ad170abeb194cb525bde0"
+    }
+  ]
 }

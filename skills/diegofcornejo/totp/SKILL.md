@@ -41,12 +41,17 @@ Protect access to:
    node scripts/generate-secret.js MyService myuser
    ```
 
-3. **Set TOTP_SECRET in `.env`:**
+3. **Send the QR image** (`qr.png`) to the user, then delete it immediately:
+   ```bash
+   rm qr.png
+   ```
+
+4. **Set TOTP_SECRET in `.env`:**
    ```env
    TOTP_SECRET=YOUR_BASE32_SECRET_HERE
    ```
 
-4. **Configure Google Authenticator/Authy** with the generated secret.
+5. **Configure Google Authenticator/Authy** with the generated secret or QR.
 
 ## Usage
 
