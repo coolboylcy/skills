@@ -1,0 +1,11 @@
+{
+  "owner": "xbtoshi",
+  "slug": "monero-wallet",
+  "displayName": "Monero Wallet",
+  "latest": {
+    "version": "1.0.7",
+    "publishedAt": 1772111526515,
+    "commit": null
+  },
+  "history": []
+}
