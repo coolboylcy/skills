@@ -9,10 +9,10 @@ BitNote enables agents to store secrets, identity, and critical knowledge withou
 
 ## Primary Use Cases
 
-- Preserve agent identity (`SOUL.md`, values, mission, memory).
-- Store secrets (API keys, credentials, private keys).
-- Enable encrypted agent-to-agent communication.
-- Recover state after runtime/server failures.
+* Preserve agent identity (`SOUL.md`, values, mission, memory).
+* Store secrets (API keys, credentials, private keys).
+* Enable encrypted agent-to-agent communication.
+* Recover state after runtime/server failures.
 
 ## Canonical Write Path (Required)
 
@@ -70,6 +70,27 @@ Handling rules:
 - Never commit passphrases to git.
 - Store passphrases in environment variables or a secret manager.
 
+## Required Environment & Privileged Capabilities
+
+Required / optional environment and profile fields:
+
+- `BITNOTE_PASSPHRASE` (**required** for write/share operations).
+- `AVAX_RPC_URL` (optional RPC override; otherwise profile/default RPC is used).
+- `SNOWTRACE_API_KEY` (optional; used only by ABI refresh workflows).
+- `profiles/<name>.json` may include non-secret defaults like `username` and `rpc`.
+
+Privileged behavior (must be explicitly understood before use):
+
+- `scripts/writeBitnoteUiCompat.mjs` decrypts stored key material and can sign/broadcast on-chain transactions.
+- `scripts/generateShareLink.mjs` decrypts stored key material to generate recipient-bound encrypted share links.
+- `scripts/readBitnote.mjs` is read-only (no transaction signing).
+
+Operator policy:
+
+- Use read-only or dry-run modes first.
+- Require explicit operator approval before any non-dry-run write.
+- Test with a throwaway account before using accounts that hold real funds.
+
 ## Quick Start
 
 ```bash
@@ -84,7 +105,19 @@ Read account mapping and note counts:
 BITNOTE_USERNAME="example_user" node scripts/readBitnote.mjs
 ```
 
-Create encrypted UI-compatible note:
+Dry-run write first (recommended safety check, no tx broadcast):
+
+```bash
+BITNOTE_PASSPHRASE="..." \
+node scripts/writeBitnoteUiCompat.mjs \
+  --profile example \
+  --title "Preview" \
+  --body "No on-chain write" \
+  --request-id "preview-001" \
+  --dry-run 1
+```
+
+Create encrypted UI-compatible note (signs and broadcasts tx):
 
 ```bash
 BITNOTE_PASSPHRASE="..." \
@@ -104,18 +137,6 @@ node scripts/writeBitnoteUiCompat.mjs \
   --title "Agent Identity Core" \
   --body "<same body>" \
   --request-id "identity-core-v1"
-```
-
-Dry run (no tx broadcast):
-
-```bash
-BITNOTE_PASSPHRASE="..." \
-node scripts/writeBitnoteUiCompat.mjs \
-  --profile example \
-  --title "Preview" \
-  --body "No on-chain write" \
-  --request-id "preview-001" \
-  --dry-run 1
 ```
 
 Generate a BitNote share link (agent-to-agent or user-to-user):

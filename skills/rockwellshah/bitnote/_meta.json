@@ -3,11 +3,16 @@
   "slug": "bitnote",
   "displayName": "BitNote",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771981364635,
-    "commit": "https://github.com/openclaw/skills/commit/a583de7ec44f950a2ad847ca88e7f18dda7d63a2"
+    "version": "1.0.2",
+    "publishedAt": 1772075831996,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771981364635,
+      "commit": "https://github.com/openclaw/skills/commit/a583de7ec44f950a2ad847ca88e7f18dda7d63a2"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1771977495390,
