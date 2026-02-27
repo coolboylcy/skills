@@ -1,0 +1,11 @@
+{
+  "owner": "nissan",
+  "slug": "fastapi-studio-template",
+  "displayName": "Fastapi Studio Template",
+  "latest": {
+    "version": "1.2.0",
+    "publishedAt": 1772145088903,
+    "commit": null
+  },
+  "history": []
+}
