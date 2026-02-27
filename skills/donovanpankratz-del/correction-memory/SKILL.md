@@ -1,5 +1,6 @@
 ---
 name: correction-memory
+version: 1.1.0
 description: Makes agent corrections persistent and reusable. When you override, reject, or correct an agent's output, this skill logs the correction and automatically injects it into future spawns of the same agent type. Solves "agent keeps making the same mistake across sessions." Installs correction-tracker lib + injection hook into agent-context-loader. Works standalone or alongside intent-engineering skill.
 ---
 

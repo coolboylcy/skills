@@ -26,10 +26,62 @@ const path = require('path');
 const CORRECTIONS_DIR  = 'memory/corrections';
 const THIRTY_DAYS_MS   = 30 * 24 * 60 * 60 * 1000;
 
+// Max lengths for input validation
+const MAX_AGENT_TYPE_LEN = 64;
+const MAX_CONTENT_LEN    = 2000;
+
+// ── Input sanitization ────────────────────────────────────────────────────────
+
+/**
+ * Sanitize agentType: allow only alphanumeric, hyphens, underscores.
+ * Prevents path traversal via filename injection.
+ */
+function _sanitizeAgentType(agentType) {
+  if (typeof agentType !== 'string' || agentType.length === 0) {
+    throw new Error('agentType must be a non-empty string');
+  }
+  if (agentType.length > MAX_AGENT_TYPE_LEN) {
+    throw new Error(`agentType exceeds max length of ${MAX_AGENT_TYPE_LEN}`);
+  }
+  const sanitized = agentType.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (sanitized.length === 0) {
+    throw new Error('agentType contains no valid characters after sanitization');
+  }
+  return sanitized;
+}
+
+/**
+ * Sanitize free-text content (issue/correction).
+ * Strips null bytes and control characters. Enforces max length.
+ * Does NOT strip legitimate punctuation — just removes injection-risky chars.
+ */
+function _sanitizeContent(text, fieldName) {
+  if (typeof text !== 'string' || text.trim().length === 0) {
+    throw new Error(`${fieldName} must be a non-empty string`);
+  }
+  // Remove null bytes and ASCII control chars (except tab/newline which are benign)
+  // eslint-disable-next-line no-control-regex
+  const sanitized = text.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
+  if (sanitized.length === 0) {
+    throw new Error(`${fieldName} is empty after sanitization`);
+  }
+  if (sanitized.length > MAX_CONTENT_LEN) {
+    throw new Error(`${fieldName} exceeds max length of ${MAX_CONTENT_LEN}`);
+  }
+  return sanitized;
+}
+
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
 function _correctionFilePath(agentType, workspaceRoot) {
-  return path.join(workspaceRoot, CORRECTIONS_DIR, `${agentType}.jsonl`);
+  const safe = _sanitizeAgentType(agentType);
+  const dir  = path.resolve(workspaceRoot, CORRECTIONS_DIR);
+  const file = path.resolve(dir, `${safe}.jsonl`);
+  // Confirm resolved path is still inside corrections dir (defense in depth)
+  if (!file.startsWith(dir + path.sep) && file !== dir) {
+    throw new Error(`Path traversal detected for agentType: ${agentType}`);
+  }
+  return file;
 }
 
 function _ensureDir(workspaceRoot) {
@@ -78,16 +130,13 @@ function _writeAll(agentType, workspaceRoot, entries) {
  * logCorrection('CoderAgent', 'Used ESM imports', 'Always use require() for stdlib', workspaceRoot);
  */
 function logCorrection(agentType, issue, correction, workspaceRoot, opts = {}) {
-  if (!agentType)    throw new Error('logCorrection: agentType is required');
-  if (!issue)        throw new Error('logCorrection: issue is required');
-  if (!correction)   throw new Error('logCorrection: correction is required');
   if (!workspaceRoot) throw new Error('logCorrection: workspaceRoot is required');
 
   const entry = {
     ts:              new Date().toISOString(),
-    issue:           issue.trim(),
-    correction:      correction.trim(),
-    session_channel: opts.session_channel || 'unknown',
+    issue:           _sanitizeContent(issue, 'issue'),
+    correction:      _sanitizeContent(correction, 'correction'),
+    session_channel: _sanitizeContent(opts.session_channel || 'unknown', 'session_channel'),
     applied_count:   0
   };
 
@@ -107,8 +156,8 @@ function logCorrection(agentType, issue, correction, workspaceRoot, opts = {}) {
  * @returns {Array<{ ts: string, issue: string, correction: string, session_channel: string, applied_count: number }>}
  */
 function getCorrections(agentType, workspaceRoot, limit = 5) {
-  if (!agentType)    throw new Error('getCorrections: agentType is required');
   if (!workspaceRoot) throw new Error('getCorrections: workspaceRoot is required');
+  agentType = _sanitizeAgentType(agentType);
 
   const all = _readAll(agentType, workspaceRoot);
   if (all.length === 0) return [];
@@ -129,8 +178,8 @@ function getCorrections(agentType, workspaceRoot, limit = 5) {
  * const fullTask = preamble ? preamble + '\n\n---\n\n' + task : task;
  */
 function buildCorrectionPreamble(agentType, workspaceRoot) {
-  if (!agentType)    throw new Error('buildCorrectionPreamble: agentType is required');
   if (!workspaceRoot) throw new Error('buildCorrectionPreamble: workspaceRoot is required');
+  agentType = _sanitizeAgentType(agentType);
 
   const cutoff = new Date(Date.now() - THIRTY_DAYS_MS);
   const recent = _readAll(agentType, workspaceRoot)
@@ -157,9 +206,9 @@ function buildCorrectionPreamble(agentType, workspaceRoot) {
  * @returns {boolean} true if found and updated, false otherwise
  */
 function markApplied(agentType, ts, workspaceRoot) {
-  if (!agentType)    throw new Error('markApplied: agentType is required');
   if (!ts)           throw new Error('markApplied: ts is required');
   if (!workspaceRoot) throw new Error('markApplied: workspaceRoot is required');
+  agentType = _sanitizeAgentType(agentType);
 
   const entries = _readAll(agentType, workspaceRoot);
   const idx     = entries.findIndex(e => e.ts === ts);
