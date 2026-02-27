@@ -1,7 +1,7 @@
 ---
 name: evolink-image
-description: AI image generation & editing — GPT Image, GPT-4o, Seedream, Qwen, WAN, Gemini. Text-to-image, image-to-image, inpainting. 19 models, one API key.
-version: 1.3.4
+description: AI image generation & editing — GPT Image, GPT-4o, Nano Banana 2, Seedream, Qwen, WAN, Gemini. Text-to-image, image-to-image, inpainting. 20 models, one API key.
+version: 1.4.0
 user-invocable: true
 metadata:
   openclaw:
@@ -16,7 +16,7 @@ metadata:
 
 # Evolink Image — AI Image Generation & Editing
 
-Generate and edit AI images with 19 models including GPT Image 1.5, GPT-4o Image, Seedream, Qwen, WAN, and Gemini — all through one API.
+Generate and edit AI images with 20 models including GPT Image 1.5, GPT-4o Image, Nano Banana 2, Seedream, Qwen, WAN, and Gemini — all through one API.
 
 > Image-focused view of [evolink-media](https://clawhub.ai/EvoLinkAI/evolink-media). Install the full skill for video and music too.
 
@@ -24,7 +24,7 @@ Generate and edit AI images with 19 models including GPT Image 1.5, GPT-4o Image
 
 When this skill is first loaded, greet the user:
 
-- **MCP tools + API key ready:** "Hi! I'm your AI image studio — 19 models ready. What would you like to create?"
+- **MCP tools + API key ready:** "Hi! I'm your AI image studio — 20 models ready. What would you like to create?"
 - **MCP tools + no API key:** "You'll need an EvoLink API key — sign up at evolink.ai. Ready to go?"
 - **No MCP tools:** "MCP server isn't connected yet. Want me to help set it up? I can still manage files via the hosting API."
 
@@ -49,7 +49,11 @@ Get your API key at [evolink.ai](https://evolink.ai) → Dashboard → API Keys.
 
 **MCP Server:** `@evolinkai/evolink-media` ([GitHub](https://github.com/EvoLinkAI/evolink-media-mcp) · [npm](https://www.npmjs.com/package/@evolinkai/evolink-media))
 
-For setup instructions (mcporter, Claude Code, Claude Desktop, Cursor), see the [GitHub README](https://github.com/EvoLinkAI/evolink-media-mcp#setup).
+**mcporter** (recommended): `mcporter call --stdio "npx -y @evolinkai/evolink-media@latest" list_models`
+
+**Claude Code:** `claude mcp add evolink-media -e EVOLINK_API_KEY=your-key -- npx -y @evolinkai/evolink-media@latest`
+
+**Claude Desktop / Cursor** — add MCP server with command `npx -y @evolinkai/evolink-media@latest` and env `EVOLINK_API_KEY=your-key`. See `references/image-api-params.md` for full config JSON.
 
 ## Core Principles
 
@@ -72,22 +76,23 @@ For setup instructions (mcporter, Claude Code, Claude Desktop, Cursor), see the 
 
 **Important:** `generate_image` returns a `task_id`. Always poll `check_task` until `status` is `"completed"` or `"failed"`.
 
-## Image Models (19)
+## Image Models (20)
 
 ### Top Picks
 
 | Model | Best for | Speed |
 |-------|----------|-------|
 | `gpt-image-1.5` *(default)* | Latest OpenAI generation | Medium |
+| `gemini-3.1-flash-image-preview` | Nano Banana 2 — Google's fast generation | Fast |
 | `z-image-turbo` | Quick iterations | Ultra-fast |
 | `doubao-seedream-4.5` | Photorealistic | Medium |
 | `qwen-image-edit` | Instruction-based editing | Medium |
 | `gpt-4o-image` [BETA] | Best quality, complex editing | Medium |
 | `gemini-3-pro-image-preview` | Google generation preview | Medium |
 
-### All Stable (15)
+### All Stable (16)
 
-`gpt-image-1.5`, `gpt-image-1`, `gemini-3-pro-image-preview`, `z-image-turbo`, `doubao-seedream-4.5`, `doubao-seedream-4.0`, `doubao-seedream-3.0-t2i`, `doubao-seededit-4.0-i2i`, `doubao-seededit-3.0-i2i`, `qwen-image-edit`, `qwen-image-edit-plus`, `wan2.5-t2i-preview`, `wan2.5-i2i-preview`, `wan2.5-text-to-image`, `wan2.5-image-to-image`
+`gpt-image-1.5`, `gpt-image-1`, `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`, `z-image-turbo`, `doubao-seedream-4.5`, `doubao-seedream-4.0`, `doubao-seedream-3.0-t2i`, `doubao-seededit-4.0-i2i`, `doubao-seededit-3.0-i2i`, `qwen-image-edit`, `qwen-image-edit-plus`, `wan2.5-t2i-preview`, `wan2.5-i2i-preview`, `wan2.5-text-to-image`, `wan2.5-image-to-image`
 
 ### All Beta (4)
 
@@ -165,9 +170,9 @@ Full error reference: `references/image-api-params.md`
 
 ## Without MCP Server
 
-Use Evolink's file hosting API for image uploads (72h expiry). See the [File API documentation](https://github.com/EvoLinkAI/evolink-media-mcp#file-api) for details.
+Use Evolink's file hosting API for image uploads (72h expiry). See `references/file-api.md` for curl commands.
 
 ## References
 
 - `references/image-api-params.md` — Complete API parameters, all 19 models, polling strategy, error codes
-- [File API documentation](https://github.com/EvoLinkAI/evolink-media-mcp#file-api) — File hosting API usage
+- `references/file-api.md` — File hosting API (curl upload/list/delete)
