@@ -17,7 +17,7 @@ All requests require:
 
 **Layer 0** - Language, timezone, comms prefs
 **Layer 1** - Projects, goals, pinned memories
-**Layer 2** - Personal identity info
+**Layer 2** - Personal identity info, API and other keys
 **Layer 3** - Encrypted vault (requires consent)
 
 ## Usage
