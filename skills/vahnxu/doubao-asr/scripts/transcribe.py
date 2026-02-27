@@ -137,8 +137,7 @@ def upload_to_tos(filepath, fmt):
             "  3. Set env vars:\n"
             "     export VOLCENGINE_ACCESS_KEY_ID='your_ak'\n"
             "     export VOLCENGINE_SECRET_ACCESS_KEY='your_sk'\n"
-            "     export VOLCENGINE_TOS_BUCKET='your_bucket_name'\n\n"
-            "Alternative: set DOUBAO_ASR_UPLOAD_URL to use your own upload endpoint."
+            "     export VOLCENGINE_TOS_BUCKET='your_bucket_name'"
         )
 
     # Validate bucket/region to prevent injection
@@ -316,8 +315,14 @@ def main():
         output = result.get("text", "")
 
     if args.out:
-        os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
-        with open(args.out, "w", encoding="utf-8") as f:
+        out_path = os.path.realpath(args.out)
+        # Block writes outside /tmp and current working directory
+        cwd = os.path.realpath(os.getcwd())
+        tmp = os.path.realpath("/tmp")
+        if not (out_path.startswith(cwd + os.sep) or out_path.startswith(tmp + os.sep)):
+            sys.exit(f"Output path not allowed (must be under working directory or /tmp): {args.out}")
+        os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f:
             f.write(output)
         print(args.out)
     else:
