@@ -1,6 +1,6 @@
 ---
 name: tg-canvas
-description: "Telegram Mini App Canvas. Renders agent-generated content (HTML, markdown) in a Telegram Mini App. Authenticated via Telegram initData — only approved users can view. Push content with `tg-canvas push` or via the /push API."
+description: "Telegram Mini App Canvas with terminal and optional Control UI proxy. Renders agent-generated content (HTML, markdown, A2UI) in a Telegram Mini App; push with `tg-canvas push`. Includes a JWT-gated browser terminal (server-side PTY/bash — high privilege, shell access to server). Optionally proxies OpenClaw Control UI via ENABLE_OPENCLAW_PROXY=true (off by default; no local files read)."
 homepage: https://github.com/clvv/openclaw-tg-canvas
 kind: server
 metadata:
@@ -21,6 +21,22 @@ metadata:
       ]
     }
   }
+---
+
+## Security FAQ (answers for skill reviewers)
+
+**Q: Does the server auto-load `~/.openclaw/openclaw.json` or any local credential file?**
+No. The server reads no local files for credentials. `OPENCLAW_GATEWAY_TOKEN` must be supplied explicitly via environment variable. The relevant code is the `ENABLE_OPENCLAW_PROXY` config block in `server.js` — verify it yourself.
+
+**Q: What is the default for `ENABLE_OPENCLAW_PROXY`?**
+Off. The code is `const ENABLE_OPENCLAW_PROXY = process.env.ENABLE_OPENCLAW_PROXY === "true";` — it is only enabled if the string `"true"` is explicitly set in the environment. Omitting the variable leaves it disabled.
+
+**Q: What are the terminal/PTY endpoints and how are they authenticated?**
+- Endpoint: `GET /ws/terminal` (WebSocket upgrade)
+- Auth: JWT verified by `verifyJwt()` in the upgrade handler — same token issued by `POST /auth` after Telegram `initData` HMAC-SHA256 verification against `BOT_TOKEN`, restricted to `ALLOWED_USER_IDS`
+- If the JWT is missing or invalid the connection is rejected with `401 Unauthorized` before a PTY is spawned
+- PTY is killed immediately when the WebSocket closes
+
 ---
 
 **This is a server skill.** It includes a Node.js HTTP/WebSocket server (`server.js`), a CLI (`bin/tg-canvas.js`), and a Telegram Mini App frontend (`miniapp/`). It is not instruction-only.
@@ -77,7 +93,7 @@ Telegram Mini App Canvas renders agent-generated HTML or markdown inside a Teleg
 | `POST /push` | ❌ loopback-only | `PUSH_TOKEN` required + loopback check |
 | `POST /clear` | ❌ loopback-only | `PUSH_TOKEN` required + loopback check |
 | `GET /health` | ❌ loopback-only | Loopback check only (read-only, low risk) |
-| `GET/WS /oc/*` | ✅ | JWT required (from `/auth`), then cookie-backed session; upstream gateway auth injected server-side |
+| `GET/WS /oc/*` | ✅ (when enabled) | JWT required; only available when `ENABLE_OPENCLAW_PROXY=true` |
 
 > ⚠️ **Cloudflared loopback bypass:** `cloudflared` (and other local tunnels) forward remote requests by making outbound TCP connections to `localhost`. This means all requests arriving via the tunnel appear to originate from `127.0.0.1` at the socket level — completely defeating the loopback-only IP check. **`PUSH_TOKEN` is therefore required and is enforced at startup.** The loopback check is retained as an additional layer but must not be relied on as the sole protection.
 
@@ -86,8 +102,23 @@ Telegram Mini App Canvas renders agent-generated HTML or markdown inside a Teleg
 - Use a strong random `JWT_SECRET` (32+ bytes).
 - Keep `BOT_TOKEN`, `JWT_SECRET`, and `PUSH_TOKEN` secret; rotate if compromised.
 - The Cloudflare tunnel exposes the Mini App publicly — the `ALLOWED_USER_IDS` check in `/auth` is the primary access control gate for the canvas.
+- **`ENABLE_OPENCLAW_PROXY` is off by default.** Only enable it if you need Control UI access through the Mini App and understand the implications (see below).
 
-### Control UI origin allowlist (required for websocket)
+### OpenClaw Control UI proxy (optional)
+
+The server can optionally proxy `/oc/*` to a local OpenClaw gateway, enabling you to access the OpenClaw Control UI through the Mini App.
+
+**This feature is disabled by default.** To enable:
+
+```env
+ENABLE_OPENCLAW_PROXY=true
+```
+
+**When enabled, the server:**
+- Proxies `/oc/*` HTTP and WebSocket requests to the local OpenClaw gateway.
+- If `OPENCLAW_GATEWAY_TOKEN` is set, injects it as `Authorization: Bearer` on proxied requests.
+
+The server does **not** read any local files for credentials — `OPENCLAW_GATEWAY_TOKEN` must be supplied explicitly via environment variable if needed.
 
 When using `/oc/*` over a public origin, add that origin to OpenClaw gateway config:
 
@@ -95,11 +126,25 @@ When using `/oc/*` over a public origin, add that origin to OpenClaw gateway con
 {
   "gateway": {
     "controlUi": {
-      "allowedOrigins": ["https://canvas.wdai.us"]
+      "allowedOrigins": ["https://your-canvas-url.example.com"]
     }
   }
 }
 ```
+
+## Terminal (high-privilege feature)
+
+The Mini App includes an interactive terminal backed by a server-side PTY.
+
+> ⚠️ **This grants shell access to the machine running the server**, as the process user. Anyone in `ALLOWED_USER_IDS` can open a bash session and run arbitrary commands. Only add users you trust with shell access to `ALLOWED_USER_IDS`.
+
+**How it works:**
+- Authenticated users see a **Terminal** button in the Mini App topbar.
+- Tapping it opens xterm.js connected to `/ws/terminal` (JWT required).
+- A PTY (bash) is spawned per WebSocket connection; killed when the connection closes.
+- Mobile toolbar provides Ctrl/Alt sticky modifiers, Esc, Tab, arrow keys.
+
+**Runtime scope:** `node-pty` spawns a bash process as the server process user. No additional env vars control this; auth is the only gate.
 
 ## Commands
 
@@ -109,16 +154,18 @@ When using `/oc/*` over a public origin, add that origin to OpenClaw gateway con
 
 ## Configuration
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `BOT_TOKEN` | Yes | Telegram bot token used for API calls and auth verification. |
-| `ALLOWED_USER_IDS` | Yes | Comma-separated Telegram user IDs allowed to view the Mini App. |
-| `JWT_SECRET` | Yes | Secret used to sign session tokens. Use a long random value (32+ bytes). |
-| `PORT` | No | Server port (default: `3721`). |
-| `MINIAPP_URL` | Yes (for bot setup) | HTTPS URL of the Mini App (Cloudflare tunnel or nginx). |
-| `PUSH_TOKEN` | Yes | Shared secret for `/push` and `/clear`. Sent via `X-Push-Token` header. Required because `cloudflared` makes loopback TCP connections, bypassing IP-based loopback checks. Generate with: `openssl rand -hex 32` |
-| `TG_CANVAS_URL` | No | Base URL for the CLI (default: `http://127.0.0.1:3721`). |
-| `ENABLE_OPENCLAW_PROXY` | No | Enable `/oc/*` proxy to local OpenClaw control UI (default: `true`). |
-| `OPENCLAW_PROXY_HOST` | No | Upstream OpenClaw host for `/oc/*` (default: `127.0.0.1`). |
-| `OPENCLAW_PROXY_PORT` | No | Upstream OpenClaw port for `/oc/*` (default: `18789`). |
-| `OPENCLAW_GATEWAY_TOKEN` | No | Optional explicit gateway token for proxied control UI requests; if unset, server loads from `~/.openclaw/openclaw.json`. |
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `BOT_TOKEN` | Yes | — | Telegram bot token for API calls and `initData` verification. |
+| `ALLOWED_USER_IDS` | Yes | — | Comma-separated Telegram user IDs allowed to authenticate. Controls access to canvas, terminal, and proxy. |
+| `JWT_SECRET` | Yes | — | Secret for signing session JWTs. Use 32+ random bytes. |
+| `PUSH_TOKEN` | Yes | — | Shared secret for `/push` and `/clear`. Server refuses to start without it. Generate: `openssl rand -hex 32` |
+| `MINIAPP_URL` | Yes (setup only) | — | HTTPS URL of the Mini App, used by `scripts/setup-bot.js` to configure the bot menu button. |
+| `PORT` | No | `3721` | HTTP server port. |
+| `TG_CANVAS_URL` | No | `http://127.0.0.1:3721` | Base URL used by the `tg-canvas` CLI. |
+| `ENABLE_OPENCLAW_PROXY` | No | `false` | Set to the string `"true"` to enable `/oc/*` proxy to a local OpenClaw gateway. **Off by default.** The server does **not** read any local files to obtain a token — `OPENCLAW_GATEWAY_TOKEN` must be set explicitly if auth is needed. |
+| `OPENCLAW_GATEWAY_TOKEN` | No | *(unset)* | Auth token injected as `Authorization: Bearer` on proxied `/oc/*` requests. Only used when `ENABLE_OPENCLAW_PROXY=true`. Must be supplied explicitly; no automatic file loading occurs. |
+| `OPENCLAW_PROXY_HOST` | No | `127.0.0.1` | Hostname of the local OpenClaw gateway (proxy only). |
+| `OPENCLAW_PROXY_PORT` | No | `18789` | Port of the local OpenClaw gateway (proxy only). |
+| `JWT_TTL_SECONDS` | No | `900` | Session token lifetime in seconds (default 15 min). |
+| `INIT_DATA_MAX_AGE_SECONDS` | No | `300` | Maximum age of Telegram `initData` (default 5 min). |

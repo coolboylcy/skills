@@ -7,9 +7,11 @@
 
 const http = require("http");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
+const pty = require("node-pty");
 
 // ---- Config ----
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
@@ -24,7 +26,12 @@ const PORT = parseInt(process.env.PORT || "3721", 10);
 const PUSH_TOKEN = process.env.PUSH_TOKEN || ""; // required — server will refuse /push and /clear without it
 const RATE_LIMIT_AUTH_PER_MIN = parseInt(process.env.RATE_LIMIT_AUTH_PER_MIN || "30", 10);
 const RATE_LIMIT_STATE_PER_MIN = parseInt(process.env.RATE_LIMIT_STATE_PER_MIN || "120", 10);
-const ENABLE_OPENCLAW_PROXY = (process.env.ENABLE_OPENCLAW_PROXY || "true") === "true";
+// OpenClaw Control UI proxy — OFF by default; must be explicitly opted into.
+// When enabled, /oc/* HTTP and WebSocket requests are proxied to the local
+// OpenClaw gateway. If OPENCLAW_GATEWAY_TOKEN is set, it is injected as an
+// Authorization: Bearer header on proxied requests. No local credential files
+// are read; OPENCLAW_GATEWAY_TOKEN must be supplied explicitly via env var.
+const ENABLE_OPENCLAW_PROXY = process.env.ENABLE_OPENCLAW_PROXY === "true";
 const OPENCLAW_PROXY_HOST = process.env.OPENCLAW_PROXY_HOST || "127.0.0.1";
 const OPENCLAW_PROXY_PORT = parseInt(process.env.OPENCLAW_PROXY_PORT || "18789", 10);
 let OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
@@ -44,17 +51,11 @@ if (!PUSH_TOKEN) {
   process.exit(1);
 }
 
-// Best effort: auto-load gateway auth token so proxied control-ui WS can authenticate.
-if (!OPENCLAW_GATEWAY_TOKEN) {
-  try {
-    const cfgPath = '/home/wdai/.openclaw/openclaw.json';
-    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-    OPENCLAW_GATEWAY_TOKEN = cfg?.gateway?.auth?.token || '';
-  } catch (_) {
-    // ignore
-  }
+if (ENABLE_OPENCLAW_PROXY) {
+  console.log(`[tg-canvas] OPENCLAW_PROXY enabled (OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN ? 'set' : 'not set'})`);
+} else {
+  console.log('[tg-canvas] OPENCLAW_PROXY disabled (set ENABLE_OPENCLAW_PROXY=true to enable)');
 }
-console.log(`[tg-canvas] OPENCLAW_PROXY token loaded: ${OPENCLAW_GATEWAY_TOKEN ? 'yes' : 'no'}`);
 
 // ---- Helpers ----
 const MINIAPP_DIR = path.join(__dirname, "miniapp");
@@ -563,8 +564,84 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// ---- WebSocket server ----
+// ---- WebSocket server (canvas) ----
 const wss = new WebSocketServer({ noServer: true });
+
+// ---- WebSocket server (terminal) ----
+const termWss = new WebSocketServer({ noServer: true });
+
+termWss.on("connection", (ws, req, payload) => {
+  const shell = process.env.SHELL || "/bin/bash";
+  const cols = 80;
+  const rows = 24;
+
+  // Use the actual process user's info — guards against the service being
+  // accidentally run as root, which would give the terminal a root shell.
+  const userInfo = (() => { try { return os.userInfo(); } catch (_) { return null; } })();
+  const userHome = userInfo?.homedir || process.env.HOME || "/";
+  const userName = userInfo?.username || process.env.USER || "";
+
+  if (process.getuid && process.getuid() === 0) {
+    console.warn("[tg-canvas] WARNING: server is running as root; terminal will be a root shell. " +
+      "Set User=<your-user> in the systemd service to fix this.");
+  }
+
+  let term;
+  try {
+    term = pty.spawn(shell, [], {
+      name: "xterm-256color",
+      cols,
+      rows,
+      cwd: userHome,
+      env: {
+        ...process.env,
+        HOME: userHome,
+        USER: userName,
+        LOGNAME: userName,
+        TERM: "xterm-256color",
+      },
+    });
+  } catch (err) {
+    ws.send(JSON.stringify({ type: "exit", code: -1, error: String(err) }));
+    ws.close();
+    return;
+  }
+
+  // PTY → WS
+  term.onData((data) => {
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: "data", data }));
+    }
+  });
+
+  term.onExit(({ exitCode }) => {
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: "exit", code: exitCode }));
+      ws.close();
+    }
+  });
+
+  // WS → PTY
+  ws.on("message", (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === "data" && typeof msg.data === "string") {
+        term.write(msg.data);
+      } else if (msg.type === "resize" && msg.cols && msg.rows) {
+        term.resize(
+          Math.max(2, Math.min(500, msg.cols)),
+          Math.max(1, Math.min(200, msg.rows))
+        );
+      }
+    } catch (_) {
+      // ignore malformed
+    }
+  });
+
+  ws.on("close", () => {
+    try { term.kill(); } catch (_) {}
+  });
+});
 
 wss.on("connection", (ws, req, payload) => {
   wsClients.add(ws);
@@ -689,7 +766,7 @@ server.on("upgrade", (req, socket, head) => {
     return;
   }
 
-  if (url.pathname !== "/ws") {
+  if (url.pathname !== "/ws" && url.pathname !== "/ws/terminal") {
     socket.destroy();
     return;
   }
@@ -704,6 +781,12 @@ server.on("upgrade", (req, socket, head) => {
   if (!payload) {
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
     socket.destroy();
+    return;
+  }
+  if (url.pathname === "/ws/terminal") {
+    termWss.handleUpgrade(req, socket, head, (ws) => {
+      termWss.emit("connection", ws, req, payload);
+    });
     return;
   }
   wss.handleUpgrade(req, socket, head, (ws) => {

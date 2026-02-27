@@ -14,6 +14,8 @@
   const connText = document.getElementById('connText');
   const lastUpdatedEl = document.getElementById('lastUpdated');
   const openControlBtn = document.getElementById('openControlBtn');
+  const openTerminalBtn = document.getElementById('openTerminalBtn');
+  const closeTerminalBtn = document.getElementById('closeTerminalBtn');
   let openingControl = false;
 
   let jwt = null;
@@ -225,8 +227,195 @@
     container.appendChild(pre);
   }
 
+  // ---------- Terminal ----------
+  let termInstance = null;
+  let termWs = null;
+  let termResizeObserver = null;
+
+  function destroyTerminal() {
+    if (termResizeObserver) { try { termResizeObserver.disconnect(); } catch (_) {} termResizeObserver = null; }
+    if (termWs) { try { termWs.close(); } catch (_) {} termWs = null; }
+    if (termInstance) { try { termInstance.dispose(); } catch (_) {} termInstance = null; }
+    const pane = document.getElementById('terminal-pane');
+    pane.style.display = 'none';
+    // Remove dynamically built toolbar so it's fresh on next open
+    pane.querySelector('.term-toolbar')?.remove();
+    document.getElementById('terminal-container').innerHTML = '';
+    // Canvas content and topbar are unaffected — they stay visible underneath
+  }
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  async function connectTerminal() {
+    const pane = document.getElementById('terminal-pane');
+    const containerEl = document.getElementById('terminal-container');
+    containerEl.innerHTML = '';
+
+    // Lazy-load xterm.js and FitAddon from CDN
+    try {
+      await loadScript('https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js');
+      await loadScript('https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js');
+    } catch (e) {
+      containerEl.innerHTML = '<div style="color:#ff7b72;padding:16px">Failed to load terminal library.</div>';
+      return;
+    }
+
+    // Compute font size: target ~72 cols on the current device.
+    // 72 cols fits most terminal output; floor at 10px (20 physical px on retina).
+    // charWidthRatio ≈ 0.6 for typical monospace fonts in xterm.js.
+    const _paneW = (pane.offsetWidth || window.innerWidth) - 8;
+    const _fontSize = Math.max(10, Math.min(14, Math.round(_paneW / 72 / 0.6)));
+
+    // Init xterm
+    const term = new Terminal({
+      cursorBlink: true,
+      fontSize: _fontSize,
+      fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", Menlo, Monaco, "Courier New", monospace',
+      theme: {
+        background: '#0d1117',
+        foreground: '#c9d1d9',
+        cursor: '#58a6ff',
+        selectionBackground: '#264f78',
+        black: '#000000', red: '#ff7b72', green: '#3fb950', yellow: '#d29922',
+        blue: '#58a6ff', magenta: '#bc8cff', cyan: '#39c5cf', white: '#b1bac4',
+        brightBlack: '#6e7681', brightRed: '#ffa198', brightGreen: '#56d364',
+        brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
+        brightCyan: '#56d4dd', brightWhite: '#ffffff',
+      },
+      allowTransparency: false,
+      scrollback: 1000,
+    });
+
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(containerEl);
+
+    // Fit after paint
+    requestAnimationFrame(() => {
+      fitAddon.fit();
+      term.focus();
+    });
+
+    termInstance = term;
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${proto}//${location.host}/ws/terminal?token=${encodeURIComponent(jwt)}`;
+    const tws = new WebSocket(wsUrl);
+    termWs = tws;
+
+    // ---- Sticky modifiers ----
+    let ctrlActive = false;
+    let altActive = false;
+
+    function setModifier(mod, on) {
+      if (mod === 'ctrl') ctrlActive = on;
+      if (mod === 'alt') altActive = on;
+      const btn = pane.querySelector(`.tbkey[data-mod="${mod}"]`);
+      if (btn) btn.classList.toggle('active', on);
+    }
+
+    function sendRaw(data) {
+      if (tws.readyState === WebSocket.OPEN) {
+        tws.send(JSON.stringify({ type: 'data', data }));
+      }
+    }
+
+    tws.onopen = () => {
+      const dims = fitAddon.proposeDimensions();
+      if (dims) tws.send(JSON.stringify({ type: 'resize', cols: dims.cols, rows: dims.rows }));
+    };
+
+    tws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'data') term.write(msg.data);
+        else if (msg.type === 'exit') {
+          term.writeln(`\r\n\x1b[33m[Process exited with code ${msg.code}]\x1b[0m`);
+        }
+      } catch (_) {}
+    };
+
+    tws.onclose = () => {
+      if (termInstance) termInstance.writeln('\r\n\x1b[31m[Connection closed]\x1b[0m');
+    };
+
+    // Keyboard input → WS (apply sticky modifiers)
+    term.onData((data) => {
+      let out = data;
+      if (ctrlActive && data.length === 1) {
+        out = String.fromCharCode(data.charCodeAt(0) & 0x1f);
+        setModifier('ctrl', false);
+      } else if (altActive && data.length === 1) {
+        out = '\x1b' + data;
+        setModifier('alt', false);
+      }
+      sendRaw(out);
+    });
+
+    // ---- Mobile toolbar ----
+    const TOOLBAR_KEYS = [
+      { label: 'Ctrl', mod: 'ctrl' },
+      { label: 'Alt',  mod: 'alt'  },
+      { label: 'Esc',  seq: '\x1b' },
+      { label: 'Tab',  seq: '\t'   },
+      { label: '↑',    seq: '\x1b[A', arrow: true },
+      { label: '↓',    seq: '\x1b[B', arrow: true },
+      { label: '←',    seq: '\x1b[D', arrow: true },
+      { label: '→',    seq: '\x1b[C', arrow: true },
+    ];
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'term-toolbar';
+
+    TOOLBAR_KEYS.forEach(({ label, mod, seq, arrow }) => {
+      const btn = document.createElement('button');
+      btn.className = 'tbkey' + (arrow ? ' tbkey-arrow' : '') + (mod ? ' tbkey-mod' : '');
+      if (mod) btn.dataset.mod = mod;
+      btn.textContent = label;
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); // don't steal focus from xterm
+        if (mod) {
+          const current = mod === 'ctrl' ? ctrlActive : altActive;
+          // toggle off the other modifier
+          if (mod === 'ctrl' && altActive) setModifier('alt', false);
+          if (mod === 'alt' && ctrlActive) setModifier('ctrl', false);
+          setModifier(mod, !current);
+        } else {
+          sendRaw(seq);
+          term.focus();
+        }
+      });
+      toolbar.appendChild(btn);
+    });
+
+    pane.appendChild(toolbar);
+
+    // Resize: observe pane, fit, send new dims to server
+    termResizeObserver = new ResizeObserver(() => {
+      try {
+        fitAddon.fit();
+        const dims = fitAddon.proposeDimensions();
+        if (dims && tws.readyState === WebSocket.OPEN) {
+          tws.send(JSON.stringify({ type: 'resize', cols: dims.cols, rows: dims.rows }));
+        }
+      } catch (_) {}
+    });
+    termResizeObserver.observe(pane);
+  }
+
+  // ---------- Rendering ----------
   function renderPayload(payload) {
     if (!payload || payload.type === 'clear') {
+      destroyTerminal();
       showCenter('Waiting for content…');
       return;
     }
@@ -277,6 +466,19 @@
       const data = await res.json();
       if (!data?.token) throw new Error('no_token');
       jwt = data.token;
+
+      if (openTerminalBtn) {
+        openTerminalBtn.onclick = () => {
+          document.getElementById('terminal-pane').style.display = 'flex';
+          connectTerminal();
+        };
+      }
+
+      if (closeTerminalBtn) {
+        closeTerminalBtn.onclick = () => {
+          destroyTerminal();
+        };
+      }
 
       if (openControlBtn) {
         openControlBtn.onclick = () => {

@@ -1,13 +1,18 @@
 {
   "owner": "clvv",
   "slug": "openclaw-tg-canvas",
-  "displayName": "Telegram Mini App Canvas",
+  "displayName": "TG Canvas Mini App",
   "latest": {
-    "version": "1.0.7",
-    "publishedAt": 1772088774009,
-    "commit": "https://github.com/openclaw/skills/commit/333b7a4d39783fd35ffc30aca827bbfbc6ad40a6"
+    "version": "0.2.6",
+    "publishedAt": 1772097846060,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.7",
+      "publishedAt": 1772088774009,
+      "commit": "https://github.com/openclaw/skills/commit/333b7a4d39783fd35ffc30aca827bbfbc6ad40a6"
+    },
     {
       "version": "0.1.3",
       "publishedAt": 1771216396861,
