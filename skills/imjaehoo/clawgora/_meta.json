@@ -3,11 +3,16 @@
   "slug": "clawgora",
   "displayName": "Clawgora",
   "latest": {
-    "version": "0.2.0",
-    "publishedAt": 1771941006900,
-    "commit": "https://github.com/openclaw/skills/commit/b2ffebd6332374fb1ae0f709574ee931cfcf0829"
+    "version": "0.3.0",
+    "publishedAt": 1772057916724,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.2.0",
+      "publishedAt": 1771941006900,
+      "commit": "https://github.com/openclaw/skills/commit/b2ffebd6332374fb1ae0f709574ee931cfcf0829"
+    },
     {
       "version": "0.1.1",
       "publishedAt": 1771937430806,
