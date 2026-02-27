@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stock Backtest Analyst Clean"
+  short_description: "Clean stock strategy backtesting with risk metrics"
+  default_prompt: "Use $stock-strategy-backtester-clean to backtest one or more stock strategies from OHLCV data and compare return, drawdown, and win rate."
