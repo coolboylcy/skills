@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORKDIR="${WORKDIR:-/root/.openclaw/vrd-data}"
+WORKDIR="${WORKDIR:-$HOME/.openclaw/vrd-data}"
 PIDFILE="${WORKDIR}/pids.env"
 
 if [[ ! -f "${PIDFILE}" ]]; then
@@ -11,17 +11,6 @@ fi
 
 # shellcheck disable=SC1090
 source "${PIDFILE}"
-TOKEN_VALUE=""
-if [[ -n "${TOKEN_FILE:-}" ]] && [[ -f "${TOKEN_FILE}" ]]; then
-  TOKEN_VALUE="$(tr -d '\r\n' < "${TOKEN_FILE}" || true)"
-fi
-
-HOST="${PUBLIC_HOST:-127.0.0.1}"
-PORT="${NOVNC_PORT:-6080}"
-TOKEN_QS=""
-if [[ -n "${TOKEN_VALUE}" ]]; then
-  TOKEN_QS="?token=${TOKEN_VALUE}"
-fi
 
 ok() { echo "[OK] $*"; }
 warn() { echo "[WARN] $*"; }
@@ -36,35 +25,25 @@ check_pid() {
   fi
 }
 
-check_pid "Xvfb" "${XVFB_PID:-}"
-check_pid "fluxbox" "${FLUX_PID:-}"
-check_pid "x11vnc" "${X11VNC_PID:-}"
-check_pid "novnc" "${NOVNC_PID:-}"
+check_pid "kasmvnc" "${KASM_PID:-}"
 
-HDR_HTML="$(curl -sSI "http://127.0.0.1:${PORT}/vnc.html${TOKEN_QS}" || true)"
-if echo "${HDR_HTML}" | grep -qi "200"; then
-  ok "vnc.html reachable"
+HTTP_CODE="$(curl -k -s -o /dev/null -w "%{http_code}" "https://127.0.0.1:${KASM_PORT}/" || true)"
+if [[ "${HTTP_CODE}" == "200" || "${HTTP_CODE}" == "401" ]]; then
+  ok "KasmVNC endpoint reachable (HTTP ${HTTP_CODE})"
 else
-  err "vnc.html unreachable"
+  err "KasmVNC endpoint unreachable (HTTP ${HTTP_CODE:-n/a})"
 fi
 
-HDR_JS="$(curl -sSI "http://127.0.0.1:${PORT}/app/ui.js" || true)"
-if echo "${HDR_JS}" | grep -qi "Content-Type: text/javascript"; then
-  ok "module MIME text/javascript"
+if [[ -n "${KASM_USER_FILE:-}" && -f "${KASM_USER_FILE}" ]]; then
+  ok "user file exists: ${KASM_USER_FILE}"
 else
-  err "module MIME invalid"
+  err "user file missing: ${KASM_USER_FILE:-unset}"
 fi
 
-if [[ -n "${TOKEN_VALUE}" ]]; then
-  code_no_token="$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/vnc.html" || true)"
-  if [[ "${code_no_token}" == "403" ]]; then
-    ok "token gate enforced"
-  else
-    warn "token gate not enforced (code ${code_no_token})"
-  fi
-  if [[ -n "${TOKEN_EXPIRES_AT_HUMAN:-}" ]]; then
-    ok "token expiry: ${TOKEN_EXPIRES_AT_HUMAN}"
-  fi
+if [[ -n "${KASM_SECRET_FILE:-}" && -f "${KASM_SECRET_FILE}" ]]; then
+  ok "secret file exists: ${KASM_SECRET_FILE}"
+else
+  err "secret file missing: ${KASM_SECRET_FILE:-unset}"
 fi
 
 COOKIE_FILE="${CHROME_PROFILE_DIR:-}/Default/Cookies"
@@ -72,6 +51,10 @@ if [[ -f "${COOKIE_FILE}" ]]; then
   ok "chrome cookies file exists: ${COOKIE_FILE}"
 else
   warn "chrome cookies file missing: ${COOKIE_FILE}"
+fi
+
+if [[ -f "${LOGDIR:-}/kasmvnc-start.log" ]]; then
+  ok "startup log exists: ${LOGDIR}/kasmvnc-start.log"
 fi
 
 echo "health check complete"

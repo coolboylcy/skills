@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PIDFILE="${1:-/root/.openclaw/vrd-data/pids.env}"
+PIDFILE="${1:-$HOME/.openclaw/vrd-data/pids.env}"
 IDLE_TIMEOUT="${IDLE_TIMEOUT:-900}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-15}"
 
@@ -21,7 +21,6 @@ fi
 # shellcheck disable=SC1090
 source "${PIDFILE}"
 
-SELF_PID=$$
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 STOP_SCRIPT="${SCRIPT_DIR}/stop_vrd.sh"
 idle_for=0
@@ -34,14 +33,11 @@ while true; do
   # shellcheck disable=SC1090
   source "${PIDFILE}"
 
-  if [[ -n "${NOVNC_PID:-}" ]] && ! kill -0 "${NOVNC_PID}" 2>/dev/null; then
-    exit 0
-  fi
-  if [[ -n "${SELF_PID}" ]] && ! kill -0 "${SELF_PID}" 2>/dev/null; then
+  if [[ -n "${KASM_PID:-}" ]] && ! kill -0 "${KASM_PID}" 2>/dev/null; then
     exit 0
   fi
 
-  conn_count="$(ss -Htan state established "( sport = :${NOVNC_PORT} )" 2>/dev/null | wc -l | tr -d ' ')"
+  conn_count="$(ss -Htan state established "( sport = :${KASM_PORT} )" 2>/dev/null | wc -l | tr -d ' ')"
   if [[ ! "${conn_count}" =~ ^[0-9]+$ ]]; then
     conn_count=0
   fi
@@ -53,8 +49,8 @@ while true; do
   fi
 
   if (( idle_for >= IDLE_TIMEOUT )); then
-    echo "[INFO] noVNC idle for ${idle_for}s, auto stopping..."
-    WORKDIR="${WORKDIR:-/root/.openclaw/vrd-data}" bash "${STOP_SCRIPT}" || true
+    echo "[INFO] KasmVNC idle for ${idle_for}s, auto stopping..."
+    WORKDIR="${WORKDIR:-$HOME/.openclaw/vrd-data}" bash "${STOP_SCRIPT}" || true
     exit 0
   fi
 
