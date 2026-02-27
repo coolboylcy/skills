@@ -1,125 +1,189 @@
 # Item Calibration Guide
 
-> How to calibrate test items for IRT parameter estimation. Use this when building or refining an item pool for adaptive testing.
-
----
-
-## Overview
-
-Item calibration estimates IRT parameters (difficulty, discrimination, guessing) from student response data. Calibrated items are required for CAT to work effectively. Without calibration, the adaptive algorithm cannot select optimal items.
-
----
+Calibration estimates the IRT parameters (a, b, c) for each question in your item bank.
 
 ## Prerequisites
 
-Before calibrating:
-- Minimum **30 responses per item** (50+ recommended for stable estimates)
-- Responses from a **diverse ability range** (not all high-performers or all low-performers)
-- Items administered as part of a **fixed-form test** initially (not adaptive -- you need unbiased response data)
-- Response data in the platform (administered via AdaptiveTest sessions with `cat_enabled: false`)
+**Minimum sample size per item:**
+- 3PL model: 1000+ responses
+- 2PL model: 500+ responses  
+- 1PL/Rasch: 200+ responses
 
----
+**Data required:**
+- Item responses (correct/incorrect)
+- Person identifiers (can be anonymous)
+- No missing data patterns that are systematically related to ability
 
 ## Calibration Process
 
-### Step 1: Classical Test Theory (CTT) Pre-Screening
+### 1. Collect Pilot Data
 
-Before running IRT calibration, screen items using CTT:
+**Field test design:**
+- Random assignment: Each student gets a random subset of items
+- Spiraling: Rotate item sets across students
+- Embedded pilot: Mix new items into operational tests (discard from scoring)
 
-| Metric | Acceptable Range | Action if Out of Range |
-|--------|-----------------|----------------------|
-| Item difficulty (p-value) | 0.20 -- 0.80 | Remove: too easy or too hard |
-| Point-biserial correlation | > 0.20 | Remove: doesn't discriminate |
-| Distractor analysis | All distractors chosen by at least 5% | Revise unused distractors |
+**Target:** Every item answered by ≥ minimum sample size
 
-Items failing CTT screening should be revised or removed before IRT calibration.
+### 2. Estimate Parameters
 
-### Step 2: IRT Parameter Estimation
+**Software options:**
+- **R:** `mirt` package (flexible, well-documented)
+- **Python:** `mirt` (port), `girth` (fast), `pymc` (Bayesian)
+- **Standalone:** BILOG-MG, MULTILOG, flexMIRT (commercial)
 
-Run calibration via the API:
-```
-POST /tests/{test_id}/calibrate
-{
-  "model": "3PL",
-  "min_responses": 30
-}
-```
+**Basic R example (2PL):**
+```r
+library(mirt)
 
-The platform estimates parameters using marginal maximum likelihood (MML):
+# data: matrix where rows=students, cols=items, values=0/1
+model <- mirt(data, model=1, itemtype='2PL')
 
-| Parameter | Symbol | Typical Range | Interpretation |
-|-----------|--------|--------------|----------------|
-| Difficulty | b | -3.0 to +3.0 | Ability level where P(correct) = 0.5 (for 2PL) |
-| Discrimination | a | 0.5 to 2.5 | Slope of the item characteristic curve at b |
-| Guessing | c | 0.0 to 0.35 | Lower asymptote (probability of correct by guessing) |
-
-### Step 3: Quality Checks
-
-After calibration, review these indicators:
-
-**Item Fit:**
-- Fit statistic close to 1.0 indicates good model fit
-- Items with fit > 1.3 or < 0.7 may not fit the IRT model well
-- Consider revising or removing poor-fitting items
-
-**Parameter Reasonableness:**
-- Discrimination < 0.5: item doesn't distinguish ability levels well
-- Discrimination > 3.0: possibly over-fitting, verify with more data
-- Guessing > 0.35: too much guessing, revise distractors
-- Difficulty outside -3 to +3: extreme, may have insufficient data at that ability level
-
-**Reliability:**
-- Overall test reliability > 0.80 is acceptable
-- > 0.90 is good for high-stakes assessments
-- Low reliability means the test needs more items or better-discriminating items
-
-### Step 4: Differential Item Functioning (DIF)
-
-DIF analysis checks whether items function differently for subgroups (e.g., gender, language, ethnicity) after controlling for ability.
-
-- Items flagged for DIF should be reviewed by content experts
-- Not all DIF is bias -- some differences reflect real ability differences
-- Flag items with moderate-to-large DIF for human review
-
----
-
-## Calibration Workflow
-
-```
-1. Create test with cat_enabled: false
-2. Add items (set initial difficulty estimates if available)
-3. Administer fixed-form to 50+ students
-4. Run POST /tests/{id}/calibrate
-5. Review calibration results
-6. Remove or revise poor items
-7. Re-calibrate if items were changed
-8. Enable CAT: PATCH /tests/{id} { "cat_enabled": true }
-9. Monitor item exposure and performance over time
-10. Re-calibrate periodically as more data accumulates
+# Extract parameters
+params <- coef(model, simplify=TRUE)$items
+# Columns: a (discrimination), b (difficulty), g (guessing), u (upper asymptote)
 ```
 
----
+**For 3PL:** Change `itemtype='3PL'`. Warning: 3PL needs large samples or priors.
 
-## Common Issues
+### 3. Check Model Fit
 
-**"Not enough responses" error:**
-Items need at least `min_responses` (default 30) to calibrate. Administer the test to more students.
+**Item-level diagnostics:**
 
-**All discrimination values near 1.0:**
-May indicate insufficient data or homogeneous ability in the sample. Administer to a wider ability range.
+**a. Item fit statistics**
+- S-χ² (Orlando & Thissen): p > 0.01 = acceptable
+- RMSEA (item): < 0.05 = good fit
+- Run: `itemfit(model, method='S_X2')`
 
-**High guessing parameters (c > 0.35):**
-Distractors may be obviously wrong. Revise answer options to make distractors more plausible.
+**b. Local independence**
+- Check residual correlations: should be near zero
+- Run: `residuals(model, type='LD')`
 
-**Very high discrimination (a > 3.0):**
-Could indicate item-level dependencies (e.g., two items testing the exact same knowledge). Check for item overlap.
+**c. Parameter flags**
+- a < 0.5 → Low discrimination, consider removal
+- a > 2.5 → May be measuring different construct
+- b < -3 or b > 3 → Outside measurable range
+- c > 0.35 → Guessing parameter too high (check item quality)
 
----
+**Test-level diagnostics:**
 
-## Ongoing Maintenance
+**a. Test information curve**
+- Should peak near target ability range
+- Flat regions = poor measurement
 
-- **Re-calibrate** after every 200+ new responses for more stable estimates
-- **Monitor item exposure** -- items administered >30% of sessions may be overexposed
-- **Retire items** that become well-known or leak to students
-- **Add new items** regularly to maintain pool diversity
-- **Track parameter drift** -- significant changes may indicate curriculum shifts or item compromise
+**b. Marginal reliability**
+- Similar to Cronbach's α but for IRT
+- Target: > 0.80 for low-stakes, > 0.90 for high-stakes
+
+### 4. Handle Problem Items
+
+**If item doesn't fit:**
+
+1. **Review content:** Is the question ambiguous? Multiple interpretations?
+2. **Check key:** Is the correct answer actually correct?
+3. **Inspect distractors:** Are wrong answers too obvious or confusing?
+4. **Revise or remove:** Fix the item and recalibrate, or drop it
+
+**If discrimination is too low (a < 0.5):**
+- Often means item is poorly written
+- May be testing memorization, not understanding
+- Consider removal
+
+**If discrimination is too high (a > 2.5):**
+- May be "giveaway" item or testing different skill
+- Check content alignment
+
+### 5. Scale Linking (Optional)
+
+If you're adding new items to an existing bank, you need to link scales:
+
+**Concurrent calibration:** Calibrate old + new items together (preferred when feasible)
+
+**Separate calibration + linking:**
+1. Calibrate new items with separate sample
+2. Use common items (anchor items) to link scales
+3. Transform new item parameters to match old scale
+
+**Linking methods:**
+- Mean-sigma (simplest)
+- Stocking-Lord (more robust)
+- Haebara (optimal for 3PL)
+
+**R example:**
+```r
+library(plink)
+
+# old_params, new_params: data frames with a, b, c columns
+# common_items: indices of anchor items
+
+link <- plink(old_params[common_items,], new_params[common_items,], 
+              method='Haebara')
+              
+# Transform new parameters to old scale
+new_params_linked <- rescale(new_params, link$A, link$B)
+```
+
+## Classical Test Theory (CTT) Pre-Check
+
+Before IRT calibration, run CTT diagnostics (fast and informative):
+
+**Item difficulty (p-value):**
+- p = proportion correct
+- Target: 0.3 to 0.7 (for discrimination)
+- p < 0.2 or p > 0.9 → May not work well in IRT
+
+**Point-biserial correlation:**
+- Correlation between item score and total score
+- Target: > 0.20
+- Negative values → Item is broken (check key)
+
+**R example:**
+```r
+# data: 0/1 matrix
+difficulty <- colMeans(data, na.rm=TRUE)
+total_scores <- rowSums(data, na.rm=TRUE)
+
+pb_corr <- sapply(1:ncol(data), function(i) {
+  cor(data[,i], total_scores, use='complete.obs')
+})
+```
+
+Flag items with:
+- p < 0.10 or p > 0.95
+- Point-biserial < 0.15
+
+These are unlikely to calibrate well.
+
+## Quality Checklist
+
+Before finalizing calibration:
+
+- [ ] All items have ≥ minimum sample size
+- [ ] No negative discriminations (a > 0)
+- [ ] Item fit statistics acceptable (S-χ² p > 0.01)
+- [ ] Residual correlations < 0.20
+- [ ] Parameters within expected ranges
+- [ ] Test information curve covers target ability range
+- [ ] Marginal reliability ≥ target threshold
+
+## When to Recalibrate
+
+- **Never:** Small changes in item wording, formatting
+- **Consider:** Change in target population (e.g., switching grades)
+- **Always:** Material content changes, correct answer changes, or suspect parameter drift (item used 2+ years)
+
+**Drift detection:** If you have ongoing data, check if recent item performance differs from calibration sample. Flag items with p-value change > 0.10.
+
+## Troubleshooting
+
+**Problem:** 3PL won't converge  
+**Solution:** Try 2PL first, or use Bayesian priors on c parameter
+
+**Problem:** Discrimination estimates are all similar  
+**Solution:** May indicate 1PL (Rasch) is more appropriate, or lack of variability in item quality
+
+**Problem:** Some items have b > 3 or b < -3  
+**Solution:** Items are outside measurable range for this population. Use different sample or remove items.
+
+**Problem:** Large standard errors on parameters  
+**Solution:** Increase sample size or use Bayesian estimation with priors
