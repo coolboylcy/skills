@@ -3,11 +3,16 @@
   "slug": "openclaw-commerce-shopify",
   "displayName": "Openclaw Commerce Shopify",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1771780408911,
-    "commit": "https://github.com/openclaw/skills/commit/4047ed537fe8c6d48668cb7f43972d8108526f4f"
+    "version": "1.0.3",
+    "publishedAt": 1772100635245,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1771780408911,
+      "commit": "https://github.com/openclaw/skills/commit/4047ed537fe8c6d48668cb7f43972d8108526f4f"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1771182521776,
