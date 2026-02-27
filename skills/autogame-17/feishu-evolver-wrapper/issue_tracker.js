@@ -63,7 +63,7 @@ function ensureDoc() {
         const grantArg = masterId ? ` --grant "${masterId}"` : '';
         const result = execSync(
             `node "${CREATE_SCRIPT}" --title "Evolver Issue Tracker"${grantArg}`,
-            { encoding: 'utf8', timeout: 30000, cwd: WORKSPACE_ROOT }
+            { encoding: 'utf8', timeout: 30000, cwd: WORKSPACE_ROOT, windowsHide: true }
         );
         const doc = JSON.parse(result);
         const token = doc.doc_token;
@@ -90,11 +90,12 @@ function appendToDoc(docToken, markdown) {
     }
 
     try {
-        const tmpFile = path.join('/tmp', `evolver_issue_${Date.now()}.md`);
+        const os = require('os');
+        const tmpFile = path.join(os.tmpdir(), `evolver_issue_${Date.now()}.md`);
         fs.writeFileSync(tmpFile, markdown);
         execSync(
             `node "${APPEND_SCRIPT}" --doc_token "${docToken}" --file "${tmpFile}"`,
-            { encoding: 'utf8', timeout: 30000, cwd: WORKSPACE_ROOT }
+            { encoding: 'utf8', timeout: 30000, cwd: WORKSPACE_ROOT, windowsHide: true }
         );
         try { fs.unlinkSync(tmpFile); } catch (_) {}
         return true;

@@ -96,7 +96,8 @@ function startDaemon() {
     const child = spawn(process.execPath, [__filename, 'daemon-loop'], {
         detached: true,
         stdio: ['ignore', out, err],
-        cwd: __dirname
+        cwd: __dirname,
+        windowsHide: true
     });
     
     fs.writeFileSync(DAEMON_PID_FILE, String(child.pid));
@@ -126,7 +127,7 @@ async function safeSendReport(payload) {
             if (payload.color) cmd += ` --color "${payload.color}"`;
             if (payload.dashboard) cmd += ` --dashboard`;
             
-            execSync(cmd, { stdio: 'ignore' });
+            execSync(cmd, { stdio: 'ignore', windowsHide: true });
         } catch (e) {
             console.error('[Wrapper] Fallback report exec failed:', e.message);
         }
@@ -185,8 +186,9 @@ function daemonLoop() {
             // Use spawn instead of spawnSync to avoid blocking the daemon loop and reducing CPU/wait time
             const child = require('child_process').spawn(process.execPath, [__filename, 'ensure', '--json', '--daemon-check'], {
                 detached: true,
-                stdio: 'ignore', // Ignore output to reduce IO
-                cwd: __dirname
+                stdio: 'ignore',
+                cwd: __dirname,
+                windowsHide: true
             });
             child.unref(); // Let it run independently
             
@@ -206,25 +208,8 @@ function ensureWatchdog() {
   let openclawCli = cachedOpenclawCli || 'openclaw';
   
   if (!cachedOpenclawCli) {
-      // Check environment variable first
-      if (process.env.OPENCLAW_CLI_PATH && fs.existsSync(process.env.OPENCLAW_CLI_PATH)) {
-          openclawCli = process.env.OPENCLAW_CLI_PATH;
-          cachedOpenclawCli = openclawCli;
-      } else {
-          const possiblePaths = [
-            '/home/crishaocredits/.npm-global/bin/openclaw',
-            '/usr/local/bin/openclaw',
-            '/usr/bin/openclaw'
-          ];
-          
-          for (const p of possiblePaths) {
-            if (fs.existsSync(p)) {
-              openclawCli = p;
-              cachedOpenclawCli = p;
-              break;
-            }
-          }
-      }
+      openclawCli = process.env.OPENCLAW_CLI_PATH || 'openclaw';
+      cachedOpenclawCli = openclawCli;
   }
 
   try {
@@ -279,7 +264,8 @@ function ensureWatchdog() {
             } else {
                 // If it's a command name like 'openclaw', check if it's in PATH using 'which' or assume valid
                 try {
-                    execSync(`which ${openclawCli}`, { stdio: 'ignore' });
+                    const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+                    execSync(`${whichCmd} ${openclawCli}`, { stdio: 'ignore', windowsHide: true });
                     cliExecutable = true;
                 } catch (e) {
                      console.warn(`[Lifecycle] OpenClaw CLI '${openclawCli}' not found in PATH. Skipping cron check.`);
@@ -290,7 +276,7 @@ function ensureWatchdog() {
 
             let listOut = '';
             try {
-                listOut = execSync(`${openclawCli} cron list --all --json`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 10000 });
+                listOut = execSync(`${openclawCli} cron list --all --json`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 10000, windowsHide: true });
             } catch (execErr) {
                 // Gracefully handle non-zero exit code (e.g. Unauthorized)
                 const errMsg = execErr.message || '';
@@ -323,20 +309,16 @@ function ensureWatchdog() {
               // Optimization: Reduced frequency from 10m to 30m to reduce exec noise
               const cmdStr = `${openclawCli} cron add --name "evolver_watchdog_robust" --every "30m" --session "isolated" --message "exec: node skills/feishu-evolver-wrapper/lifecycle.js ensure" --no-deliver`;
               
-              execSync(cmdStr);
+              execSync(cmdStr, { windowsHide: true });
               console.log('[Lifecycle] Watchdog cron job created successfully.');
             } else {
-              // If disabled, enable it
               if (exists.enabled === false) {
                  console.log(`[Lifecycle] Enabling disabled watchdog job (ID: ${exists.id})...`);
-                 execSync(`${openclawCli} cron edit "${exists.id}" --enable`);
+                 execSync(`${openclawCli} cron edit "${exists.id}" --enable`, { windowsHide: true });
               }
-              // Optimization: Enforce 30m interval if currently 10m (reduce exec usage)
               if (exists.schedule && exists.schedule.everyMs === 600000) {
                  console.log(`[Lifecycle] Optimizing watchdog frequency to 30m (ID: ${exists.id})...`);
-                 // Use cron update with patch
-                 // FIXED: Use --every instead of invalid --patch
-                 execSync(`${openclawCli} cron edit "${exists.id}" --every "30m"`);
+                 execSync(`${openclawCli} cron edit "${exists.id}" --every "30m"`, { windowsHide: true });
               }
             }
             // Update state file on success
@@ -432,7 +414,8 @@ function start(args) {
   const child = spawn('node', [WRAPPER_INDEX, ...args], {
     detached: true,
     stdio: ['ignore', out, err],
-    cwd: __dirname
+    cwd: __dirname,
+    windowsHide: true
   });
   
   fs.writeFileSync(PID_FILE, String(child.pid));
@@ -614,7 +597,7 @@ function status(json = false) {
              } else {
                  const reportScript = path.resolve(__dirname, 'report.js');
                  const cmd = `node "${reportScript}" --title "🧬 Evolver Status Check" --status "Status: [RUNNING] wrapper is active.\n${statusText}" --color "green"`;
-                 execSync(cmd, { stdio: 'inherit' });
+                 execSync(cmd, { stdio: 'inherit', windowsHide: true });
              }
          } catch(e) {
              console.error('Failed to send status report:', e.message);
@@ -638,7 +621,7 @@ function status(json = false) {
              } else {
                  const reportScript = path.resolve(__dirname, 'report.js');
                  const cmd = `node "${reportScript}" --title "🚨 Evolver Status Check" --status "Status: [STOPPED] wrapper is NOT running.\n${statusText}" --color "red"`;
-                 execSync(cmd, { stdio: 'inherit' });
+                 execSync(cmd, { stdio: 'inherit', windowsHide: true });
              }
          } catch(e) {
              console.error('Failed to send status report:', e.message);
@@ -761,7 +744,7 @@ switch (action) {
                     const reportScript = path.resolve(__dirname, 'report.js');
                     const issueText = health.checks.filter(c => c.ok === false).map(c => `- ${c.name}: ${c.error || c.status}`).join('\n');
                     const cmd = `node "${reportScript}" --title "🚨 Evolver Self-Healing Triggered" --status "Status: [HEALTH_FAIL] System detected critical failure.\n${issueText}" --color "red"`;
-                    execSync(cmd, { stdio: 'ignore' });
+                    execSync(cmd, { stdio: 'ignore', windowsHide: true });
                 }
             } catch(e) {}
         }
@@ -840,7 +823,7 @@ switch (action) {
         } else {
             const reportScript = path.resolve(__dirname, 'report.js');
             const cmd = `node "${reportScript}" --dashboard --color "blue"`;
-            execSync(cmd, { stdio: 'inherit' });
+            execSync(cmd, { stdio: 'inherit', windowsHide: true });
         }
     } catch(e) {
         console.error('[Dashboard] Failed to generate card:', e.message);

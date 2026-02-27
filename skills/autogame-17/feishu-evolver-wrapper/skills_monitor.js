@@ -63,7 +63,7 @@ function checkSkill(skillName) {
                     if (fs.existsSync(entryAbs) && mainFile.endsWith('.js')) {
                         try {
                             execSync(`node -e "require('${entryAbs.replace(/'/g, "\\'")}')"`, {
-                                stdio: 'ignore', timeout: 5000, cwd: skillPath
+                                stdio: 'ignore', timeout: 5000, cwd: skillPath, windowsHide: true
                             });
                             // require succeeded: deps are resolved via relative paths or globals, no issue
                         } catch (e) {
@@ -82,7 +82,7 @@ function checkSkill(skillName) {
         const entryPoint = path.join(skillPath, mainFile);
         if (fs.existsSync(entryPoint)) {
             try {
-                execSync(`node -c "${entryPoint}"`, { stdio: 'ignore', timeout: 5000 });
+                execSync(`node -c "${entryPoint}"`, { stdio: 'ignore', timeout: 5000, windowsHide: true });
             } catch (e) {
                 issues.push(`Syntax Error in ${mainFile}`);
             }
@@ -109,7 +109,7 @@ function autoHeal(skillName, issues) {
         if (issue === 'Missing node_modules (needs npm install)') {
             try {
                 execSync('npm install --production --no-audit --no-fund', {
-                    cwd: skillPath, stdio: 'ignore', timeout: 30000
+                    cwd: skillPath, stdio: 'ignore', timeout: 30000, windowsHide: true
                 });
                 healed.push(issue);
                 console.log(`[SkillsMonitor] Auto-healed ${skillName}: npm install`);

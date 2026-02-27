@@ -16,7 +16,7 @@ function cachedExec(command, callback) {
     }
   }
   
-  exec(command, (error, stdout, stderr) => {
+  exec(command, { windowsHide: true }, (error, stdout, stderr) => {
     EXEC_CACHE.set(command, { timestamp: Date.now(), error, stdout, stderr });
     callback(error, stdout, stderr);
   });

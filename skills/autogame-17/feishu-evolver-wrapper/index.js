@@ -3,9 +3,12 @@ const { cachedExec } = require('./exec_cache.js');
 const { sendCard } = require('./feishu-helper.js');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const crypto = require('crypto');
-const { sleepSync } = require('./utils/sleep'); // New helper
-const { sendReport } = require('./report.js'); // Use optimized internal report function
+const { sleepSync } = require('./utils/sleep');
+const { sendReport } = require('./report.js');
+
+const IS_WIN = process.platform === 'win32';
 
 // [2026-02-03] WRAPPER REFACTOR: PURE PROXY
 // This wrapper now correctly delegates to the core 'evolver' plugin.
@@ -244,9 +247,9 @@ const LOG_DEDUP_FILE = path.resolve(__dirname, '../../memory/evolution/log_dedup
 const LOG_DEDUP_WINDOW_MS = Number.parseInt(process.env.EVOLVE_LOG_DEDUP_WINDOW_MS || '600000', 10); // 10 minutes
 const LOG_DEDUP_MAX_KEYS = Number.parseInt(process.env.EVOLVE_LOG_DEDUP_MAX_KEYS || '800', 10);
 
-// Lifecycle log target group (set via env or hardcode for reliability)
-const FEISHU_LOG_GROUP = process.env.LOG_TARGET || 'oc_ab79ebbe224701d0288891d6f8ddb10e';
-const FEISHU_CN_REPORT_GROUP = process.env.FEISHU_CN_REPORT_GROUP || 'oc_86ff5e0d40cb49c777a24156f379c48c';
+// Lifecycle log target group (set via env; no hardcoded fallbacks for public release)
+const FEISHU_LOG_GROUP = process.env.FEISHU_LOG_TARGET || process.env.LOG_TARGET || '';
+const FEISHU_CN_REPORT_GROUP = process.env.FEISHU_CN_REPORT_GROUP || '';
 process.env.LOG_TARGET = FEISHU_LOG_GROUP;
 
 function normalizeLogForDedup(msg) {
@@ -468,25 +471,23 @@ function execWithTimeout(cmd, cwd, timeoutMs = 30000) {
         const parts = cmd.trim().split(/\s+/);
         let bin = parts[0];
         
-        // Fix for "spawn /.../gi" error: Ensure 'git' uses absolute path if possible
-        if (bin === 'git') {
+        if (bin === 'git' && !IS_WIN) {
             bin = '/usr/bin/git';
         }
 
         const args = parts.slice(1).map(arg => {
-            // Basic unquote
             if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
                 return arg.slice(1, -1);
             }
             return arg;
         });
 
-        // Use spawnSync directly (no shell)
         const res = require('child_process').spawnSync(bin, args, { 
             cwd, 
             timeout: timeoutMs, 
             encoding: 'utf8',
-            stdio: 'pipe' 
+            stdio: 'pipe',
+            windowsHide: true
         });
         
         if (res.error) throw res.error;
@@ -580,7 +581,7 @@ function gitSync() {
             }
         }
 
-        var status = execSync('git diff --cached --name-only', { cwd: gitRoot, encoding: 'utf8' }).trim();
+        var status = execSync('git diff --cached --name-only', { cwd: gitRoot, encoding: 'utf8', windowsHide: true }).trim();
         if (!status) {
             console.log('[Wrapper] Git Sync: nothing to commit.');
             return null;
@@ -595,7 +596,7 @@ function gitSync() {
         }))].slice(0, 3);
         var areaStr = areas.join(', ') + (areas.length >= 3 ? ' ...' : '');
         var commitMsg = '🧬 Evolution: ' + fileCount + ' files in ' + areaStr;
-        var msgFile = path.join('/tmp', 'evolver_commit_' + Date.now() + '.txt');
+        var msgFile = path.join(os.tmpdir(), 'evolver_commit_' + Date.now() + '.txt');
         fs.writeFileSync(msgFile, commitMsg);
         execWithTimeout('git commit -F "' + msgFile + '"', gitRoot, 30000);
         try { fs.unlinkSync(msgFile); } catch (_) {}
@@ -614,7 +615,7 @@ function gitSync() {
 
         // Get the short hash of the commit we just pushed
         var shortHash = '';
-        try { shortHash = execSync('git log -1 --format=%h', { cwd: gitRoot, encoding: 'utf8' }).trim(); } catch (_) {}
+        try { shortHash = execSync('git log -1 --format=%h', { cwd: gitRoot, encoding: 'utf8', windowsHide: true }).trim(); } catch (_) {}
 
         console.log('[Wrapper] Git Sync Complete. (' + shortHash + ')');
         forwardLogToFeishu('🧬 Git Sync: ' + fileCount + ' files in ' + areaStr + ' (' + shortHash + ')', 'LIFECYCLE');
@@ -698,13 +699,18 @@ function isWrapperProcess(pid) {
                 if (e.code === 'ENOENT') return false;
             }
         }
-        // Fallback: ps (for non-Linux or /proc failures)
-        var cmdline = execSync('ps -p ' + pid + ' -o args=', { encoding: 'utf8', timeout: 5000 }).trim();
+        if (IS_WIN) {
+            try {
+                var wmicOut = execSync('wmic process where "ProcessId=' + pid + '" get CommandLine /format:list', { encoding: 'utf8', timeout: 5000, windowsHide: true }).trim();
+                if (wmicOut.includes('feishu-evolver-wrapper') && wmicOut.includes('--loop')) return true;
+            } catch (_) {}
+            return false;
+        }
+        var cmdline = execSync('ps -p ' + pid + ' -o args=', { encoding: 'utf8', timeout: 5000, windowsHide: true }).trim();
         if (cmdline.includes('feishu-evolver-wrapper/index.js') && cmdline.includes('--loop')) return true;
-        // Also handle relative-path launches by checking CWD via lsof
         if (cmdline.includes('index.js') && cmdline.includes('--loop')) {
             try {
-                var cwdInfo = execSync('readlink /proc/' + pid + '/cwd 2>/dev/null || lsof -p ' + pid + ' -Fn 2>/dev/null | head -3', { encoding: 'utf8', timeout: 5000 });
+                var cwdInfo = execSync('readlink /proc/' + pid + '/cwd 2>/dev/null || lsof -p ' + pid + ' -Fn 2>/dev/null | head -3', { encoding: 'utf8', timeout: 5000, windowsHide: true });
                 if (cwdInfo.includes('feishu-evolver-wrapper')) return true;
             } catch (_) {}
         }
@@ -847,26 +853,37 @@ async function run() {
     const CIRCUIT_BREAKER_MAX_PAUSE_SEC = Number.parseInt(process.env.EVOLVE_CIRCUIT_BREAKER_MAX_PAUSE_SEC || '7200', 10); // 2 hour max
 
     let cachedOpenclawPath = null;
-    
-    // Helper to resolve OpenClaw path once
+    let cachedOpenclawSpawn = null;
+
     function resolveOpenclawPath() {
         if (cachedOpenclawPath) return cachedOpenclawPath;
         if (process.env.OPENCLAW_BIN) {
             cachedOpenclawPath = process.env.OPENCLAW_BIN;
             return cachedOpenclawPath;
         }
-        const candidates = [
-            'openclaw',
-            path.join(process.env.HOME || '', '.npm-global/bin/openclaw'),
-            '/usr/local/bin/openclaw',
-            '/usr/bin/openclaw',
-        ];
+
+        const whichCmd = IS_WIN ? 'where openclaw' : 'which openclaw';
+        const homedir = process.env.HOME || process.env.USERPROFILE || os.homedir() || '';
+
+        const candidates = IS_WIN
+            ? [
+                'openclaw',
+                path.join(homedir, 'AppData', 'Roaming', 'npm', 'openclaw.cmd'),
+                path.join(homedir, 'AppData', 'Roaming', 'npm', 'openclaw'),
+                path.join(homedir, '.npm-global', 'openclaw.cmd'),
+            ]
+            : [
+                'openclaw',
+                path.join(homedir, '.npm-global/bin/openclaw'),
+                '/usr/local/bin/openclaw',
+                '/usr/bin/openclaw',
+            ];
+
         for (const c of candidates) {
             try {
                 if (c === 'openclaw') {
-                    // Cache only if successful
                     try {
-                        execSync('which openclaw', { stdio: 'ignore' });
+                        execSync(whichCmd, { stdio: 'ignore', windowsHide: true });
                         cachedOpenclawPath = 'openclaw';
                         return 'openclaw';
                     } catch (e) {}
@@ -879,6 +896,78 @@ async function run() {
         }
         cachedOpenclawPath = candidates[1] || 'openclaw';
         return cachedOpenclawPath;
+    }
+
+    function extractJsEntryFromCmd(cmdFilePath) {
+        try {
+            const content = fs.readFileSync(cmdFilePath, 'utf8');
+            const patterns = [
+                /"%~dp0\\([^"]+\.js)"/,
+                /"%~dp0\/([^"]+\.js)"/,
+                /"([^"]*node_modules[^"]*\.js)"/,
+                /"([^"]*openclaw[^"]*\.js)"/,
+            ];
+            for (const re of patterns) {
+                const m = content.match(re);
+                if (m) {
+                    let jsRel = m[1];
+                    const jsAbs = path.resolve(path.dirname(cmdFilePath), jsRel);
+                    if (fs.existsSync(jsAbs)) return jsAbs;
+                }
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    function resolveOpenclawForSpawn() {
+        if (cachedOpenclawSpawn) return cachedOpenclawSpawn;
+
+        const openclawPath = resolveOpenclawPath();
+
+        if (!IS_WIN) {
+            cachedOpenclawSpawn = { bin: openclawPath, prefixArgs: [] };
+            return cachedOpenclawSpawn;
+        }
+
+        if (openclawPath.endsWith('.js')) {
+            cachedOpenclawSpawn = { bin: process.execPath, prefixArgs: [openclawPath] };
+            return cachedOpenclawSpawn;
+        }
+
+        const cmdCandidates = [
+            openclawPath.endsWith('.cmd') ? openclawPath : null,
+            openclawPath + '.cmd',
+        ].filter(Boolean);
+
+        for (const cmdPath of cmdCandidates) {
+            try {
+                if (!fs.existsSync(cmdPath)) continue;
+                const jsEntry = extractJsEntryFromCmd(cmdPath);
+                if (jsEntry) {
+                    console.log(`[Wrapper] Windows: resolved openclaw .cmd -> ${jsEntry}`);
+                    cachedOpenclawSpawn = { bin: process.execPath, prefixArgs: [jsEntry] };
+                    return cachedOpenclawSpawn;
+                }
+            } catch (e) {}
+        }
+
+        if (openclawPath === 'openclaw') {
+            try {
+                const whereOut = execSync('where openclaw', { encoding: 'utf8', windowsHide: true }).trim();
+                const firstLine = whereOut.split(/\r?\n/)[0];
+                if (firstLine && firstLine.endsWith('.cmd') && fs.existsSync(firstLine)) {
+                    const jsEntry = extractJsEntryFromCmd(firstLine);
+                    if (jsEntry) {
+                        console.log(`[Wrapper] Windows: resolved openclaw via where -> ${jsEntry}`);
+                        cachedOpenclawSpawn = { bin: process.execPath, prefixArgs: [jsEntry] };
+                        return cachedOpenclawSpawn;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        cachedOpenclawSpawn = { bin: openclawPath, prefixArgs: [] };
+        return cachedOpenclawSpawn;
     }
 
     while (true) {
@@ -1022,7 +1111,8 @@ ${modelRoutingDirective}`;
 
                     const child = spawn('node', [mainScript, ...childArgsArrBase], {
                         env: process.env,
-                        stdio: ['ignore', 'pipe', 'pipe']
+                        stdio: ['ignore', 'pipe', 'pipe'],
+                        windowsHide: true
                     });
 
                     let fullStdout = '';
@@ -1120,10 +1210,13 @@ ${modelRoutingDirective}`;
                                         // so the output is valid JSON). Do NOT sanitize/re-escape -- that
                                         // double-escapes and breaks parsing at position 666.
                                         let taskContent = null;
+                                        let parseError = null;
+                                        
                                         try {
                                             const parsed = JSON.parse(rawJson);
                                             taskContent = parsed.task;
                                         } catch (jsonErr) {
+                                            parseError = jsonErr;
                                             // Fallback 1: Try to fix unquoted keys if JSON.parse failed
                                             try {
                                                 const fixedJson = rawJson.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
@@ -1133,11 +1226,13 @@ ${modelRoutingDirective}`;
                                                 // Fallback 2: JS object literal (dangerous but necessary for LLM-generated loose syntax)
                                                 try {
                                                     // Wrap in parentheses to force expression context
-                                                    const parsed = new Function('return (' + rawJson + ')')();
+                                                    // Sanitize common dangerous patterns before eval
+                                                    const sanitized = rawJson.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+                                                    const parsed = new Function('return (' + sanitized + ')')();
                                                     taskContent = parsed.task;
                                                 } catch (evalErr) {
                                                     console.error('[Wrapper] Parse failed. rawJson[0..100]:', rawJson.slice(0, 100));
-                                                    throw new Error(`Failed to parse sessions_spawn payload: ${jsonErr.message} / ${fixErr.message} / ${evalErr.message}`);
+                                                    throw new Error(`Failed to parse sessions_spawn payload: ${parseError.message} / ${fixErr.message} / ${evalErr.message}`);
                                                 }
                                             }
                                         }
@@ -1195,8 +1290,7 @@ ${modelRoutingDirective}`;
                                             const taskFile = path.resolve(path.dirname(lifecycleLog), `task_${cycleTag}.txt`);
                                             fs.writeFileSync(taskFile, taskContent);
                                             
-                                            // Ensure openclaw is reachable (resolve full path to avoid ENOENT under nohup)
-                                            const openclawPath = resolveOpenclawPath();
+                                            const { bin: openclawBin, prefixArgs: openclawPrefix } = resolveOpenclawForSpawn();
                                             
                                             console.log(`[Wrapper] Task File: ${taskFile}`);
                                             
@@ -1219,14 +1313,23 @@ ${modelRoutingDirective}`;
                                                 }
 
                                                 await new Promise((resolveHand, rejectHand) => {
-                                                    console.log(`[Wrapper] Executing: ${openclawPath} agent --agent main --session-id ${sessionId} -m <task> --timeout 600 (attempt ${handAttempt}/${HAND_MAX_RETRIES_PER_CYCLE})`);
-                                                    const handChild = spawn(openclawPath, ['agent', '--agent', 'main', '--session-id', sessionId, '-m', attemptTask, '--timeout', '600'], {
+                                                    const finalArgs = [
+                                                        ...openclawPrefix,
+                                                        'agent', '--agent', 'main',
+                                                        '--session-id', sessionId,
+                                                        '-m', attemptTask,
+                                                        '--timeout', '600'
+                                                    ];
+
+                                                    console.log(`[Wrapper] Executing: ${openclawBin}${openclawPrefix.length ? ' ' + path.basename(openclawPrefix[0]) : ''} agent --agent main --session-id ${sessionId} -m <task> --timeout 600 (attempt ${handAttempt}/${HAND_MAX_RETRIES_PER_CYCLE})`);
+                                                    const handChild = spawn(openclawBin, finalArgs, {
                                                         env: {
                                                             ...process.env,
                                                             EVOLVE_CYCLE_TAG: String(cycleTag),
                                                             EVOLVE_STATUS_FILE: statusFile,
                                                         },
-                                                        stdio: ['ignore', 'pipe', 'pipe']
+                                                        stdio: ['ignore', 'pipe', 'pipe'],
+                                                        windowsHide: true
                                                     });
 
                                                     let stdoutBuf = '';
@@ -1447,7 +1550,7 @@ ${modelRoutingDirective}`;
 
                     // Send CN report (Optimized: Internal call)
                     try {
-                        const FEISHU_CN_REPORT_GROUP = process.env.FEISHU_CN_REPORT_GROUP || 'oc_86ff5e0d40cb49c777a24156f379c48c';
+                        const FEISHU_CN_REPORT_GROUP = process.env.FEISHU_CN_REPORT_GROUP || '';
                         await sendReport({
                             cycle: cycleTag,
                             title: `🧬 进化 #${cycleTag}`,
@@ -1532,7 +1635,7 @@ ${modelRoutingDirective}`;
                             });
                         } catch (_) {}
                         try {
-                            const FEISHU_CN_REPORT_GROUP = process.env.FEISHU_CN_REPORT_GROUP || 'oc_86ff5e0d40cb49c777a24156f379c48c';
+                            const FEISHU_CN_REPORT_GROUP = process.env.FEISHU_CN_REPORT_GROUP || '';
                             await sendReport({
                                 cycle: cycleTag,
                                 title: `🧬 进化 #${cycleTag}`,

@@ -6,8 +6,8 @@ const { sendCard } = require('./feishu-helper.js');
 // 2. Prefix (e.g., "[INFO]")
 const msg = process.argv[2];
 const prefix = process.argv[3] || '[INFO]';
-const target = process.env.LOG_TARGET || '';
-if (!target) { process.stderr.write('[CardFail] LOG_TARGET env var not set\n'); process.exit(1); }
+const target = process.env.FEISHU_LOG_TARGET || process.env.LOG_TARGET || '';
+if (!target) { process.stderr.write('[CardFail] FEISHU_LOG_TARGET or LOG_TARGET env var not set\n'); process.exit(1); }
 
 if (!msg) process.exit(0);
 

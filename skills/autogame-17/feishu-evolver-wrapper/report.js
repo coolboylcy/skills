@@ -116,7 +116,7 @@ try {
 let sysMon;
 try {
     // Try to load the optimized monitor first
-    sysMon = require('../common/system-monitor/index.js');
+    sysMon = require('../system-monitor');
 } catch (e) {
     // Optimized Native Implementation (Linux/Node 18+)
     sysMon = {
@@ -127,7 +127,8 @@ try {
                     return fs.readdirSync('/proc').filter(f => /^\d+$/.test(f)).length;
                 }
                 // Fallback for non-Linux
-                return execSync('ps -e | wc -l').toString().trim();
+                if (process.platform === 'win32') return '?';
+                return execSync('ps -e | wc -l', { windowsHide: true }).toString().trim();
             } catch(e){ return '?'; }
         },
         getDiskUsage: (mount) => {
@@ -140,7 +141,8 @@ try {
                     return Math.round((used / total) * 100) + '%';
                 }
                 // Fallback for older Node
-                return execSync(`df -h "${mount || '/'}" | tail -1 | awk '{print $5}'`).toString().trim();
+                if (process.platform === 'win32') return '?';
+                return execSync(`df -h "${mount || '/'}" | tail -1 | awk '{print $5}'`, { windowsHide: true }).toString().trim();
             } catch(e){ return '?'; }
         },
         getLastLine: (f) => {
@@ -373,7 +375,7 @@ async function sendReport(options) {
                             uptime = Math.floor((Date.now() - stats.ctimeMs) / 1000);
                         } else {
                             // Fallback to exec if /proc missing (non-Linux?)
-                            const et = execSync(`ps -o etimes= -p ${pid}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+                            const et = execSync(`ps -o etimes= -p ${pid}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }).trim();
                             const secs = parseInt(et, 10);
                             if (Number.isFinite(secs) && secs >= 0) uptime = secs;
                         }

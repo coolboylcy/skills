@@ -16,20 +16,17 @@ function run() {
     log('Starting Emergency Git Repair...');
     
     try {
-        // 1. Abort any pending rebase
         try {
-            execSync('git rebase --abort', { cwd: WORKSPACE_ROOT, stdio: 'ignore' });
+            execSync('git rebase --abort', { cwd: WORKSPACE_ROOT, stdio: 'ignore', windowsHide: true });
             log('Aborted pending rebase.');
         } catch (e) {}
 
-        // 2. Abort any pending merge
         try {
-            execSync('git merge --abort', { cwd: WORKSPACE_ROOT, stdio: 'ignore' });
+            execSync('git merge --abort', { cwd: WORKSPACE_ROOT, stdio: 'ignore', windowsHide: true });
             log('Aborted pending merge.');
         } catch (e) {}
 
-        // 3. Check status
-        const status = execSync('git status --porcelain', { cwd: WORKSPACE_ROOT }).toString();
+        const status = execSync('git status --porcelain', { cwd: WORKSPACE_ROOT, windowsHide: true }).toString();
         log(`Current status:\n${status}`);
 
         // 4. If index.lock exists, remove it (dangerous but necessary for unattended recovery)
@@ -46,7 +43,7 @@ function run() {
 
         // 5. Hard Reset (Last Resort)? NO. That loses work.
         // Instead, we just try to fetch and let the next cycle handle it.
-        execSync('git fetch origin main', { cwd: WORKSPACE_ROOT });
+        execSync('git fetch origin main', { cwd: WORKSPACE_ROOT, windowsHide: true });
         log('Fetched origin main.');
 
     } catch (err) {
