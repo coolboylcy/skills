@@ -58,59 +58,10 @@ except ImportError:
 
 # Source tag for tracking
 TRADE_SOURCE = "sdk:signalsniper"
+SKILL_SLUG = "polymarket-signal-sniper"
 _automaton_reported = False
 
-def _load_config(schema, skill_file, config_filename="config.json"):
-    """Load config with priority: config.json > env vars > defaults."""
-    from pathlib import Path
-    config_path = Path(skill_file).parent / config_filename
-    file_cfg = {}
-    if config_path.exists():
-        try:
-            with open(config_path) as f:
-                file_cfg = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
-    result = {}
-    for key, spec in schema.items():
-        if key in file_cfg:
-            result[key] = file_cfg[key]
-        elif spec.get("env") and os.environ.get(spec["env"]):
-            val = os.environ.get(spec["env"])
-            type_fn = spec.get("type", str)
-            try:
-                result[key] = type_fn(val) if type_fn != str else val
-            except (ValueError, TypeError):
-                result[key] = spec.get("default")
-        else:
-            result[key] = spec.get("default")
-    return result
-
-def _get_config_path(skill_file, config_filename="config.json"):
-    """Get path to config file."""
-    from pathlib import Path
-    return Path(skill_file).parent / config_filename
-
-def _update_config(updates, skill_file, config_filename="config.json"):
-    """Update config values and save to file."""
-    from pathlib import Path
-    config_path = Path(skill_file).parent / config_filename
-    existing = {}
-    if config_path.exists():
-        try:
-            with open(config_path) as f:
-                existing = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
-    existing.update(updates)
-    with open(config_path, "w") as f:
-        json.dump(existing, f, indent=2)
-    return existing
-
-# Aliases for compatibility
-load_config = _load_config
-get_config_path = _get_config_path
-update_config = _update_config
+from simmer_sdk.skill import load_config, update_config, get_config_path
 
 # Configuration schema
 CONFIG_SCHEMA = {
@@ -123,7 +74,7 @@ CONFIG_SCHEMA = {
 }
 
 # Load configuration
-_config = load_config(CONFIG_SCHEMA, __file__)
+_config = load_config(CONFIG_SCHEMA, __file__, slug="polymarket-signal-sniper")
 
 # SimmerClient singleton
 _client = None
@@ -412,6 +363,8 @@ def discover_markets(keywords: List[str], log=print) -> List[str]:
         log(f"  ⚠️ Market discovery failed: {e}")
         return []
 
+    markets = [m for m in markets if getattr(m, 'is_live_now', True) is not False]  # skip not-yet-open markets (no-op if field absent)
+
     if not keywords:
         return []
 
@@ -452,21 +405,56 @@ def _count_keyword_hits(text: str, keywords: List[str]) -> int:
     return count
 
 
-def infer_side(article: Dict[str, str]) -> Optional[str]:
-    """Infer trade side from article sentiment using keyword matching.
+NEGATIVE_QUESTION_PATTERNS = [
+    r'\bwill\b.*\b(fail|lose|drop|fall|crash|decline|collapse|miss|default|reject)\b',
+    r'\bwill there be\b.*\b(recession|downturn|shutdown|crisis|war|conflict)\b',
+    r'\bwill\b.*\b(below|under|less than|fewer than|lower than)\b',
+    r'\bwill\b.*\bnot\b',
+    r'\bwill\b.*\b(ban|block|veto|oppose|cancel|delay|deny)\b',
+]
 
-    Returns 'yes', 'no', or None if unclear.
+
+def _is_negative_question(question: str) -> bool:
+    """Detect if a market question is negatively-phrased (YES = bad thing happens).
+
+    For these markets, bearish article sentiment should map to YES (not NO),
+    because the bad outcome the question asks about becomes more likely.
+    """
+    q = question.lower()
+    return any(re.search(pat, q) for pat in NEGATIVE_QUESTION_PATTERNS)
+
+
+def infer_side(article: Dict[str, str], market_question: str = "") -> Tuple[Optional[str], float]:
+    """Infer trade side from article sentiment, aware of market question phrasing.
+
+    Returns (side, confidence) where side is 'yes', 'no', or None.
+    Confidence is 0-1 based on keyword hit strength.
     """
     text = f"{article['title']} {article['summary']}".lower()
 
     bull_score = _count_keyword_hits(text, BULLISH_KEYWORDS)
     bear_score = _count_keyword_hits(text, BEARISH_KEYWORDS)
 
+    total = bull_score + bear_score
+    if total == 0:
+        return None, 0.0
+
+    # Determine raw sentiment
     if bull_score > bear_score and bull_score >= 2:
-        return "yes"
+        raw_side = "yes"
     elif bear_score > bull_score and bear_score >= 2:
-        return "no"
-    return None
+        raw_side = "no"
+    else:
+        return None, 0.0
+
+    # Confidence: how decisive the keyword balance is (0.5 = barely, 1.0 = all one way)
+    confidence = abs(bull_score - bear_score) / total
+
+    # Flip direction for negatively-phrased markets
+    if market_question and _is_negative_question(market_question):
+        raw_side = "no" if raw_side == "yes" else "yes"
+
+    return raw_side, confidence
 
 
 def get_market_context(market_id: str, my_probability: float = None) -> Optional[Dict]:
@@ -805,7 +793,8 @@ def run_scan(
                 continue
 
             # Safeguards passed — infer trade direction from article sentiment
-            side = infer_side(article)
+            market_question = context.get("market", {}).get("question", "")
+            side, signal_confidence = infer_side(article, market_question)
             market_price = context.get("market", {}).get("current_price", 0.5)
 
             if not side:
@@ -820,7 +809,21 @@ def run_scan(
                 }
                 continue
 
-            print(f"\n     🧠 SIGNAL: {side.upper()} on {market_id[:20]}")
+            # Gate on confidence threshold
+            if signal_confidence < CONFIDENCE_THRESHOLD:
+                print(f"     📉 Signal confidence {signal_confidence:.0%} below threshold {CONFIDENCE_THRESHOLD:.0%}, skipping")
+                skip_reasons.append(f"low confidence ({signal_confidence:.0%})")
+                processed[h] = {
+                    "title": article["title"],
+                    "url": article["url"],
+                    "market_id": market_id,
+                    "action": "low_confidence",
+                    "confidence": signal_confidence,
+                    "processed_at": datetime.now(timezone.utc).isoformat(),
+                }
+                continue
+
+            print(f"\n     🧠 SIGNAL: {side.upper()} on {market_id[:20]} (confidence: {signal_confidence:.0%})")
             print(f"     Article: {article['title'][:60]}")
             print(f"     Market price: {market_price:.1%}")
 
@@ -838,9 +841,9 @@ def run_scan(
                     side=side,
                     amount=MAX_USD,
                     price=market_price,
-                    source=TRADE_SOURCE,
+                    source=TRADE_SOURCE, skill_slug=SKILL_SLUG,
                     thesis=f"Signal: {article['title'][:100]}",
-                    confidence=CONFIDENCE_THRESHOLD,
+                    confidence=signal_confidence,
                 )
                 if trade_result.get("success"):
                     shares = trade_result.get("shares", 0)
@@ -939,7 +942,7 @@ def main():
             print(f"   Saved to: {get_config_path(__file__)}")
             # Reload globals
             global FEEDS, MARKETS, KEYWORDS, CONFIDENCE_THRESHOLD, MAX_USD, MAX_TRADES_PER_RUN
-            _config = load_config(CONFIG_SCHEMA, __file__)
+            _config = load_config(CONFIG_SCHEMA, __file__, slug="polymarket-signal-sniper")
             FEEDS = _config["feeds"]
             MARKETS = _config["markets"]
             KEYWORDS = _config["keywords"]
