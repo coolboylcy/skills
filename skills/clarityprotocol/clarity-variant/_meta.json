@@ -1,0 +1,11 @@
+{
+  "owner": "clarityprotocol",
+  "slug": "clarity-variant",
+  "displayName": "Clarity Variant",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772055692124,
+    "commit": null
+  },
+  "history": []
+}
