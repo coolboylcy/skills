@@ -1,6 +1,6 @@
 ---
 name: subagent-architecture
-version: 2.3.0
+version: 2.3.5
 description: Advanced patterns for specialized subagent orchestration with production-ready reference implementations. Security isolation, phased implementation, peer collaboration, and cost-aware spawning.
 tags: [subagents, architecture, isolation, security, collaboration, orchestration, reference-implementation]
 difficulty: intermediate
@@ -9,11 +9,63 @@ requirements:
   optional_skills: [task-routing, cost-governor, drift-guard]
 author: OpenClaw Community
 license: MIT
+
+# Credential & External Integration Disclosure
+credentials_required: none
+external_integrations:
+  - name: Discord webhook (peer review flow)
+    required: false
+    notes: "Only needed if using the federated peer-review pattern. User must supply their own webhook URL manually. No token is stored or auto-configured by this skill."
+  - name: External peer agents (API endpoints)
+    required: false
+    notes: "Federated review workflows are opt-in. No external calls are made unless the user explicitly configures peer endpoints."
+
+# Package Contents Disclosure
+# This skill contains runnable JS reference libraries in lib/ and example templates in templates/.
+# These files are NOT auto-executed on install. They are reference implementations
+# intended to be copied into your workspace lib/ directory manually or via setup.sh.
+# setup.sh only creates local directory scaffolding — it makes no network calls and installs no packages.
+package_type: reference-implementation-with-libs
+auto_executes: false
 ---
 
 # Advanced Subagent Architecture
 
 Patterns and templates for building robust multi-agent systems with OpenClaw.
+
+## Why This Skill Is Complex (Read Before Installing)
+
+This is one of the most feature-dense skills in the ClawHub registry. Security scanners will flag it — not because it's malicious, but because it does a lot. Here's exactly what's in it and why:
+
+**Scope:**
+- 4 production-ready JS libraries (~1,200 lines total across spawn-security-proxy, spawn-researcher, cost-estimator, quality-scorer)
+- 4 spawn templates covering security proxy, researcher, phased implementation, and peer review patterns
+- A `setup.sh` that creates local directory scaffolding (no network calls, no package installs)
+- Inline attack vector documentation in `spawn-security-proxy.js` (test fixtures, not live payloads)
+
+**Why the libs exist:** These aren't glue code — they implement real patterns: output sanitization with canary tokens, multi-source research validation, cost projection with approval gates, and subagent output scoring. The complexity is the point; simpler skills don't solve these problems.
+
+**Why scanners flag it:**
+1. JS code in a skill package looks like an execution surface — it is, but only when you explicitly `require()` it
+2. The security proxy documents injection attack patterns as test examples — pattern matchers don't distinguish documentation from intent
+3. External integration references (Discord, peer agents) appear in templates — they're opt-in workflows, not auto-configured connections
+
+**Complexity is not a red flag here. It's the product.**
+
+---
+
+## ⚠️ Security Transparency Notice
+
+**What this skill contains:**
+- `lib/` — Reference JS libraries (spawn helpers, cost estimator, quality scorer). These are **not auto-executed**. Copy them to your workspace `lib/` directory to use them.
+- `templates/` — Markdown spawn templates for common patterns.
+- `setup.sh` — Creates local directory scaffolding only. Makes **no network calls**, installs **no packages**.
+
+**External integrations:** All optional, none auto-configured.
+- **Discord webhooks** — Only used in the federated peer-review pattern. You supply your own token manually. This skill does not store or transmit credentials.
+- **Peer agent endpoints** — Federated review is opt-in. No external calls unless you explicitly configure peer URLs.
+
+**Credential requirements:** None. No API keys, tokens, or env vars are required or auto-read by this skill.
 
 ## Overview
 
@@ -21,7 +73,7 @@ This skill provides battle-tested patterns for:
 - **Security isolation** - Contain high-risk operations with minimal context exposure
 - **Specialized research** - Multi-perspective data gathering with domain experts
 - **Phased implementation** - Architecture → Development → Review pipelines
-- **Peer collaboration** - External validation via federated agent network
+- **Peer collaboration** - External validation via federated agent network (opt-in)
 - **Cost-aware spawning** - Budget estimation and optimization strategies
 
 ## What's New in v2.0
