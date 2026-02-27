@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# clawd-zero-trust dynamic egress whitelist wrapper — v1.2.0
+# clawd-zero-trust dynamic egress whitelist wrapper — v1.3.0
 # Instantly punctures the Zero Trust proxy for the target domain and forces a physical UFW refresh.
 
 if [ "$#" -ne 2 ]; then
