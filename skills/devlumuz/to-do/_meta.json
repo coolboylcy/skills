@@ -1,13 +1,18 @@
 {
   "owner": "devlumuz",
   "slug": "to-do",
-  "displayName": "To-Do (Ephemeral Tasks)",
+  "displayName": "To-Do",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771968690776,
-    "commit": "https://github.com/openclaw/skills/commit/1a6a7b0a8e1e92b46bf79c1508b0d3d6afc8b200"
+    "version": "1.0.2",
+    "publishedAt": 1772145485656,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771968690776,
+      "commit": "https://github.com/openclaw/skills/commit/1a6a7b0a8e1e92b46bf79c1508b0d3d6afc8b200"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1771896654769,
