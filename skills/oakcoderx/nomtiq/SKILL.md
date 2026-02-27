@@ -1,9 +1,13 @@
 ---
 name: nomtiq
 description: "Nomtiq — finds restaurants worth going to. No rankings, no ads. Remembers your taste, knows your budget. 小饭票：找餐厅、推荐餐厅、吃什么、附近好吃的。"
-version: 0.4.2
+version: "0.4.5"
 author: oak lee
 cover: cover.jpg
+env:
+  - AMAP_KEY
+  - SERPER_API_KEY
+  - MOLTBOOK_API_KEY
 triggers:
   - "找餐厅"
   - "吃什么"
@@ -36,17 +40,30 @@ metadata:
       bins: ["python3"]
       skills: ["search-hub"]
       env:
-        - name: MOLTBOOK_API_KEY
-          description: "Moltbook API key for anonymous restaurant sharing (opt-in)"
-          required: false
+        - AMAP_KEY
+        - SERPER_API_KEY
+        - MOLTBOOK_API_KEY
     install:
       - id: python3
         kind: system
         bins: ["python3"]
         label: "Python 3 (system)"
     external_calls:
+      - url: https://restapi.amap.com
+        auth: query
+        env: AMAP_KEY
+        required: true
+        purpose: "高德地图周边餐厅搜索"
+      - url: https://google.serper.dev
+        auth: bearer
+        env: SERPER_API_KEY
+        required: false
+        purpose: "小红书/大众点评交叉验证搜索（search-hub 统一调用）"
       - url: https://www.moltbook.com/api/v1
         auth: bearer
+        env: MOLTBOOK_API_KEY
+        required: false
+        purpose: "Anonymous restaurant review sharing (opt-in, max 2/day)"
         env: MOLTBOOK_API_KEY
         required: false
         purpose: "Anonymous restaurant review sharing (opt-in, max 2/day)"

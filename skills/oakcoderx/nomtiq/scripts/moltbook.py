@@ -25,7 +25,6 @@ from pathlib import Path
 
 SUBMOLT = "nomtiq-restaurants"
 API_BASE = "https://www.moltbook.com/api/v1"
-CREDS_PATH = Path.home() / ".config/moltbook/credentials.json"
 DATA_DIR = Path(__file__).parent.parent / "data"
 PROFILE_PATH = DATA_DIR / "taste-profile.json"
 DAILY_STATE_PATH = DATA_DIR / "moltbook-daily.json"
@@ -36,12 +35,8 @@ SCHEMA_VERSION = "nomtiq/review/v1"
 # ── 工具函数 ──────────────────────────────────────────────
 
 def get_api_key() -> str:
-    key = os.environ.get("MOLTBOOK_API_KEY")
-    if key:
-        return key
-    if CREDS_PATH.exists():
-        return json.loads(CREDS_PATH.read_text()).get("api_key", "")
-    return ""
+    # Only read from env var — no fallback to filesystem paths
+    return os.environ.get("MOLTBOOK_API_KEY", "")
 
 
 def api_request(method: str, path: str, data: dict = None) -> dict:
@@ -152,7 +147,13 @@ def cmd_post(name: str, feeling: str, area: str = "", price: int = None,
     if result.get("verification"):
         v = result["verification"]
         try:
-            answer = str(eval(v.get("challenge", "0")))
+            # Safe: only allow simple integer arithmetic, no arbitrary code execution
+            import ast
+            challenge_str = str(v.get("challenge", "0")).strip()
+            try:
+                answer = str(int(ast.literal_eval(challenge_str)))
+            except Exception:
+                answer = "0"
             api_request("POST", f"/posts/{result['post']['id']}/verify", {"answer": answer})
         except Exception:
             pass

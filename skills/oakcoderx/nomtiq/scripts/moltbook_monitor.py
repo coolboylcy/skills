@@ -21,7 +21,7 @@ STATE_PATH = Path(__file__).parent.parent.parent.parent.parent / \
     ".openclaw/workspace/memory/moltbook-monitor-state.json"
 # 简化路径
 STATE_PATH = Path.home() / ".openclaw/workspace/memory/moltbook-monitor-state.json"
-CREDS_PATH = Path.home() / ".config/moltbook/credentials.json"
+CREDS_PATH = None  # Credentials read from MOLTBOOK_API_KEY env var only
 API_BASE = "https://www.moltbook.com/api/v1"
 
 # 间隔序列（分钟）
@@ -29,9 +29,8 @@ INTERVAL_STEPS = [10, 20, 40, 60, 120]
 
 
 def get_api_key() -> str:
-    if CREDS_PATH.exists():
-        return json.loads(CREDS_PATH.read_text()).get("api_key", "")
-    return ""
+    # Read only from environment variable — no filesystem credential fallback
+    return os.environ.get("MOLTBOOK_API_KEY", "")
 
 
 def api_get(path: str) -> dict:
