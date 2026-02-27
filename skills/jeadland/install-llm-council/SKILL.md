@@ -1,6 +1,6 @@
 ---
 name: install-llm-council
-version: 1.1.3
+version: 1.1.6
 description: |
   LLM Council — multi-model consensus app with one-command setup. Ask one question to many
   models, let them critique each other, get a synthesized chairman answer. OpenRouter/OpenClaw-native
@@ -27,7 +27,7 @@ This skill is the fastest way to run it: one command installs dependencies, conf
 ## Slash Command
 
 ```
-/install-llm-council [--mode dev|preview] [--dir PATH]
+/install-llm-council [--mode auto|dev|preview] [--dir PATH]
 ```
 
 When the user says `/install-llm-council`, run:
@@ -42,16 +42,17 @@ The script will:
 3. **`uv sync`** — Python backend dependencies
 4. **`npm ci`** — frontend dependencies
 5. **Write `.env`** — API key/URL for OpenRouter direct or OpenClaw gateway mode
-6. **Start backend** — FastAPI on `:8001` (background)
-7. **Start frontend** — Vite dev on `:5173` (background)
-8. **Print access URL** — `http://<pi-ip>:5173`
+6. **Start app** — uses hardened `start.sh` with mode-aware startup and health checks
+7. **Auto-handle port conflicts** — selects safe fallback ports when defaults are busy
+8. **Print practical access URLs** — Caddy route and common direct fallbacks
 
 ## Flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--mode dev` | `dev` | Run Vite dev server (hot reload, port 5173) |
-| `--mode preview` | — | Build + run Vite preview (port 4173) |
+| `--mode auto` | `auto` | Detect Caddy on :5173 and prefer preview mode; otherwise dev mode |
+| `--mode dev` | — | Run Vite dev server (hot reload, port 5173 default) |
+| `--mode preview` | — | Build + run Vite preview (port 4173 default) |
 | `--dir PATH` | `~/workspace/llm-council` | Override clone directory |
 
 ## Credential Resolution (OpenClaw-native)
