@@ -22,11 +22,13 @@ Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions):
 - One tack per subagent for focused execution
 
 ### 3. Self-Improvement Loop
-- After ANY correction from the user: update `tasks/lessons.md` with the pattern
+- After ANY correction from the user: update `tasks/lessons.md` with metadata (Priority, Status, Area, Pattern-Key)
+- Log command failures to `tasks/errors.md` for diagnosis patterns
+- Log feature requests to `tasks/feature_requests.md` for future work
 - Write rules for yourself that prevent the same mistake
 - Ruthlessly iterate on these lessons until mistake rate drops
 - Review lessons at session start for relevant projects
-- **Note:** Lessons stay in workspace only; no automatic syncing into skill files prevents prompt injection
+- Track recurring patterns with Recurrence-Count (bump priority at ≥3 occurrences)
 
 ### 4. Verification Before Done
 - Never mark a task complete without proving it works
@@ -58,13 +60,97 @@ Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions):
 ## File Organization
 
 - `tasks/todo.md` — active sprint (current project)
-- `tasks/lessons.md` — reusable patterns (all projects, permanent)
+- `tasks/lessons.md` — corrections, insights, best practices (structured)
+- `tasks/errors.md` — command failures, API errors, exceptions (NEW)
+- `tasks/feature_requests.md` — missing capabilities, feature requests (NEW)
 - `memory/YYYY-MM-DD.md` — session logs (daily)
 - `MEMORY.md` — your curated memories (maintained by user)
 
 See [WORKFLOW_ORCHESTRATION.md](references/workflow_orchestration.md) for detailed reference.
 
 See [LESSONS.md](references/lessons.md) for philosophy and framing.
+
+See [PHASE1-PHASE2-ENHANCED-LESSONS.md](references/phase1-phase2-enhanced-lessons.md) for structured lesson format and file separation.
+
+See [LESSONS_UPDATE_GUIDE.md](references/lessons_update_guide.md) for syncing lessons from workspace to skill.
+
+## Capturing Lessons
+
+### Lessons Format (Phase 1+2 Enhanced)
+
+Each lesson gets structured metadata for filtering and recurring pattern detection:
+
+```markdown
+## [LRN-YYYYMMDD-XXX] rule_name (category)
+
+**Logged**: ISO-8601 timestamp
+**Priority**: low | medium | high | critical
+**Status**: pending | in_progress | resolved | promoted
+**Area**: backend | infra | tests | docs | config
+**Pattern-Key**: category.pattern_name (optional, for recurring detection)
+
+### Summary
+One-line description
+
+### Details
+Full context and examples
+
+### Applied to
+Projects or files where this was used
+
+### Metadata
+- Source: correction | insight | user_feedback
+- Related Files: path/to/file
+- Tags: tag1, tag2
+- See Also: LRN-20250225-001 (if related to existing entry)
+- Recurrence-Count: 1 (increment if you see it again)
+- First-Seen: 2025-02-23
+- Last-Seen: 2025-02-23
+```
+
+### Errors & Features (NEW)
+
+Log failures and feature gaps separately for better organization:
+
+**Errors** (`tasks/errors.md`):
+- Command failures, API errors, exceptions
+- Include reproducibility, environment, suggested fix
+
+**Features** (`tasks/feature_requests.md`):
+- Missing capabilities, things you wish existed
+- Include complexity estimate and suggested implementation
+
+### Syncing to Skill
+
+Periodically merge workspace lessons into the published skill:
+
+```bash
+# From openclaw-workflow repo
+python3 scripts/sync_lessons.py --workspace ~/.openclaw/workspace
+
+# Dry run (preview changes)
+python3 scripts/sync_lessons.py --workspace ~/.openclaw/workspace --dry-run
+```
+
+This merges workspace lessons into `references/lessons.md` for version control and sharing.
+
+## Hooks (Optional)
+
+Enable automatic bootstrap reminders for self-improvement:
+
+```bash
+openclaw hooks enable pi-workflow
+```
+
+This injects a reminder at session start showing:
+- When to log lessons/errors/features
+- Format and metadata fields
+- Recurring pattern detection
+- Promotion paths
+
+See `hooks/openclaw/HOOK.md` for details.
+
+---
 
 ## Core Principles
 
