@@ -1,0 +1,11 @@
+{
+  "owner": "dinstein",
+  "slug": "cobo-tss-node",
+  "displayName": "Cobo TSS Node",
+  "latest": {
+    "version": "0.2.0",
+    "publishedAt": 1772078929815,
+    "commit": null
+  },
+  "history": []
+}
