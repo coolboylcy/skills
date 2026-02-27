@@ -1,0 +1,11 @@
+{
+  "owner": "mrlynn",
+  "slug": "openclaw-memory-skill",
+  "displayName": "OpenClaw MongoDB Semantic Memory",
+  "latest": {
+    "version": "0.2.1",
+    "publishedAt": 1771959903931,
+    "commit": null
+  },
+  "history": []
+}
