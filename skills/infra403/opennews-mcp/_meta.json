@@ -1,0 +1,11 @@
+{
+  "owner": "infra403",
+  "slug": "opennews-mcp",
+  "displayName": "opennews",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772091927485,
+    "commit": null
+  },
+  "history": []
+}
