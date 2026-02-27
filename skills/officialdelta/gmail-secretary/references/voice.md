@@ -1,12 +1,12 @@
 # Alan voice reference (auto)
 
-Generated: 2026-02-23T10:55:30.654Z
+Generated: 2026-02-25T10:55:29.711Z
 Sample size (sent snippets): 50
 
 ## High-level style (heuristics)
 - Concise snippets (<=180 chars): 42%
-- Greeting present: 12%
-- Gratitude language: 24%
+- Greeting present: 14%
+- Gratitude language: 26%
 
 ## Drafting rules
 - Clear, direct, polite.
@@ -15,6 +15,12 @@ Sample size (sent snippets): 50
 - Avoid filler.
 
 ## Representative micro-snippets (snippets only)
+- “Hi Mr. Spinks, I had a really fun time today! I'd be happy to switch times. Thank you for letting me know! Warm regards, Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link]”
+- “Dear Mrs. Annie, I hope you are doing well!! I'm so sorry for responding so late - I've been extremely busy recently with school. I've had a lot of exciting things happen recently! Last year, my cancer cell simulation pr…”
+- “Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link] ---------- Forwarded message ---------- From: Cornell Financial Aid <[email]> Date: Feb 24, 2026 at 5:38 PM -0500 To: [email] Subject:…”
+- “Dear Mrs. Zeiner, I hope all is well. I am applying to speak for the JASON Colloquium, and I would love it if you could write a letter of recommendation for me. If you are able to, I can send you any information you need…”
+- “Dear Mr. Spinks, I hope all is well. Looking at my calendar, it turns out I will have a minor conflict during the Interview Prep Night meeting on Friday. I will be able to join, but I most likely won't be able to have my…”
+- “Hi Ms. O'Brien, I am still conducting experimentation following my research plan. Should I put an end date in the future? Warm regards, Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link…”
 - “I wear an adult small. Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link]”
 - “My fair director will be returning the trophy. Warm regards, Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link]”
 - “Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link] ---------- Forwarded message ---------- From: Harvard College Griffin Financial Aid Office <[email]> Date: Feb 20, 2026 at 1:02 PM -05…”
@@ -24,9 +30,3 @@ Sample size (sent snippets): 50
 - “I would love to join for dinner! Warm regards, Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link]”
 - “Thank you so much! Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link]”
 - “Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link] ---------- Forwarded message ---------- From: Roleithia Perry <[email]> Date: Feb 10, 2026 at 3:50 PM -0500 To: College of Medicine md…”
-- “What are the refund eligibility requirements? I'd like to speak with a human representative. Warm regards, Alan Alwakeel”
-- “I already downgraded, but I do not need Ultra for this month. I have not used any of the Ultra usage to my knowledge, as the period began today. What would've been the criteria for refund eligibility? Warm regards, Alan …”
-- “Dear Cursor Team, I was planning on cancelling my Ultra Subscription, but it renewed today just before I was going to cancel. Is it possible to get a refund for the period of February 10 - March 10 and move me to the Pro…”
-- “Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link] ---------- Forwarded message ---------- From: Harvard College Admissions & Financial Aid <[email]> Date: Feb 9, 2026 at 11:19 AM -0500…”
-- “Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link] ---------- Forwarded message ---------- From: Cornell Financial Aid <[email]> Date: Feb 5, 2026 at 6:26 PM -0500 To: [email] Subject: …”
-- “Here is the first tax form for the crypto trading account. Warm regards, Alan Alwakeel Stanton College Preparatory School Class of 2026 [email] [phone] [link]”
