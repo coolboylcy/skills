@@ -49,6 +49,18 @@ This package ships templates under `templates/` for:
 
 Senior agents can copy these templates into the target repository and open a bootstrap PR.
 
+Source paths in this package:
+
+- `templates/github/workflows/junior-pr-validate.yml`
+- `templates/github/workflows/senior-release-control.yml`
+- `templates/github/CODEOWNERS.md`
+
+Target paths in the destination repository:
+
+- `.github/workflows/junior-pr-validate.yml`
+- `.github/workflows/senior-release-control.yml`
+- `.github/CODEOWNERS`
+
 ## GitHub App setup model
 
 Use one of:
