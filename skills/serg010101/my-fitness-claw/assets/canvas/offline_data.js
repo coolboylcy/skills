@@ -8,5 +8,9 @@ window.__OFFLINE_TARGETS = {
   }
 };
 window.__OFFLINE_INSIGHTS = {
-  "tips": ["Log your first meal to see AI insights!"]
+  "date": "",
+  "insights": [],
+  "tips": [
+    "Log your first meal to see AI insights!"
+  ]
 };

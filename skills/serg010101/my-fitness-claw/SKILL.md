@@ -1,6 +1,6 @@
 ---
 name: my-fitness-claw
-version: 1.4
+version: 1.6.0
 description: Your personal nutrition sidekick. Log meals in plain natural language, track macros (P/C/F) automatically, and visualize your progress on a beautiful real-time dashboard. Includes AI-driven health insights, common food memory, and daily progress tracking—all controlled via chat.
 requires:
   tools: [canvas, read, write, edit]
@@ -11,34 +11,34 @@ requires:
 
 This skill manages your nutritional data and provides a visual dashboard for tracking macros using OpenClaw's native tools.
 
-## Core Files (Workspace Root)
+## Core Files (Skill Assets)
 
-- `nutrition/daily_macros.json`: The structured log of daily intake.
-- `nutrition/targets.json`: Daily nutritional goals (calories, protein, carbs, fats).
-- `nutrition/insights.json`: AI-generated tips based on current progress.
-- `nutrition/foods/common.md`: A reference list of frequently eaten foods and their macros.
-- `canvas/index.html`: The visual dashboard for the OpenClaw Canvas.
+- `assets/nutrition/daily_macros.json`: The structured log of daily intake.
+- `assets/nutrition/targets.json`: Daily nutritional goals (calories, protein, carbs, fats).
+- `assets/nutrition/insights.json`: AI-generated tips based on current progress.
+- `assets/nutrition/foods/common.md`: A reference list of frequently eaten foods and their macros.
+- `assets/canvas/index.html`: The visual dashboard for the OpenClaw Canvas.
 
 ## Workflow: Logging Food
 
 When the user mentions eating something:
-1. **Estimate Macros**: If the user doesn't provide them, estimate calories, protein, carbs, and fats. Check `nutrition/foods/common.md` first.
-2. **Update Daily Log (Canonical)**: Update `nutrition/daily_macros.json`. This is the source of truth.
-3. **Update Offline Mirror**: Update `canvas/offline_data.js` with the same data. 
+1. **Estimate Macros**: If the user doesn't provide them, estimate calories, protein, carbs, and fats. Check `assets/nutrition/foods/common.md` first.
+2. **Update Daily Log (Canonical)**: Update `assets/nutrition/daily_macros.json`. This is the source of truth.
+3. **Update Offline Mirror**: Update `assets/canvas/offline_data.js` with the same data. 
    - Overwrite the file with: `window.__OFFLINE_DAILY_MACROS = [...]; window.__OFFLINE_TARGETS = {...}; window.__OFFLINE_INSIGHTS = {...};`
    - This ensures the dashboard works when opened via `file://` (offline/browser-first).
 4. **Update Memory**: Log the meal in the agent's current daily memory file (e.g., `memory/YYYY-MM-DD.md`).
-5. **Show Dashboard**: Use `canvas(action=present, url='assets/canvas/index.html')` to show the updated dashboard inside OpenClaw.
+5. **Show Dashboard**: Use `canvas(action=present, url='skills/my-fitness-claw/assets/canvas/index.html')` to show the updated dashboard inside OpenClaw.
 6. **Provide Browser Access**: After every log, provide the following message:
    > 📊 **View in your browser:**
    > - **Quick:** Open `skills/my-fitness-claw/assets/canvas/index.html` in your browser (uses offline mirror).
    > - **Full:** Run `python -m http.server 8000` from the workspace root and visit `http://localhost:8000/skills/my-fitness-claw/assets/canvas/index.html`.
-7. **Generate Insights**: Analyze progress against goals in `nutrition/targets.json` and update `nutrition/insights.json`.
+7. **Generate Insights**: Analyze progress against goals in `assets/nutrition/targets.json` and update `assets/nutrition/insights.json`.
 
 **Persistence Rules**:
-- `nutrition/*.json`: Canonical storage.
-- `canvas/offline_data.js`: Mirror for `file://` viewing only.
-- **Do not** modify `canvas/index.html` during routine logging.
+- `assets/nutrition/*.json`: Canonical storage.
+- `assets/canvas/offline_data.js`: Mirror for `file://` viewing only.
+- **Do not** modify `assets/canvas/index.html` during routine logging.
 
 ## Publishing Checklist (Public Safety)
 
