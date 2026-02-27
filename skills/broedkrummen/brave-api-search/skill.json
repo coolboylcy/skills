@@ -1,7 +1,7 @@
 {
   "name": "brave-search-skill",
-  "version": "2.1.1",
-  "description": "Real-time web search and AI-powered answers using the Brave Search API. Requires BRAVE_SEARCH_API_KEY and BRAVE_ANSWERS_API_KEY environment variables.",
+  "version": "2.2.1",
+  "description": "Real-time web search, autosuggest, and AI-powered answers using the Brave Search API. Requires BRAVE_SEARCH_API_KEY and BRAVE_ANSWERS_API_KEY environment variables.",
   "author": "Broedkrummen",
   "requiredEnv": [
     "BRAVE_SEARCH_API_KEY",
@@ -41,6 +41,33 @@
         "summary": {
           "type": "boolean",
           "description": "Fetch AI summarizer result for the search query",
+          "default": false
+        }
+      }
+    },
+    {
+      "name": "brave_suggest",
+      "description": "Get search query autosuggestions as users type. Returns contextual suggestions based on partial input with optional rich metadata (titles, descriptions, images).",
+      "command": "node {{workspace}}/brave_suggest.js --query \"{{query}}\" --count {{count|5}} --country {{country|US}} --rich {{rich|false}}",
+      "args": {
+        "query": {
+          "type": "string",
+          "description": "Partial query to get suggestions for",
+          "required": true
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of suggestions to return (1-10)",
+          "default": 5
+        },
+        "country": {
+          "type": "string",
+          "description": "2-letter country code for geographic targeting",
+          "default": "US"
+        },
+        "rich": {
+          "type": "boolean",
+          "description": "Include enhanced metadata (titles, descriptions, images, entity detection). Requires paid subscription.",
           "default": false
         }
       }
