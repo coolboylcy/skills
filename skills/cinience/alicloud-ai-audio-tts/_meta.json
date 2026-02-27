@@ -3,11 +3,16 @@
   "slug": "alicloud-ai-audio-tts",
   "displayName": "Alicloud Ai Audio Tts",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1770973056340,
-    "commit": "https://github.com/openclaw/skills/commit/123c00185b6095ae576391ff26762203a642835e"
+    "version": "1.0.3",
+    "publishedAt": 1772109449606,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1770973056340,
+      "commit": "https://github.com/openclaw/skills/commit/123c00185b6095ae576391ff26762203a642835e"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1770768394297,
