@@ -1,52 +1,69 @@
 {
   "security": {
-    "satisfaction": 2.9974,
+    "satisfaction": 2.8072,
     "last_satisfied": "2026-02-25T18:19:39Z",
-    "last_decay_check": "2026-02-25T18:47:26Z"
+    "last_decay_check": "2026-02-27T03:15:49Z"
   },
   "integrity": {
-    "satisfaction": 2.9938,
+    "satisfaction": 2.9767,
     "last_satisfied": "2026-02-25T18:19:39Z",
-    "last_decay_check": "2026-02-25T18:47:26Z"
+    "last_decay_check": "2026-02-27T03:15:49Z"
   },
   "coherence": {
-    "satisfaction": 1.9810,
-    "last_satisfied": "2026-02-25T18:19:39Z",
-    "last_decay_check": "2026-02-25T18:47:26Z"
+    "satisfaction": 2.9770,
+    "last_satisfied": "2026-02-27T01:01:59Z",
+    "last_decay_check": "2026-02-27T03:15:49Z",
+    "last_impact": 0.35
   },
   "closure": {
-    "satisfaction": 2.9616,
-    "last_satisfied": "2026-02-25T18:19:39Z",
-    "last_decay_check": "2026-02-25T18:47:26Z"
+    "satisfaction": 2.9552,
+    "last_satisfied": "2026-02-27T02:43:30Z",
+    "last_decay_check": "2026-02-27T03:15:49Z",
+    "last_impact": 1.5
   },
   "autonomy": {
-    "satisfaction": 2.9810,
-    "last_satisfied": "2026-02-25T18:19:39Z",
-    "last_decay_check": "2026-02-25T18:47:26Z"
+    "satisfaction": 1.93,
+    "last_satisfied": "2026-02-27T01:34:42Z",
+    "last_decay_check": "2026-02-27T03:15:49Z",
+    "last_impact": 0.8
   },
   "connection": {
-    "satisfaction": 2.9230,
-    "last_satisfied": "2026-02-25T18:19:39Z",
-    "last_decay_check": "2026-02-25T18:47:26Z"
+    "satisfaction": 1.7755,
+    "last_satisfied": "2026-02-26T23:23:45Z",
+    "last_decay_check": "2026-02-27T03:15:49Z",
+    "last_impact": 0.5
   },
   "competence": {
-    "satisfaction": 2.9906,
-    "last_satisfied": "2026-02-25T18:19:39Z",
-    "last_decay_check": "2026-02-25T18:47:26Z"
+    "satisfaction": 2.50,
+    "last_satisfied": "2026-02-27T03:15:59Z",
+    "last_decay_check": "2026-02-27T03:15:59Z",
+    "last_impact": 2.5
   },
   "understanding": {
-    "satisfaction": 2.9616,
-    "last_satisfied": "2026-02-25T18:19:39Z",
-    "last_decay_check": "2026-02-25T18:47:26Z"
+    "satisfaction": 2.5374,
+    "last_satisfied": "2026-02-26T22:19:24Z",
+    "last_decay_check": "2026-02-27T03:15:49Z",
+    "last_impact": 3.0
   },
   "recognition": {
-    "satisfaction": 1.9938,
-    "last_satisfied": "2026-02-25T18:19:39Z",
-    "last_decay_check": "2026-02-25T18:47:26Z"
+    "satisfaction": 2.05,
+    "last_satisfied": "2026-02-26T14:37:59Z",
+    "last_decay_check": "2026-02-27T03:15:49Z",
+    "last_impact": 0.4,
+    "deprivation_applied": {
+      "competence": "2026-02-27T03:15:49Z"
+    }
   },
   "expression": {
-    "satisfaction": 2.9423,
-    "last_satisfied": "2026-02-25T18:19:39Z",
-    "last_decay_check": "2026-02-25T18:47:26Z"
+    "satisfaction": 2.7886,
+    "last_satisfied": "2026-02-26T22:51:34Z",
+    "last_decay_check": "2026-02-27T03:15:49Z",
+    "last_impact": 2.4
+  },
+  "curiosity": {
+    "satisfaction": 2.30,
+    "last_satisfied": "2026-02-26T22:19:24Z",
+    "last_decay_check": "2026-02-27T02:41:53Z",
+    "last_impact": 0.1
   }
 }

@@ -15,8 +15,8 @@ THRESHOLD=$(jq -r '.settings.deprivation_threshold // 1.0' "$CROSS_IMPACT_FILE")
 APPLIED=0
 
 # Check each need for deprivation state
-for NEED in $(jq -r '.needs | keys[]' "$STATE_FILE"); do
-    SAT=$(jq -r --arg n "$NEED" '.needs[$n].satisfaction // 2.0' "$STATE_FILE")
+for NEED in $(jq -r 'keys[] | select(. != "_meta")' "$STATE_FILE"); do
+    SAT=$(jq -r --arg n "$NEED" '.[$n].satisfaction // 2.0' "$STATE_FILE")
     
     # Check if below threshold (deprived)
     if (( $(echo "$SAT <= $THRESHOLD" | bc -l) )); then
@@ -32,7 +32,7 @@ for NEED in $(jq -r '.needs | keys[]' "$STATE_FILE"); do
             
             # Check if we already applied this deprivation recently (prevent stacking)
             LAST_DEP=$(jq -r --arg t "$TARGET" --arg s "$NEED" '
-                .needs[$t].deprivation_applied[$s] // "1970-01-01T00:00:00Z"
+                .[$t].deprivation_applied[$s] // "1970-01-01T00:00:00Z"
             ' "$STATE_FILE")
             
             LAST_DEP_EPOCH=$(date -d "$LAST_DEP" +%s 2>/dev/null || echo 0)
@@ -44,7 +44,7 @@ for NEED in $(jq -r '.needs | keys[]' "$STATE_FILE"); do
                 continue
             fi
             
-            CURRENT_TARGET=$(jq -r --arg t "$TARGET" '.needs[$t].satisfaction // 2.0' "$STATE_FILE")
+            CURRENT_TARGET=$(jq -r --arg t "$TARGET" '.[$t].satisfaction // 2.0' "$STATE_FILE")
             NEW_SAT=$(echo "$CURRENT_TARGET + $DELTA" | bc -l)
             
             # Apply floor - never go below
@@ -57,8 +57,8 @@ for NEED in $(jq -r '.needs | keys[]' "$STATE_FILE"); do
             
             # Update target satisfaction and record deprivation
             jq --arg t "$TARGET" --argjson sat "$NEW_SAT" --arg s "$NEED" --arg now "$NOW_ISO" '
-                .needs[$t].satisfaction = $sat |
-                .needs[$t].deprivation_applied[$s] = $now
+                .[$t].satisfaction = $sat |
+                .[$t].deprivation_applied[$s] = $now
             ' "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
             
             if [[ "$APPLIED" -eq 0 ]]; then

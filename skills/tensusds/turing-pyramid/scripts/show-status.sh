@@ -26,7 +26,7 @@ needs=$(jq -r '.needs | keys[]' "$CONFIG_FILE")
 for need in $needs; do
     importance=$(jq -r ".needs.\"$need\".importance" "$CONFIG_FILE")
     decay_rate=$(jq -r ".needs.\"$need\".decay_rate_hours" "$CONFIG_FILE")
-    last_sat=$(jq -r ".needs.\"$need\".last_satisfied" "$STATE_FILE")
+    last_sat=$(jq -r ".\"$need\".last_satisfied" "$STATE_FILE")
     
     if [[ "$last_sat" == "null" || -z "$last_sat" ]]; then
         hours_since="∞"

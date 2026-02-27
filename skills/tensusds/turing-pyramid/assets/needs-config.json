@@ -1,11 +1,11 @@
 {
   "_meta": {
     "name": "Turing Pyramid — Agent Needs Configuration",
-    "version": "1.7.1",
+    "version": "1.7.2",
     "author": "turing-pyramid contributors",
     "created": "2026-02-22",
-    "updated": "2026-02-25",
-    "note": "v1.7.1: Balance fixes (connection/closure decay, autonomy cascade)"
+    "updated": "2026-02-27",
+    "note": "v1.7.2: Fix jq queries in apply-deprivation.sh and show-status.sh (state file structure)"
   },
   "needs": {
     "security": {

@@ -20,6 +20,7 @@ STATE_FILE="$SKILL_DIR/assets/needs-state.json"
 SCRIPTS_DIR="$SKILL_DIR/scripts"
 WORKSPACE="$WORKSPACE"
 MEMORY_DIR="$WORKSPACE/memory"
+LOGS_DIR="$WORKSPACE/memory/logs"
 
 # Check initialization
 if [[ ! -f "$STATE_FILE" ]]; then
@@ -254,7 +255,7 @@ log_noticed() {
     
     # Append to today's memory with timestamp
     if [[ -d "$MEMORY_DIR" ]]; then
-        echo "- [$timestamp] ○ noticed: $need (sat=$sat, tension=$tension) — non-action" >> "$MEMORY_DIR/$TODAY.md"
+        echo "- [$timestamp] ○ noticed: $need (sat=$sat, tension=$tension) — non-action" >> "$LOGS_DIR/$TODAY-cycles.log"
     fi
 }
 
@@ -267,7 +268,7 @@ log_action() {
     
     # Append to today's memory with timestamp
     if [[ -d "$MEMORY_DIR" ]]; then
-        echo "- [$timestamp] ▶ action: $need (sat=$sat, tension=$tension) — requires action" >> "$MEMORY_DIR/$TODAY.md"
+        echo "- [$timestamp] ▶ action: $need (sat=$sat, tension=$tension) — requires action" >> "$LOGS_DIR/$TODAY-cycles.log"
     fi
 }
 
