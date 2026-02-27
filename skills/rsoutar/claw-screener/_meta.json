@@ -3,11 +3,16 @@
   "slug": "claw-screener",
   "displayName": "Claw Screener",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1772039832429,
-    "commit": "https://github.com/openclaw/skills/commit/34ad095d251c8a4e6326dcfcbc2f664f9363e2e1"
+    "version": "1.0.3",
+    "publishedAt": 1772041168176,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1772039832429,
+      "commit": "https://github.com/openclaw/skills/commit/34ad095d251c8a4e6326dcfcbc2f664f9363e2e1"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1771333489581,
