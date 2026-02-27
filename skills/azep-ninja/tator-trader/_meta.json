@@ -3,9 +3,15 @@
   "slug": "tator-trader",
   "displayName": "Tator Trader - AI Trading",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1771535757244,
-    "commit": "https://github.com/openclaw/skills/commit/cc7bbce38965b012c77bddec1033443ebb627251"
+    "version": "1.0.6",
+    "publishedAt": 1772154445031,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1771535757244,
+      "commit": "https://github.com/openclaw/skills/commit/cc7bbce38965b012c77bddec1033443ebb627251"
+    }
+  ]
 }
