@@ -1,0 +1,11 @@
+{
+  "owner": "clarityprotocol",
+  "slug": "clarity-submit",
+  "displayName": "Clarity Submit",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772055687724,
+    "commit": null
+  },
+  "history": []
+}
