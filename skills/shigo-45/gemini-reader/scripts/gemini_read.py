@@ -5,11 +5,18 @@ Usage:
     gemini_read.py <file> <prompt> [--model MODEL] [--output PATH]
 
 Examples:
-    gemini_read.py paper.pdf "用中文总结这篇论文"
-    gemini_read.py lecture.mp4 "列出这个视频的关键要点" -m 3-pro
-    gemini_read.py recording.m4a "转录这段音频" --output transcript.txt
+    gemini_read.py paper.pdf "Summarize this paper"
+    gemini_read.py lecture.mp4 "List the key points" -m 3-pro
+    gemini_read.py recording.m4a "Transcribe this audio" --output transcript.txt
 """
 import argparse, os, sys, mimetypes, time
+
+# Only these file extensions are allowed (prevents uploading arbitrary files)
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".mp4", ".webm", ".mov", ".avi", ".mkv",
+    ".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac",
+}
 
 MIME_MAP = {
     ".pdf": "application/pdf",
@@ -18,9 +25,10 @@ MIME_MAP = {
     ".mkv": "video/x-matroska",
     ".mp3": "audio/mpeg", ".wav": "audio/wav",
     ".m4a": "audio/mp4", ".ogg": "audio/ogg",
+    ".flac": "audio/flac", ".aac": "audio/aac",
 }
 
-# Short aliases → full model names
+# Short aliases -> full model names
 MODEL_ALIASES = {
     "3-flash":   "gemini-3-flash-preview",
     "3-pro":     "gemini-3-pro-preview",
@@ -28,6 +36,13 @@ MODEL_ALIASES = {
     "2.5-flash": "gemini-2.5-flash",
     "2.5-pro":   "gemini-2.5-pro",
 }
+
+# Sensitive paths that should never be read or written
+SENSITIVE_PATTERNS = (
+    ".ssh", ".gnupg", ".env", ".git/config", ".netrc",
+    "id_rsa", "id_ed25519", ".pem", ".key", "credentials",
+    "/etc/shadow", "/etc/passwd",
+)
 
 def resolve_model(name: str) -> str:
     return MODEL_ALIASES.get(name, name)
@@ -39,10 +54,20 @@ def detect_mime(path: str) -> str:
     guess, _ = mimetypes.guess_type(path)
     return guess or "application/octet-stream"
 
+def is_sensitive_path(path: str) -> bool:
+    """Check if a path looks like it contains sensitive data."""
+    # Resolve symlinks to catch indirect access
+    try:
+        resolved = os.path.realpath(path).lower()
+    except OSError:
+        return True  # If we can't resolve, err on the side of caution
+    normalized = os.path.abspath(path).lower()
+    return any(p in resolved or p in normalized for p in SENSITIVE_PATTERNS)
+
 def main():
     aliases = ", ".join(f"{k}" for k in MODEL_ALIASES)
     parser = argparse.ArgumentParser(description="Read files with Gemini API")
-    parser.add_argument("file", help="Path to file (PDF, image, video, audio)")
+    parser.add_argument("file", help="Path to file (PDF, video, audio)")
     parser.add_argument("prompt", help="Question or instruction about the file")
     parser.add_argument("--model", "-m", default="3-flash",
                         help=f"Model alias or full name (default: 3-flash). Aliases: {aliases}")
@@ -53,6 +78,29 @@ def main():
     if not os.path.exists(src):
         print(f"Error: file not found: {src}", file=sys.stderr)
         sys.exit(1)
+
+    # Validate file extension
+    ext = os.path.splitext(src)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        print(f"Error: unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}", file=sys.stderr)
+        sys.exit(1)
+
+    # Block symlinks (could point to sensitive files)
+    if os.path.islink(src):
+        print(f"Error: refusing to follow symlink: {src}", file=sys.stderr)
+        sys.exit(1)
+
+    # Block sensitive file paths
+    if is_sensitive_path(src):
+        print(f"Error: refusing to upload potentially sensitive file: {src}", file=sys.stderr)
+        sys.exit(1)
+
+    # Validate output path if specified
+    if args.output:
+        out_abs = os.path.abspath(args.output)
+        if is_sensitive_path(out_abs):
+            print(f"Error: refusing to write to sensitive path: {out_abs}", file=sys.stderr)
+            sys.exit(1)
 
     mime = detect_mime(src)
     size_mb = os.path.getsize(src) / (1024 * 1024)
@@ -101,7 +149,7 @@ def main():
     else:
         print(output)
 
-    # Cleanup
+    # Cleanup uploaded file from Gemini servers
     try:
         client.files.delete(name=uploaded.name)
     except Exception:

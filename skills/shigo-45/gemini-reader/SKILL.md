@@ -31,16 +31,16 @@ python3 scripts/gemini_read.py <file> "<prompt>" [--model MODEL] [--output PATH]
 
 ```bash
 # Summarize a PDF
-python3 scripts/gemini_read.py paper.pdf "用中文总结这篇论文的主要内容"
+python3 scripts/gemini_read.py paper.pdf "Summarize the key findings of this paper"
 
 # Analyze a video
-python3 scripts/gemini_read.py lecture.mp4 "列出这个视频的关键要点"
+python3 scripts/gemini_read.py lecture.mp4 "List the main topics covered in this video"
 
 # Transcribe audio
-python3 scripts/gemini_read.py recording.m4a "转录这段音频的内容"
+python3 scripts/gemini_read.py recording.m4a "Transcribe this audio verbatim"
 
 # Save output to file
-python3 scripts/gemini_read.py report.pdf "提取所有数据表格" --output tables.txt
+python3 scripts/gemini_read.py report.pdf "Extract all data tables" --output tables.txt
 ```
 
 ### Model selection
@@ -57,7 +57,9 @@ Use alias with `-m`: `gemini_read.py file.pdf "prompt" -m 2.5-pro`
 
 ## Notes
 
-- All files go through File Upload API (upload → generate → cleanup), unified flow regardless of size
+- Files are uploaded to Google's Gemini API for processing and deleted after use. Do not use with confidential or sensitive files.
+- The script enforces a file extension whitelist (PDF/video/audio only), blocks known sensitive paths, and rejects symlinks.
+- All files go through File Upload API (upload -> generate -> cleanup), unified flow regardless of size
 - For files on remote nodes (e.g. Mac), transfer to VM first using Tailscale or scp
 - The script auto-detects MIME type from file extension
 - API calls are direct — no sandbox restrictions, no CLI overhead
