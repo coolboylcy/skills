@@ -8,10 +8,23 @@ OpenClaw provides file paths in the format:
 """
 
 import sys
+import site
+from pathlib import Path
+
+# Activate the virtual environment's packages if .venv exists next to the skill root.
+# OpenClaw invokes the script with system Python, so we need to add
+# the venv's site-packages to sys.path manually.
+_skill_root = Path(__file__).resolve().parent.parent
+_venv_dir = _skill_root / ".venv"
+if _venv_dir.is_dir():
+    _venv_site = list(_venv_dir.glob("lib/python*/site-packages"))
+    for sp in _venv_site:
+        if str(sp) not in sys.path:
+            site.addsitedir(str(sp))
+
 import time
 import argparse
 import logging
-from pathlib import Path
 from typing import Dict, Any, List
 
 from config_manager import ConfigManager

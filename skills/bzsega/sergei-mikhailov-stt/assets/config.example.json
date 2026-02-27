@@ -7,17 +7,6 @@
       "lang": "ru-RU",
       "model": "general",
       "timeout": 30
-    },
-    "google": {
-      "credentials_path": "${GOOGLE_CREDENTIALS_PATH}",
-      "project_id": "${GOOGLE_PROJECT_ID}",
-      "lang": "ru-RU",
-      "model": "latest_long"
-    },
-    "openai": {
-      "api_key": "${OPENAI_API_KEY}",
-      "model": "whisper-1",
-      "lang": "ru"
     }
   },
   "audio": {
