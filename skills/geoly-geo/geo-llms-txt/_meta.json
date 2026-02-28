@@ -1,0 +1,11 @@
+{
+  "owner": "geoly-geo",
+  "slug": "geo-llms-txt",
+  "displayName": "llms.txt File Builder",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772202264761,
+    "commit": null
+  },
+  "history": []
+}
