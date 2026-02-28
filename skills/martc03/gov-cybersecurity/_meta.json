@@ -1,0 +1,11 @@
+{
+  "owner": "martc03",
+  "slug": "gov-cybersecurity",
+  "displayName": "Government Cybersecurity Vulnerability Intel",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772183761504,
+    "commit": null
+  },
+  "history": []
+}
