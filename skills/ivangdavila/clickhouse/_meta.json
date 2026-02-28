@@ -1,0 +1,11 @@
+{
+  "owner": "ivangdavila",
+  "slug": "clickhouse",
+  "displayName": "ClickHouse",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1772138899075,
+    "commit": null
+  },
+  "history": []
+}
