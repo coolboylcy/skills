@@ -1,0 +1,11 @@
+{
+  "owner": "awspace",
+  "slug": "email-skill",
+  "displayName": "Email",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1772164810039,
+    "commit": null
+  },
+  "history": []
+}
