@@ -1,0 +1,11 @@
+{
+  "owner": "wangwu-30",
+  "slug": "openclaw-safe-config-rollback",
+  "displayName": "OpenClaw Safe Config Rollback",
+  "latest": {
+    "version": "0.1.1",
+    "publishedAt": 1772214131658,
+    "commit": null
+  },
+  "history": []
+}
