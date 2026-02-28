@@ -18,6 +18,7 @@ OpenCortex transforms your agent into one that **gets smarter every day** throug
 - **Nightly distillation** — Daily work automatically distilled into permanent knowledge
 - **Weekly synthesis** — Pattern detection across days catches recurring problems and unfinished threads
 - **Enforced principles** — Habits that prevent knowledge loss (decision capture, tool documentation, sub-agent debriefs)
+- **Write-ahead durability** — Agent writes decisions and preferences to memory before responding, so nothing is lost if the session ends or compacts mid-conversation
 - **Encrypted vault** — AES-256 encrypted secret storage with system keyring support
 - **Voice profiling** *(opt-in)* — Learns how your human communicates for authentic ghostwriting
 - **Infrastructure collection** *(opt-in)* — Auto-routes infrastructure details from daily logs to INFRA.md
@@ -65,7 +66,23 @@ clawhub install opencortex --force         # Download latest
 bash skills/opencortex/scripts/install.sh  # Detects existing install, offers Update
 ```
 
-The installer detects your existing version and offers: **1) Update** (recommended) — adds missing content, refreshes cron messages, offers new optional features. **2) Full reinstall.** **3) Cancel.** It never overwrites files you've customized.
+The installer detects your existing version and offers: **1) Update** (recommended), **2) Full reinstall**, **3) Cancel.** It never overwrites files you've customized.
+
+### What the updater does
+
+| Content | Update method | User data safe? |
+|---------|--------------|-----------------|
+| Principles (P1-P8) | Hash comparison, asks before replacing | ✅ Asks y/N per principle |
+| P0 (Custom Principles) | Never touched | ✅ Your custom principles are always safe |
+| Helper scripts (verify, vault, metrics, git-backup) | Checksum comparison, auto-replaced | ✅ These aren't user-edited |
+| Reference docs (distillation, weekly-synthesis, architecture) | Checksum comparison, auto-replaced | ✅ These aren't user-edited |
+| Cron job messages | Always updated to latest template | ✅ Only the message text changes |
+| Cron model overrides | Cleared to gateway default | ✅ Fixes stale hardcoded models |
+| MEMORY.md structure (## Identity, ## Memory Index) | Adds missing core sections | ✅ Existing sections untouched |
+| MEMORY.md index (### Infrastructure through ### Daily Logs) | Adds all missing sub-sections | ✅ Existing sections untouched |
+| preferences.md | Created if missing | ✅ Existing file untouched |
+| New directories (contacts, workflows) | Created if missing | ✅ |
+| AGENTS.md, BOOTSTRAP.md, SOUL.md, USER.md | Never modified, warns if outdated | ✅ Never touched |
 
 ---
 
@@ -90,12 +107,13 @@ memory/
   YYYY-MM-DD.md  ← Today's working log (distilled nightly)
 ```
 
-## Principles (P1–P8)
+## Principles (P0–P8)
 
 | # | Principle | What It Does | Enforcement |
 |---|-----------|-------------|-------------|
-| P1 | Delegate First | Sub-agent delegation by default | Agent protocol |
-| P2 | Write It Down | Commit to files, not mental notes | Agent protocol |
+| P0 | Custom Principles | Your own principles (P0-A, P0-B, etc.) | Never modified by updates |
+| P1 | Delegate First | Model-agnostic sub-agent delegation (Light/Medium/Heavy) | Agent protocol |
+| P2 | Write It Down | Write-ahead durability: save before responding | Agent protocol |
 | P3 | Ask Before External | Confirm before public/destructive actions | Agent protocol |
 | P4 | Tool Shed & Workflows | Document tools and workflows | Nightly audit scans for undocumented tools and workflows |
 | P5 | Capture Decisions & Preferences | Record decisions and preferences | Nightly + weekly audit for uncaptured decisions and preferences |

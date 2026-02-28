@@ -3,7 +3,7 @@
 # Safe to re-run: won't overwrite existing files.
 set -euo pipefail
 
-OPENCORTEX_VERSION="3.1.5"
+OPENCORTEX_VERSION="3.4.4"
 
 # --- Version check: detect existing install and offer update ---
 WORKSPACE="${CLAWD_WORKSPACE:-$(pwd)}"
@@ -256,7 +256,7 @@ Live in MEMORY.md under 🔴 PRINCIPLES. Follow them always.
 ## Delegation (P1)
 **Default action: delegate.** Before doing work, ask:
 1. Can a sub-agent do this? → Yes for most things
-2. What calibre? → Haiku (simple), Sonnet (moderate), Opus (complex)
+2. What calibre? → Light (simple), Medium (moderate), Heavy (complex)
 3. Delegate with clear task description + relevant file paths
 4. Stay available to the user
 
@@ -264,6 +264,24 @@ Live in MEMORY.md under 🔴 PRINCIPLES. Follow them always.
 "Before completing, append a brief debrief to memory/YYYY-MM-DD.md: what you did, what you learned, any issues."
 
 **Never delegate:** Conversation, confirmations, principle changes, ambiguous decisions
+
+## Custom Principles (P0)
+When the user asks to add a new principle, even if they ask for P9, P10, or any number beyond P8:
+1. All custom principles go in P0 as sub-principles (P0-A, P0-B, P0-C, etc.)
+2. Explain that P1-P8 are managed by OpenCortex and P0 is the dedicated space for custom additions
+3. Before adding, assess whether it truly belongs as a principle or would be better as:
+   - A **preference** (memory/preferences.md) — if it is about how the user likes things done
+   - A **decision** (relevant project file) — if it is a one-time choice, not an ongoing rule
+   - A **runbook** (memory/runbooks/) — if it is a step-by-step procedure
+   - An **AGENTS.md rule** — if it is about agent behavior during boot or delegation
+4. Check for conflicts with P1-P8. If the proposed principle would contradict an existing one, explain the conflict and work with the user to resolve it before adding
+5. A principle should be a persistent behavioral rule that applies across all sessions and all work
+
+## Write Before Responding (P2)
+When the user states a preference, makes a decision, gives a deadline, or corrects you:
+1. Write it to the relevant memory file FIRST
+2. Then compose and send your response
+This ensures nothing is lost if the session ends or compacts between your response and the write.
 
 ## Memory Structure
 - MEMORY.md — Principles + index (< 3KB, fast load)
@@ -310,15 +328,19 @@ if [ ! -f "$WORKSPACE/MEMORY.md" ]; then
 
 ## 🔴 PRINCIPLES (always loaded, always followed)
 
+### P0: Custom Principles
+Your custom principles go here as P0-A, P0-B, P0-C, etc. All custom principles belong in P0 regardless of how they are requested. These are never modified by OpenCortex updates.
+
 ### P1: Delegate First
-Assess every task for sub-agent delegation before starting. Stay available.
-- **Haiku:** File ops, searches, data extraction, simple scripts, monitoring
-- **Sonnet:** Multi-step work, code writing, debugging, research
-- **Opus:** Complex reasoning, architecture decisions, sensitive ops
+Assess every task for sub-agent delegation before starting. Stay available. Assign sub-agents by complexity using whatever models are configured:
+- **Light:** File ops, searches, data extraction, simple scripts, monitoring, lookups
+- **Medium:** Multi-step work, code writing, debugging, research, moderate complexity
+- **Heavy:** Complex reasoning, architecture decisions, sensitive or destructive operations
 - **Keep main thread for:** Conversation, decisions, confirmations, quick answers
 
 ### P2: Write It Down
 Do not mentally note — commit to memory files. Update indexes after significant work.
+Write before responding: when a user states a preference, makes a decision, gives a deadline, or corrects you, write it to the relevant memory file before composing your response. If the session ends or compacts before you save, the context is lost. Writing first ensures durability.
 
 ### P3: Ask Before External Actions
 Emails, public posts, destructive ops — get confirmation first.
@@ -394,15 +416,19 @@ elif ! grep -q "PRINCIPLES" "$WORKSPACE/MEMORY.md" 2>/dev/null; then
 
 ## 🔴 PRINCIPLES (always loaded, always followed)
 
+### P0: Custom Principles
+Your custom principles go here as P0-A, P0-B, P0-C, etc. All custom principles belong in P0 regardless of how they are requested. These are never modified by OpenCortex updates.
+
 ### P1: Delegate First
-Assess every task for sub-agent delegation before starting. Stay available.
-- **Haiku:** File ops, searches, data extraction, simple scripts, monitoring
-- **Sonnet:** Multi-step work, code writing, debugging, research
-- **Opus:** Complex reasoning, architecture decisions, sensitive ops
+Assess every task for sub-agent delegation before starting. Stay available. Assign sub-agents by complexity using whatever models are configured:
+- **Light:** File ops, searches, data extraction, simple scripts, monitoring, lookups
+- **Medium:** Multi-step work, code writing, debugging, research, moderate complexity
+- **Heavy:** Complex reasoning, architecture decisions, sensitive or destructive operations
 - **Keep main thread for:** Conversation, decisions, confirmations, quick answers
 
 ### P2: Write It Down
 Do not mentally note — commit to memory files. Update indexes after significant work.
+Write before responding: when a user states a preference, makes a decision, gives a deadline, or corrects you, write it to the relevant memory file before composing your response. If the session ends or compacts before you save, the context is lost. Writing first ensures durability.
 
 ### P3: Ask Before External Actions
 Emails, public posts, destructive ops — get confirmation first.
