@@ -9,7 +9,7 @@ metadata: {"openclaw": {"primaryEnv": "IAMMETER_TOKEN", "requires": {"env": ["IA
 A Node.js client and CLI for the iammeter API, based on the official swagger spec.
 
 Features
-- Token is loaded automatically: first from the `IAMMETER_TOKEN` environment variable,
+- API key is loaded automatically: first from the `IAMMETER_TOKEN` environment variable,
   then from `~/.openclaw/openclaw.json` (`skills.entries.iammeter.apiKey`)
 - List user sites (sitelist)
 - Get latest data for all meters (metersdata)
@@ -18,10 +18,10 @@ Features
 - Power analysis (poweranalysis), offline analysis (offlineanalysis)
 
 Configuration
-- Option A (OpenClaw / Clawhub): set the token in the Skills UI. It is stored in
+- Option A (OpenClaw / Clawhub): set the API key in the Skills UI. It is stored in
   `~/.openclaw/openclaw.json` under `skills.entries.iammeter.apiKey` and injected
   as the `IAMMETER_TOKEN` environment variable at runtime.
-- Option B (local testing): export IAMMETER_TOKEN=<your_token> before running.
+- Option B (local testing): export IAMMETER_TOKEN=<your_api_key> before running.
 
 Files
 - references/api.md — endpoint reference summarized from swagger
@@ -42,7 +42,7 @@ Usage (local testing)
 
 Notes
 - Some endpoints have strict rate limits (see references/api.md for details).
-- Do not commit real tokens to public repositories.
+- Do not commit real credentials to public repositories.
 
 # Credits
 - API endpoints and fields from https://www.iammeter.com/swaggerui/swagger.json

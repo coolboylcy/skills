@@ -3,9 +3,15 @@
   "slug": "iammeter-openclaw-skill",
   "displayName": "iammeter",
   "latest": {
-    "version": "0.2.0",
-    "publishedAt": 1772171607507,
-    "commit": "https://github.com/openclaw/skills/commit/f401697e258e5b84d8ad2100cb6cb9abe98d89be"
+    "version": "0.2.1",
+    "publishedAt": 1772245518554,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.2.0",
+      "publishedAt": 1772171607507,
+      "commit": "https://github.com/openclaw/skills/commit/f401697e258e5b84d8ad2100cb6cb9abe98d89be"
+    }
+  ]
 }

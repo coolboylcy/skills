@@ -2,15 +2,9 @@
 
 Based on https://www.iammeter.com/swaggerui/swagger.json
 
-## Authentication
+All read endpoints require the header: `token: <api_key>`
 
-**POST /api/v1/user/login**
-- Body: `{ userName, password }`
-- Response: `{ data: { id, token, refreshToken }, successful, message }`
-- Note: You can also obtain the token directly from the IAMMETER web console and
-  pass it via the request header `token: YOUR_TOKEN`.
-
-All read endpoints require the header: `token: YOUR_TOKEN`
+> Obtain your API key from the IAMMETER web console or set it via the OpenClaw Skills UI.
 
 ---
 
@@ -97,7 +91,7 @@ Example row: `[230.1, 5.2, 1196.5, 320.44, 12.01, ...]`
 
 | HTTP Status | Meaning                      | Action                            |
 |-------------|------------------------------|-----------------------------------|
-| 401         | Invalid or expired token     | Refresh token in IAMMETER console |
+| 401         | Invalid or expired API key   | Regenerate API key in IAMMETER console |
 | 429         | Rate limit exceeded          | Exponential back-off and retry    |
 | 5xx         | Server error                 | Retry with back-off               |
 
