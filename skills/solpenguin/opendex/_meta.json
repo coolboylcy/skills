@@ -1,0 +1,11 @@
+{
+  "owner": "solpenguin",
+  "slug": "opendex",
+  "displayName": "OpenDEX Solana Token API",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772155122340,
+    "commit": null
+  },
+  "history": []
+}
