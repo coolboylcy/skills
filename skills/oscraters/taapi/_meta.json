@@ -1,0 +1,11 @@
+{
+  "owner": "oscraters",
+  "slug": "taapi",
+  "displayName": "TAAPI CLI",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772211431267,
+    "commit": null
+  },
+  "history": []
+}
