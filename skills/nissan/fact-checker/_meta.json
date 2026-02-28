@@ -1,0 +1,11 @@
+{
+  "owner": "nissan",
+  "slug": "fact-checker",
+  "displayName": "Fact Checker",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1772143850047,
+    "commit": null
+  },
+  "history": []
+}
