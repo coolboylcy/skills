@@ -1,0 +1,11 @@
+{
+  "owner": "nissan",
+  "slug": "insight-engine",
+  "displayName": "Insight Engine",
+  "latest": {
+    "version": "1.0.2",
+    "publishedAt": 1772145186021,
+    "commit": null
+  },
+  "history": []
+}
