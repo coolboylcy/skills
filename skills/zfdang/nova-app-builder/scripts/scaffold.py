@@ -3,7 +3,7 @@
 scaffold.py — Create a Nova app project from the bundled template.
 
 Usage:
-    python3 scripts/scaffold.py --name my-app --desc "My secure app" --port 8080 --out ./projects
+    python3 scripts/scaffold.py --name my-app --desc "My secure app" --port 8000 --out ./projects
 
 Output:
     ./projects/my-app/
@@ -12,10 +12,6 @@ Output:
         ├── main.py
         ├── odyn.py
         └── requirements.txt
-
-Note: Do NOT create enclaver.yaml or nova-build.yaml — the Nova Platform
-      generates these automatically in app-hub when you trigger a build.
-      Just push your Dockerfile + app code to Git and use nova_deploy.py.
 """
 
 import argparse
@@ -60,21 +56,13 @@ def scaffold(name: str, desc: str, port: int, out: Path) -> Path:
 
     print(textwrap.dedent(f"""
     Next steps:
-      1. Edit  {dest}/enclave/main.py          ← implement your app logic
-      2. Edit  {dest}/enclave/requirements.txt ← add pip packages
+      1. Edit  {dest}/enclave/main.py   ← implement your app logic here
+      2. Edit  {dest}/enclave/requirements.txt  ← add pip packages
       3. Test locally:
            cd {dest}/enclave
            IN_ENCLAVE=false uvicorn main:app --host 0.0.0.0 --port {port} --reload
-      4. Push to a Git repo (GitHub, etc.)
-      5. Deploy to Nova Platform:
-           python3 scripts/nova_deploy.py \\
-             --repo https://github.com/you/{name} \\
-             --name "{name}" \\
-             --port {port} \\
-             --api-key <your-nova-api-key>
-
-    Note: No Docker build/push needed — Nova Platform builds from Git automatically.
-          Do NOT create enclaver.yaml or nova-build.yaml — the platform generates them.
+      4. When ready:
+           python3 scripts/build_push.py --name {name} --registry <docker.io/username>
     """))
 
     return dest
