@@ -1,0 +1,11 @@
+{
+  "owner": "oscraters",
+  "slug": "nasdaq-public",
+  "displayName": "NASDAQ Public API CLI",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772204618202,
+    "commit": null
+  },
+  "history": []
+}
