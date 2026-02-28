@@ -1,0 +1,11 @@
+{
+  "owner": "fdrummer",
+  "slug": "mailparser",
+  "displayName": "Extracts structured data from emails",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772227581206,
+    "commit": null
+  },
+  "history": []
+}
