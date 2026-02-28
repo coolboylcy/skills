@@ -1,0 +1,11 @@
+{
+  "owner": "hexbabe",
+  "slug": "viam-cli",
+  "displayName": "This skill informs the agent how to use Viam CLI",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1772151935328,
+    "commit": null
+  },
+  "history": []
+}
